@@ -1,0 +1,1043 @@
+import { test } from "@playwright/test";
+import { expect, setupPage } from "./utils.js";
+
+test.describe("`focusgroup` attribute", () => {
+  let group;
+  let item1;
+  let item2;
+
+  test.beforeEach(async ({ page }) => {
+    group = page.getByTestId("group");
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+  });
+
+  test.describe("behavior token", () => {
+    test("should change role inferrence", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <span tabindex="0" data-testid="item1">item 1</span>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "tablist");
+      });
+
+      await expect(group).toHaveComputedRole("tablist");
+      await expect(item1).toHaveComputedRole("tab");
+      await expect(item2).toHaveComputedRole("tab");
+    });
+
+    test("should disable directional navigation if changed to `none`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "none");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should enable directional navigation if changed from `none`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="none" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should disable directional navigation if changed to an invalid behavior token", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "inline listbox");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item1).toBeFocused();
+    });
+  });
+
+  test.describe("logical axis restriction token", () => {
+    test("should disable up and down arrows if `inline` is added", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox inline");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowDown");
+
+      await expect(item1).toBeFocused();
+
+      await item2.focus();
+      await page.keyboard.press("ArrowUp");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should disable left and right arrows if `block` is added", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox block");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item1).toBeFocused();
+
+      await item2.focus();
+      await page.keyboard.press("ArrowLeft");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should change restriction when swapped", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox inline" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox block");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item1).toBeFocused();
+
+      await item2.focus();
+      await page.keyboard.press("ArrowLeft");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("`wrap` token", () => {
+    test("should enable wrap if added", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox wrap");
+      });
+
+      await item2.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should disable wrap if removed", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox wrap" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox");
+      });
+
+      await item2.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("`nomemory` token", () => {
+    test("should disable memory if added", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        <button>after</button>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox nomemory");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should enable memory if removed", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox nomemory" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        <button>after</button>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.setAttribute("focusgroup", "listbox");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+});
+
+test.describe("writing direction CSS changes", () => {
+  let group;
+  let item1;
+  let item2;
+
+  test.beforeEach(async ({ page }) => {
+    group = page.getByTestId("group");
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+  });
+
+  test.describe("`direction`", () => {
+    test("should navigate forward with ArrowLeft if changed to `rtl`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await group.evaluate((node) => {
+        node.dir = "rtl";
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowLeft");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should navigate backward with ArrowLeft if changed to `ltr`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group" dir="rtl">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await group.evaluate((node) => {
+        node.removeAttribute("dir");
+      });
+
+      await item2.focus();
+      await page.keyboard.press("ArrowLeft");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should navigate backward with ArrowDown if changed to `rtl` in a vertical writing mode", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group" style="writing-mode: vertical-rl;">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.dir = "rtl";
+      });
+
+      await item2.focus();
+      await page.keyboard.press("ArrowDown");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should navigate forward with ArrowDown if changed to `ltr` in a vertical writing mode", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group" dir="rtl" style="writing-mode: vertical-rl;">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.removeAttribute("dir");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowDown");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("writing-mode", () => {
+    test("should navigate forward with ArrowLeft if changed to `vertical-rl`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox" data-testid="group" style="writing-mode: vertical-lr;">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+      );
+
+      await group.evaluate((node) => {
+        node.style.setProperty("writing-mode", "vertical-rl");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowLeft");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+});
+
+test.describe("opt-out", () => {
+  let group;
+  let item1;
+  let item2;
+  let item3;
+
+  test.beforeEach(async ({ page }) => {
+    group = page.getByTestId("group");
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+    item3 = page.getByTestId("item3");
+  });
+
+  test("should remove the opt-out item from directional navigation", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+          <button data-testid="item3">item 3</button>
+        </div>
+      `,
+    );
+
+    await item2.evaluate((node) => {
+      node.setAttribute("focusgroup", "none");
+    });
+
+    await item1.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item3).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item2).toBeFocused();
+  });
+
+  test("should remove directional navigation from the opt-out group", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div data-testid="group" focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+    );
+
+    await group.evaluate((node) => {
+      node.setAttribute("focusgroup", "none");
+    });
+
+    await item1.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item1).toBeFocused();
+
+    await page.keyboard.press("Tab");
+
+    await expect(item2).toBeFocused();
+  });
+});
+
+test.describe("`focusgroupstart` item", () => {
+  let item1;
+  let item2;
+  let item3;
+  let before;
+  let after;
+
+  test.beforeEach(async ({ page }) => {
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+    item3 = page.getByTestId("item3");
+    before = page.getByTestId("before");
+    after = page.getByTestId("after");
+  });
+
+  test.describe("added", () => {
+    test.beforeEach(async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        <button data-testid="after">after</button>
+        `,
+      );
+    });
+
+    test("should not affect navigation if the group already has memorized tab stop", async ({
+      page,
+    }) => {
+      await item2.focus();
+      await page.keyboard.press("Tab");
+
+      await item1.evaluate((node) => {
+        node.setAttribute("focusgroupstart", "");
+      });
+
+      await page.keyboard.press("Shift+Tab");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should move the tab stop to the element", async ({ page }) => {
+      await item2.evaluate((node) => {
+        node.setAttribute("focusgroupstart", "");
+      });
+
+      await after.focus();
+      await page.keyboard.press("Shift+Tab");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("removed", () => {
+    test.beforeEach(async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" focusgroupstart>item 2</button>
+        </div>
+        `,
+      );
+    });
+
+    test("should not affect navigation if the group already has memorized tab stop", async ({
+      page,
+    }) => {
+      await before.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+
+      await item2.evaluate((node) => {
+        node.removeAttribute("focusgroupstart");
+      });
+
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should move the tab stop to the first element", async ({ page }) => {
+      await item2.evaluate((node) => {
+        node.removeAttribute("focusgroupstart");
+      });
+
+      await before.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item1).toBeFocused();
+    });
+  });
+
+  test.describe("added with an existing `focusgroupstart` element", () => {
+    test("should move the tab stop to the element if added before the existing one", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" focusgroupstart>item 2</button>
+        </div>
+        `,
+      );
+
+      await item1.evaluate((node) => {
+        node.setAttribute("focusgroupstart", "");
+      });
+
+      await before.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should keep the tab stop unchanged if added after the existing one", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" focusgroupstart>item 2</button>
+          <button data-testid="item3">item 3</button>
+        </div>
+        `,
+      );
+
+      await item3.evaluate((node) => {
+        node.setAttribute("focusgroupstart", "");
+      });
+
+      await before.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("removed with anthor focusgroupstart element", () => {
+    test("should move the tab stop to the other one if removed before it", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" focusgroupstart>item 2</button>
+          <button data-testid="item3" focusgroupstart>item 3</button>
+        </div>
+        `,
+      );
+
+      await item2.evaluate((node) => {
+        node.removeAttribute("focusgroupstart");
+      });
+
+      await before.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item3).toBeFocused();
+    });
+  });
+});
+
+test.describe("item keyboard focusability", () => {
+  let item1;
+  let item2;
+  let item3;
+
+  test.beforeEach(async ({ page }) => {
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+    item3 = page.getByTestId("item3");
+  });
+
+  test.describe("`tabindex`", () => {
+    test("should remove an item from directional navigation if changed to `-1`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+          <button data-testid="item3">item 3</button>
+        </div>
+        `,
+      );
+
+      await item2.evaluate((node) => {
+        node.tabIndex = -1;
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item3).toBeFocused();
+    });
+
+    test("should add an item to directional navigation if changed to `0`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" tabindex="-1">item 2</button>
+        </div>
+        `,
+      );
+
+      await item2.evaluate((node) => {
+        node.removeAttribute("tabindex");
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("`disabled`", () => {
+    test("should remove an item from directional navigation if changed to `true`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+          <button data-testid="item3">item 3</button>
+        </div>
+        `,
+      );
+
+      await item2.evaluate((node) => {
+        node.disabled = true;
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item3).toBeFocused();
+    });
+
+    test("should add an item to directional navigation if changed to `false`", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" disabled>item 2</button>
+        </div>
+        `,
+      );
+
+      await item2.evaluate((node) => {
+        node.disabled = false;
+      });
+
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+});
+
+test.describe("current tab stop element", () => {
+  let item1;
+  let item2;
+  let before;
+
+  test.beforeEach(async ({ page }) => {
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+    before = page.getByTestId("before");
+  });
+
+  test.describe("added", () => {
+    test("should move tab stop to the first item", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+        </div>
+        `,
+      );
+
+      await before.focus();
+      await item1.evaluate((node) => {
+        const button = document.createElement("button");
+        button.dataset.testid = "item2";
+        node.before(button);
+      });
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+    });
+  });
+
+  test.describe("removed", () => {
+    test("should move tab stop to the first item", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await before.focus();
+      await item1.evaluate((node) => {
+        node.remove();
+      });
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should move memorized tab stop to the first item", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await item1.focus();
+      await item1.evaluate((node) => {
+        node.remove();
+      });
+      await before.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+    });
+
+    test("should move memorized tab stop to the first item if parent removed", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <span data-testid="item2-parent">
+            <button data-testid="item2">item 2</button>
+          </span>
+        </div>
+        `,
+      );
+
+      await item2.focus();
+      await page.getByTestId("item2-parent").evaluate((node) => {
+        node.remove();
+      });
+      await before.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item1).toBeFocused();
+    });
+  });
+});
+
+test.describe("segmentor", () => {
+  let item1;
+  let item2;
+  let segmentor;
+  let after;
+
+  test.beforeEach(async ({ page }) => {
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+    segmentor = page.getByTestId("segmentor");
+    after = page.getByTestId("after");
+  });
+
+  test.describe("added", () => {
+    test("should add tab stop to all segments if added an opt-out element", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await item1.evaluate((node) => {
+        const segmentor = document.createElement("button");
+        segmentor.setAttribute("focusgroup", "none");
+        segmentor.dataset.testid = "segmentor";
+
+        node.after(segmentor);
+      });
+
+      await segmentor.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should add tab stop to all segments if added a nested group", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await item1.evaluate((node) => {
+        const nested = document.createElement("span");
+        nested.setAttribute("focusgroup", "listbox");
+        const item = document.createElement("button");
+        item.dataset.testid = "segmentor";
+        nested.append(item);
+
+        node.after(nested);
+      });
+
+      await segmentor.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item2).toBeFocused();
+
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
+
+      await expect(item1).toBeFocused();
+    });
+
+    test("should not add tab stop if added a nest group with no focusable items", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        <button data-testid="after">after</button>
+        `,
+      );
+
+      await item1.evaluate((node) => {
+        const nested = document.createElement("span");
+        nested.setAttribute("focusgroup", "listbox");
+        nested.dataset.testid = "segmentor";
+
+        node.after(nested);
+      });
+
+      await item1.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(after).toBeFocused();
+    });
+  });
+
+  test.describe("removed", () => {
+    test("should keep one tab stop element within the merged segments", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="segmentor" focusgroup="none">opt out</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        <button data-testid="after">after</button>
+        `,
+      );
+
+      await segmentor.evaluate((node) => {
+        node.remove();
+      });
+
+      await item1.focus();
+      await page.keyboard.press("Tab");
+
+      await expect(after).toBeFocused();
+    });
+
+    test("should keep the current memorized element as tab stop", async ({
+      page,
+    }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="segmentor" focusgroup="none">opt out</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+        `,
+      );
+
+      await item1.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Tab");
+
+      await segmentor.evaluate((node) => {
+        node.remove();
+      });
+
+      await page.keyboard.press("ArrowLeft");
+
+      await expect(item1).toBeFocused();
+    });
+  });
+});

@@ -1,0 +1,1071 @@
+import { expect, test } from "@playwright/test";
+import { setupPage } from "../../tests/utils";
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+});
+
+test.describe("nextNode() across shadow boundaries", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <div id="host1">
+            <template shadowrootmode="open">
+              <span id="shadow1-a"></span>
+              <span id="shadow1-b"></span>
+            </template>
+          </div>
+          <div id="light-after"></div>
+        </div>
+      `);
+  });
+
+  test("should walk into a shadow root and return shadow children", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["host1", "shadow1-a", "shadow1-b", "light-after"]);
+  });
+
+  test("should accept a filter function and skip non-matching nodes", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+        (node) =>
+          node.id.startsWith("shadow1")
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_SKIP,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["shadow1-a", "shadow1-b"]);
+  });
+
+  test("should accept a filter object with acceptNode method", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode(node) {
+            return node.id === "light-after"
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_SKIP;
+          },
+        },
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["light-after"]);
+  });
+});
+
+test.describe("nextNode() with nested shadow roots", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <div id="outer-host">
+            <template shadowrootmode="open">
+              <div id="inner-host">
+                <template shadowrootmode="open">
+                  <span id="deep-child"></span>
+                </template>
+              </div>
+              <span id="outer-shadow-sibling"></span>
+            </template>
+          </div>
+        </div>
+      `);
+  });
+
+  test("should walk through nested shadow roots in tree order", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "outer-host",
+      "inner-host",
+      "deep-child",
+      "outer-shadow-sibling",
+    ]);
+  });
+});
+
+test.describe("nextNode() with slotted children", () => {
+  test("should consider slotted elements as children of their assigned slot element’s parent", async ({
+    page,
+  }) => {
+    await page.setContent(`
+      <div id="root">
+        <div id="slotted-last" slot="end"></div>
+        <div id="slotted-before">
+          <div id="slotted-before-child"></div>
+        </div>
+        <template shadowrootmode="open">
+          <div id="shadow-before"></div>
+          <slot></slot>
+          <div id="shadow-after"></div>
+          <slot name="end"></slot>
+        </template>
+        <div id="slotted-after">
+          <div id="slotted-after-child"></div>
+        </div>
+      </div>
+    `);
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "shadow-before",
+      "slotted-before",
+      "slotted-before-child",
+      "slotted-after",
+      "slotted-after-child",
+      "shadow-after",
+      "slotted-last",
+    ]);
+  });
+
+  test("should ignore light DOM children if they aren’t assigned to any slot", async ({
+    page,
+  }) => {
+    await page.setContent(`
+      <div id="root">
+        <div id="slotted-before"></div>
+        <template shadowrootmode="open">
+          <div id="shadow-before"></div>
+          <div id="shadow-after"></div>
+        </template>
+        <div id="slotted-after"></div>
+      </div>
+    `);
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["shadow-before", "shadow-after"]);
+  });
+
+  test("should move to the next slotted or shadow element when started from the middle", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div id="root">
+          <template shadowrootmode="open">
+            <div id="shadow-before"></div>
+            <slot></slot>
+            <div id="shadow-after"></div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-middle");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-middle", "slotted-after", "shadow-after"]);
+  });
+
+  test("should move to the next shadow element when started from the last slotted element", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div id="root">
+          <template shadowrootmode="open">
+            <div id="shadow-before"></div>
+            <slot></slot>
+            <div id="shadow-after"></div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-after");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-after", "shadow-after"]);
+  });
+
+  test("should move to the next slotted or shadow element when started from the middle and root is inside a shadow tree", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div>
+          <template shadowrootmode="open">
+            <div data-testid="root">
+              <div id="shadow-before"></div>
+              <slot></slot>
+              <div id="shadow-after"></div>
+            </div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.getByTestId("root").evaluate(async (root) => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-middle");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-middle", "slotted-after", "shadow-after"]);
+  });
+
+  test("should move to the next shadow element when started from the last slotted element and root is inside a shadow tree", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div>
+          <template shadowrootmode="open">
+            <div data-testid="root">
+              <div id="shadow-before"></div>
+              <slot></slot>
+              <div id="shadow-after"></div>
+            </div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.getByTestId("root").evaluate(async (root) => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-after");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-after", "shadow-after"]);
+  });
+});
+
+test.describe("previousNode() across shadow boundaries", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <div id="host">
+            <template shadowrootmode="open">
+              <span id="shadow-a"></span>
+              <span id="shadow-b"></span>
+            </template>
+          </div>
+          <div id="light-after"></div>
+        </div>
+      `);
+  });
+
+  test("should walk backwards through shadow boundaries", async ({ page }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      // Walk forward to the end first
+      while (walker.nextNode()) {}
+      const result = [];
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["shadow-b", "shadow-a", "host"]);
+  });
+
+  test("should return null when at the beginning", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      return walker.previousNode();
+    });
+
+    expect(result).toBeNull();
+  });
+});
+
+test.describe("previousNode() with nested shadow roots", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <div id="outer-host">
+            <template shadowrootmode="open">
+              <div id="inner-host">
+                <template shadowrootmode="open">
+                  <span id="deep-child"></span>
+                </template>
+              </div>
+              <span id="outer-shadow-sibling"></span>
+            </template>
+          </div>
+        </div>
+      `);
+  });
+
+  test("should walk backwards through nested shadow roots", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      while (walker.nextNode()) {}
+      const result = [];
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["deep-child", "inner-host", "outer-host"]);
+  });
+});
+
+test.describe("previousnNode() with slotted children", () => {
+  test("should consider slotted elements as children of their assigned slot element’s parent", async ({
+    page,
+  }) => {
+    await page.setContent(`
+      <div id="root">
+        <div id="slotted-before">
+          <div id="slotted-before-child"></div>
+        </div>
+        <template shadowrootmode="open">
+          <slot name="start"></slot>
+          <div id="shadow-before"></div>
+          <slot></slot>
+          <div id="shadow-after"></div>
+        </template>
+        <div id="slotted-after">
+          <div id="slotted-after-child"></div>
+        </div>
+        <div id="slotted-first" slot="start"></div>
+      </div>
+    `);
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      while (walker.nextNode()) {}
+      const result = [];
+      result.push(walker.currentNode.id);
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "shadow-after",
+      "slotted-after-child",
+      "slotted-after",
+      "slotted-before-child",
+      "slotted-before",
+      "shadow-before",
+      "slotted-first",
+    ]);
+  });
+
+  test("should ignore light DOM children if they aren’t assigned to any slot", async ({
+    page,
+  }) => {
+    await page.setContent(`
+      <div id="root">
+        <div id="slotted-before"></div>
+        <template shadowrootmode="open">
+          <div id="shadow-before"></div>
+          <div id="shadow-after"></div>
+        </template>
+        <div id="slotted-after"></div>
+      </div>
+    `);
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      while (walker.nextNode()) {}
+      const result = [];
+      result.push(walker.currentNode.id);
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["shadow-after", "shadow-before"]);
+  });
+
+  test("should move to the previous slotted or shadow element when started from the middle", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div id="root">
+          <template shadowrootmode="open">
+            <div id="shadow-before"></div>
+            <slot></slot>
+            <div id="shadow-after"></div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-middle");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-middle", "slotted-before", "shadow-before"]);
+  });
+
+  test("should move to the previous shadow element when started from the first slotted element", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div id="root">
+          <template shadowrootmode="open">
+            <div id="shadow-before"></div>
+            <slot></slot>
+            <div id="shadow-after"></div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-before");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-before", "shadow-before"]);
+  });
+
+  test("should move to the previous slotted or shadow element when started from the middle and root is inside a shadow tree", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div>
+          <template shadowrootmode="open">
+            <div data-testid="root">
+              <div id="shadow-before"></div>
+              <slot></slot>
+              <div id="shadow-after"></div>
+            </div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.getByTestId("root").evaluate(async (root) => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-middle");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-middle", "slotted-before", "shadow-before"]);
+  });
+
+  test("should move to the previous shadow element when started from the first slotted element and root is inside a shadow tree", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div>
+          <template shadowrootmode="open">
+            <div data-testid="root">
+              <div id="shadow-before"></div>
+              <slot></slot>
+              <div id="shadow-after"></div>
+            </div>
+          </template>
+          <div id="slotted-before"></div>
+          <div id="slotted-middle"></div>
+          <div id="slotted-after"></div>
+        </div>
+      `,
+    );
+
+    const ids = await page.getByTestId("root").evaluate(async (root) => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-before");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual(["slotted-before", "shadow-before"]);
+  });
+});
+
+test.describe("previousNode() when root is a shadow host", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <template shadowrootmode="open">
+            <span id="a"></span>
+            <span id="b"></span>
+            <span id="c"></span>
+          </template>
+        </div>
+      `);
+  });
+
+  test("should walk backwards after forward walk to a mid-point", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      while (walker.nextNode() && walker.currentNode.id !== "c") {}
+      const result = [];
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["b", "a"]);
+  });
+
+  test("should walk backwards after forward exhaustion", async ({ page }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      while (walker.nextNode()) {}
+      walker.nextNode();
+      const result = [];
+      result.push(walker.currentNode.id);
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["c", "b", "a"]);
+  });
+
+  test("should walk backwards from a position set via currentNode setter", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      walker.currentNode = root.shadowRoot.getElementById("c");
+      const result = [];
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["b", "a"]);
+  });
+
+  test("should handle alternating forward and backward walks", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      // Walk forward to b, then backward, then forward again to c, then backward
+      const result = [];
+      while (walker.nextNode() && walker.currentNode.id !== "b") {}
+      result.push(walker.currentNode.id);
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["b", "a", "b", "c", "b", "a"]);
+  });
+});
+
+test.describe("currentNode setter across shadow boundaries", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <div id="host">
+            <template shadowrootmode="open">
+              <span id="shadow-first"></span>
+              <span id="shadow-target"></span>
+              <span id="shadow-last"></span>
+            </template>
+          </div>
+        </div>
+      `);
+  });
+
+  test("should allow setting currentNode to a node inside a shadow root", async ({
+    page,
+  }) => {
+    const id = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const target = document
+        .getElementById("host")
+        .shadowRoot.getElementById("shadow-target");
+      walker.currentNode = target;
+      return walker.currentNode.id;
+    });
+
+    expect(id).toBe("shadow-target");
+  });
+
+  test("should continue walking forward from a node set inside shadow DOM", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const target = document
+        .getElementById("host")
+        .shadowRoot.getElementById("shadow-target");
+      walker.currentNode = target;
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["shadow-last"]);
+  });
+
+  test("should continue walking backward from a node set inside shadow DOM", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const target = document
+        .getElementById("host")
+        .shadowRoot.getElementById("shadow-target");
+      walker.currentNode = target;
+      const result = [];
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["shadow-first", "host"]);
+  });
+
+  test("should throw when setting currentNode to a node outside the root", async ({
+    page,
+  }) => {
+    const threw = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      try {
+        walker.currentNode = document.body;
+        return false;
+      } catch {
+        return true;
+      }
+    });
+
+    expect(threw).toBe(true);
+  });
+});
+
+test.describe("multiple shadow hosts at the same level", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="root">
+          <div id="host-a">
+            <template shadowrootmode="open">
+              <span id="shadow-a1"></span>
+            </template>
+          </div>
+          <div id="host-b">
+            <template shadowrootmode="open">
+              <span id="shadow-b1"></span>
+            </template>
+          </div>
+        </div>
+      `);
+  });
+
+  test("should walk through sibling shadow hosts in order", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["host-a", "shadow-a1", "host-b", "shadow-b1"]);
+  });
+
+  test("should walk backwards through sibling shadow hosts", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const root = document.getElementById("root");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      while (walker.nextNode()) {}
+      const result = [];
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual(["host-b", "shadow-a1", "host-a"]);
+  });
+});
+
+test.describe("shadow root as the walker root", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(`
+        <div id="host">
+          <template shadowrootmode="open">
+            <span id="shadow-child-a"></span>
+            <div id="nested-host">
+              <template shadowrootmode="open">
+                <span id="nested-shadow-child"></span>
+              </template>
+            </div>
+          </template>
+        </div>
+      `);
+  });
+
+  test("should walk a shadow root used as the root, including nested shadow children", async ({
+    page,
+  }) => {
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const host = document.getElementById("host");
+      const walker = new ShadowTreeWalker(
+        document,
+        host,
+        NodeFilter.SHOW_ELEMENT,
+      );
+      const result = [];
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "shadow-child-a",
+      "nested-host",
+      "nested-shadow-child",
+    ]);
+  });
+});

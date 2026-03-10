@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
+<title>focusgroup polyfill</title>
+<style>
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: sans-serif;
+  }
+</style>
+
+<h1><code>focusgroup</code> polyfill</h1>
+
+<div tabindex="0">before</div>
+
+<div focusgroup="toolbar inline">
+  <button>foo</button>
+  <button>bar</button>
+  <button>baz</button>
+</div>
+
+<div tabindex="0">after</div>
+
+<script type="module" src="./src/main.js"></script>
+
+</html>

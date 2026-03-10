@@ -1,0 +1,31 @@
+{
+  "name": "polyfills",
+  "version": "1.0.0",
+  "description": "A collection of polyfills for new and upcoming web platform features.",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "biome check",
+    "fix": "biome check --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microsoft/polyfills.git"
+  },
+  "keywords": [
+    "html",
+    "polyfill"
+  ],
+  "author": "Microsoft",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/microsoft/polyfills/issues"
+  },
+  "homepage": "https://github.com/microsoft/polyfills#readme",
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "lefthook": "2.1.1"
+  }
+}
