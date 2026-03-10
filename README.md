@@ -2,6 +2,10 @@
 
 A collection of polyfills for new and upcoming web platform features.
 
+## Third-Party Code
+
+This project does not currently include any third-party code.
+
 ## Support
 
 For information on how to get support, please see [SUPPORT.md](SUPPORT.md).
