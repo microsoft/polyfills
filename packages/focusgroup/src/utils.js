@@ -1,0 +1,233 @@
+/*!
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
+
+import { BehaviorMap, DatasetName } from "./constants.js";
+import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
+
+/**
+ * Whether the current user agent supports focusgroup.
+ *
+ * @returns {boolean}
+ */
+export function supportsFocusGroup() {
+  return "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {});
+}
+
+/**
+ * Generate a page-wide unique ID for a focusgroup.
+ * @returns {string}
+ */
+let focusgroupCount = 0;
+export function generateUniqueId() {
+  return String(focusgroupCount++);
+}
+
+/**
+ * Whether the given element is keyboard focusable (tabbable).
+ *
+ * @param {HTMLElement} element
+ * @returns {boolean}
+ */
+export function isKeyboardFocusable(element) {
+  return (
+    // Is content editable
+    (element.isContentEditable ||
+      // A media element with controls, this check is necessary because
+      // `tabIndex` is `-1` in WebKit in this case
+      element.matches(":is(audio, video)[controls]") ||
+      // Is tabbable
+      element.tabIndex > -1) &&
+    !(
+      // Not disabled
+      (
+        element.disabled ||
+        element.hasAttribute("disabled") ||
+        // Not an anchor or area without href
+        element.matches(":is(a, area):not([href])") ||
+        // Not inert
+        element.inert ||
+        // Not hidden
+        element.hidden ||
+        element.matches("input[type='hidden']") ||
+        // Not a media element without controls
+        element.matches(":is(audio, video):not([controls])") ||
+        // Has not been assigned a tabindex by the polyfill
+        element.hasAttribute(DatasetName.AUTHOR_TABINDEX)
+      )
+    )
+  );
+}
+
+/**
+ * Gets the navigation direction (“forward” or “backward”) based on:
+ *
+ * - The key that the user just pressed
+ * - The owner element’s writing mode and direction
+ * - The current focus group’s directional limit (“inline”, “block”, none)
+ *
+ * @param {KeyboardEvent} event - The keyboard event object.
+ * @param {HTMLElement} owner - The owner element.
+ * @param {("inline" | "block" | undefined)} axis - The directional limitation.
+ * @returns {("forward" | "backward" | "start" | "end" | null)} Returns `null`
+ *     if there shouldn’t be navigation, e.g. when directional limit applies.
+ */
+export function getNavigationDirection(event, owner, axis) {
+  if (isKeyConflictElement(event.composedPath()[0])) {
+    return event.key === "Tab"
+      ? event.shiftKey
+        ? "backward"
+        : "forward"
+      : null;
+  }
+
+  if (event.shiftKey || event.ctrlKey || event.metaKey) {
+    return null;
+  }
+
+  const { writingMode, direction } = window.getComputedStyle(owner);
+  const isVertical = !writingMode.startsWith("horizontal-");
+  const isRtl = direction === "rtl";
+  const horizontal = isVertical ? "block" : "inline";
+  const vertical = isVertical ? "inline" : "block";
+  const isHorizontalReversed = isVertical
+    ? writingMode.endsWith("-rl") !== isRtl
+    : isRtl;
+  const isVerticalReversed = isVertical && isRtl;
+
+  const map = {
+    ArrowUp: {
+      axis: vertical,
+      dir: isVerticalReversed ? "forward" : "backward",
+    },
+    ArrowDown: {
+      axis: vertical,
+      dir: isVerticalReversed ? "backward" : "forward",
+    },
+    ArrowLeft: {
+      axis: horizontal,
+      dir: isHorizontalReversed ? "forward" : "backward",
+    },
+    ArrowRight: {
+      axis: horizontal,
+      dir: isHorizontalReversed ? "backward" : "forward",
+    },
+    Home: { dir: "start" },
+    End: { dir: "end" },
+  };
+
+  const action = map[event.key];
+  if (!action || (axis && action.axis && action.axis !== axis)) {
+    return null;
+  }
+
+  return action.dir;
+}
+
+/**
+ * Whether a given element has keyboard conflicts with navigation keys, in which
+ * case they should be considered as segmentors.
+ *
+ * @param {HTMLElement} element
+ * @returns {boolean}
+ */
+export function isKeyConflictElement(el) {
+  return (
+    el?.nodeType === Node.ELEMENT_NODE &&
+    // Is an editable form element
+    ((["INPUT", "TEXTAREA", "SELECT"].includes(el.nodeName) &&
+      !["checkbox", "radio"].includes(el.getAttribute("type"))) ||
+      // Is content editable
+      el.isContentEditable ||
+      // Scrollable and scroll direction aligns with the direction limit
+      // TODO
+      // Element with preventDefault() on arrow keys
+      (["AUDIO", "VIDEO"].includes(el.nodeName) &&
+        el.hasAttribute("controls")) ||
+      // iframes and object
+      ["IFRAME", "OBJECT"].includes(el.nodeName))
+  );
+}
+
+/**
+ * Whether a nested focusgroup element creates a segment boundary.
+ *
+ * A segmentor is:
+ * - A focusable element with focusgroup="none" (opted-out tab stop), or
+ * - A non-focusable nested focusgroup whose subtree contains focusable
+ *   elements (the subtree is an independent tab stop)
+ *
+ * @param {HTMLElement} node
+ * @returns {boolean}
+ */
+export function isSegmentor(node) {
+  if (isKeyboardFocusable(node)) {
+    return node.getAttribute("focusgroup").includes("none");
+  }
+  const walker = new ShadowTreeWalker(document, node, NodeFilter.SHOW_ELEMENT);
+  while (walker.nextNode()) {
+    if (
+      walker.currentNode !== node &&
+      isKeyboardFocusable(walker.currentNode)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Infer or clear the ARIA role on a focusgroup element.
+ *
+ * Looks up the role from RoleMap for the given behavior and kind.
+ * Sets the role if the element has no author-defined role (or already has an
+ * inferred one). Clears a previously inferred role when the behavior has no
+ * mapped role for that kind.
+ *
+ * @param {HTMLElement} element
+ * @param {string} behavior - The focusgroup behavior token.
+ * @param {"owner" | "child"} kind - Which role to look up from RoleMap.
+ */
+export function inferRole(element, behavior, kind) {
+  const allowRoleInferring =
+    hasGenericRole(element) ||
+    (kind === "child" && element.nodeName === "BUTTON");
+  const role = allowRoleInferring
+    ? BehaviorMap.get(behavior)?.[`${kind}Role`]
+    : undefined;
+
+  if (role) {
+    if (
+      !element.hasAttribute("role") ||
+      element.hasAttribute(DatasetName.INFERRED_ROLE)
+    ) {
+      element.setAttribute("role", role);
+      element.setAttribute(DatasetName.INFERRED_ROLE, "");
+    }
+  } else if (element.hasAttribute(DatasetName.INFERRED_ROLE)) {
+    element.removeAttribute("role");
+    element.removeAttribute(DatasetName.INFERRED_ROLE);
+  }
+}
+
+/**
+ * Whether the given element has a ARIA `generic` role.
+ * NOTE: This function leverages a non-Baseline property, `computedRole`, and
+ * falls back to only check if the given element is a `<div>`, a `<span>`, or a
+ * custom element, which is far from comprehensive, but it should cover most of
+ * the use cases and maintain reasonable performance. For a comprehensive list
+ * of HTML elements with a `generic` role, see:
+ * https://www.w3.org/TR/html-aria/#docconformance
+ *
+ * @param {HTMLElement} element
+ * @returns {boolean}
+ */
+export function hasGenericRole(element) {
+  if ("computedRole" in HTMLElement.prototype) {
+    return element.computedRole === "generic";
+  }
+  return (
+    ["DIV", "SPAN"].includes(element.nodeName) || element.nodeName.includes("-")
+  );
+}

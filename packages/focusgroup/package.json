@@ -1,0 +1,60 @@
+{
+  "name": "@microsoft/focusgroup-polyfill",
+  "version": "0.0.1",
+  "description": "A polyfill for the focusgroup HTML attribute.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --config vite.config.lib.js && vite build --config vite.config.lib.js --mode minified",
+    "build:app": "vite build",
+    "test": "playwright test",
+    "size": "size-limit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MicrosoftEdge/focusgroup-polyfill.git"
+  },
+  "keywords": [
+    "focusgroup",
+    "polyfill",
+    "edge",
+    "html"
+  ],
+  "author": "MicrosoftEdge",
+  "license": "MIT",
+  "type": "module",
+  "module": "./build/focusgroup-polyfill.min.mjs",
+  "exports": {
+    ".": {
+      "import": "./build/focusgroup-polyfill.min.mjs"
+    },
+    "./unminified": {
+      "import": "./build/focusgroup-polyfill.mjs"
+    }
+  },
+  "files": [
+    "build"
+  ],
+  "size-limit": [
+    {
+      "path": "build/focusgroup-polyfill.min.mjs",
+      "limit": "10 kB",
+      "gzip": true
+    },
+    {
+      "path": "build/focusgroup-polyfill.min.mjs",
+      "limit": "10 kB"
+    }
+  ],
+  "bugs": {
+    "url": "https://github.com/MicrosoftEdge/focusgroup-polyfill/issues"
+  },
+  "homepage": "https://github.com/MicrosoftEdge/focusgroup-polyfill#readme",
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@size-limit/preset-small-lib": "12.0.0",
+    "@types/node": "^25.4.0",
+    "size-limit": "12.0.0",
+    "terser": "5.46.0",
+    "vite": "7.3.1"
+  }
+}
