@@ -1127,7 +1127,7 @@ test.describe("multiple shadow hosts at the same level", () => {
   });
 });
 
-test.describe("shadow root as the walker root", () => {
+test.describe("shadow host as the walker root", () => {
   test.beforeEach(async ({ page }) => {
     await page.setContent(`
         <div id="host">
