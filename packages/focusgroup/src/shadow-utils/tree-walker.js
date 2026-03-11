@@ -420,7 +420,7 @@ export class ShadowTreeWalker {
 
     const previousNode = active.walker.previousNode();
 
-    if (previousNode && previousNode !== this.root) {
+    if (previousNode) {
       const gen = this.#handleBackwardNode(previousNode);
       const { value, done } = gen.next();
       if (!done) {
@@ -439,7 +439,7 @@ export class ShadowTreeWalker {
         // it if the user filter accepts it (host visited after all its
         // shadow content in reverse order).
         const hostNode = active.hostNode;
-        if (hostNode && hostNode !== this.root) {
+        if (hostNode) {
           const nodeResult = this.#filterNode(hostNode);
 
           if (nodeResult === NodeFilter.FILTER_ACCEPT) {
@@ -450,6 +450,14 @@ export class ShadowTreeWalker {
 
         return this.#walkBackward();
       } else {
+        // Root walker exhausted — return the root itself if not yet visited.
+        if (this.#currentNode !== this.root) {
+          const nodeResult = this.#filterNode(this.root);
+          if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+            this.#currentNode = this.root;
+            return this.root;
+          }
+        }
         return null;
       }
     }
