@@ -368,7 +368,11 @@ export class ShadowTreeWalker {
 
       if (slottedEl.shadowRoot) {
         this.#currentNode = slottedEl;
-        return this.#enterShadowBackward(slottedEl);
+        // Save remaining slotted siblings so they aren't drained before
+        // this shadow host's content is fully traversed.
+        const savedSlotted = this.#slotted;
+        this.#slotted = [];
+        return this.#enterShadowBackward(slottedEl, savedSlotted);
       }
 
       // In reverse tree order, descendants come before ancestors.
@@ -433,12 +437,18 @@ export class ShadowTreeWalker {
     } else {
       // Walker exhausted (or reached root).
       if (this.#backwardStack.length > 1) {
-        this.#backwardStack.shift();
+        const popped = this.#backwardStack.shift();
+
+        // Restore any slotted siblings that were deferred when we entered
+        // this shadow scope from the slotted queue.
+        if (popped.savedSlotted?.length) {
+          this.#slotted = popped.savedSlotted;
+        }
 
         // The hostNode from the popped entry is the shadow host — return
         // it if the user filter accepts it (host visited after all its
         // shadow content in reverse order).
-        const hostNode = active.hostNode;
+        const hostNode = popped.hostNode;
         if (hostNode) {
           const nodeResult = this.#filterNode(hostNode);
 
@@ -498,14 +508,16 @@ export class ShadowTreeWalker {
    * shadow walker, push it onto `#backwardStack`, and recurse.
    *
    * @param {Element} hostNode - The shadow host to enter.
+   * @param {Element[]} [savedSlotted] - Slotted siblings to restore after
+   *   this shadow scope is exhausted and the host is popped.
    */
-  #enterShadowBackward(hostNode) {
+  #enterShadowBackward(hostNode, savedSlotted) {
     const shadowRoot = hostNode.shadowRoot;
     const walker = this.#doc.createTreeWalker(shadowRoot, this.whatToShow, {
       acceptNode: this.#makeFilter(false),
     });
 
-    this.#backwardStack.unshift({ walker, hostNode });
+    this.#backwardStack.unshift({ walker, hostNode, savedSlotted });
     return this.#walkBackward();
   }
 }

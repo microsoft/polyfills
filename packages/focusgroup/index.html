@@ -388,6 +388,33 @@
 
 <hr>
 
+<h2>With custom elements</h2>
+<my-tablist focusgroup="tablist">
+  <template shadowrootmode="open">
+    <slot></slot>
+  </template>
+  <my-tab tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    tab 1
+  </my-tab>
+  <my-tab tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    tab 2
+  </my-tab>
+  <my-tab tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    tab 3
+  </my-tab>
+</my-tablist>
+
+<hr>
+
 <div><button>after</button></div>
 
 <script type="module">

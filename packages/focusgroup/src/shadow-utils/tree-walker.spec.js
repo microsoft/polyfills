@@ -1168,3 +1168,63 @@ test.describe("shadow host as the walker root", () => {
     ]);
   });
 });
+
+test.describe("shadow host with multiple shadow containing children", () => {
+  test("should walk in DOM order", async ({ page }) => {
+    await page.setContent(`
+      <my-tablist focusgroup="tablist" id="tablist">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        <my-tab tabindex="0" id="tab1">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          tab 1
+        </my-tab>
+        <my-tab tabindex="0" id="tab2">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          tab 2
+        </my-tab>
+        <my-tab tabindex="0" id="tab3">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          tab 3
+        </my-tab>
+      </my-tablist>
+    `);
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const tablist = document.getElementById("tablist");
+      const walker = new ShadowTreeWalker(
+        document,
+        tablist,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      const result = [];
+      result.push(walker.currentNode.id);
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "tablist",
+      "tab1",
+      "tab2",
+      "tab3",
+      "tab2",
+      "tab1",
+      "tablist",
+    ]);
+  });
+});
