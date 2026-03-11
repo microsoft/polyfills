@@ -62,9 +62,9 @@ export function polyfill(root = document.body) {
         : NodeFilter.FILTER_SKIP,
   );
 
-  while (walker.nextNode()) {
+  do {
     new FocusGroup(walker.currentNode);
-  }
+  } while (walker.nextNode());
 }
 
 class FocusGroup {
