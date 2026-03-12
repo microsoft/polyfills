@@ -393,6 +393,49 @@ test.describe("nextNode() with slotted children", () => {
 
     expect(ids).toEqual(["slotted-after", "shadow-after"]);
   });
+
+  test("should walk the slotted chidren in order", async ({ page }) => {
+    await setupPage(
+      page,
+      `
+      <div id="root">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        <div id="slotted-1"></div>
+        <div id="slotted-2"></div>
+        <div id="slotted-3"></div>
+        <div id="slotted-4"></div>
+      </div>
+    `,
+    );
+
+    const ids = await page.locator("#root").evaluate(async (root) => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "root",
+      "slotted-1",
+      "slotted-2",
+      "slotted-3",
+      "slotted-4",
+    ]);
+  });
 });
 
 test.describe("previousNode() across shadow boundaries", () => {
@@ -428,7 +471,7 @@ test.describe("previousNode() across shadow boundaries", () => {
       return result;
     });
 
-    expect(ids).toEqual(["shadow-b", "shadow-a", "host"]);
+    expect(ids).toEqual(["shadow-b", "shadow-a", "host", "root"]);
   });
 
   test("should return null when at the beginning", async ({ page }) => {
@@ -484,7 +527,7 @@ test.describe("previousNode() with nested shadow roots", () => {
       return result;
     });
 
-    expect(ids).toEqual(["deep-child", "inner-host", "outer-host"]);
+    expect(ids).toEqual(["deep-child", "inner-host", "outer-host", "root"]);
   });
 });
 
@@ -535,6 +578,7 @@ test.describe("previousnNode() with slotted children", () => {
       "slotted-before",
       "shadow-before",
       "slotted-first",
+      "root",
     ]);
   });
 
@@ -569,7 +613,7 @@ test.describe("previousnNode() with slotted children", () => {
       return result;
     });
 
-    expect(ids).toEqual(["shadow-after", "shadow-before"]);
+    expect(ids).toEqual(["shadow-after", "shadow-before", "root"]);
   });
 
   test("should move to the previous slotted or shadow element when started from the middle", async ({
@@ -612,7 +656,12 @@ test.describe("previousnNode() with slotted children", () => {
       return result;
     });
 
-    expect(ids).toEqual(["slotted-middle", "slotted-before", "shadow-before"]);
+    expect(ids).toEqual([
+      "slotted-middle",
+      "slotted-before",
+      "shadow-before",
+      "root",
+    ]);
   });
 
   test("should move to the previous shadow element when started from the first slotted element", async ({
@@ -655,7 +704,7 @@ test.describe("previousnNode() with slotted children", () => {
       return result;
     });
 
-    expect(ids).toEqual(["slotted-before", "shadow-before"]);
+    expect(ids).toEqual(["slotted-before", "shadow-before", "root"]);
   });
 
   test("should move to the previous slotted or shadow element when started from the middle and root is inside a shadow tree", async ({
@@ -666,7 +715,7 @@ test.describe("previousnNode() with slotted children", () => {
       `
         <div>
           <template shadowrootmode="open">
-            <div data-testid="root">
+            <div id="root" data-testid="root">
               <div id="shadow-before"></div>
               <slot></slot>
               <div id="shadow-after"></div>
@@ -699,7 +748,12 @@ test.describe("previousnNode() with slotted children", () => {
       return result;
     });
 
-    expect(ids).toEqual(["slotted-middle", "slotted-before", "shadow-before"]);
+    expect(ids).toEqual([
+      "slotted-middle",
+      "slotted-before",
+      "shadow-before",
+      "root",
+    ]);
   });
 
   test("should move to the previous shadow element when started from the first slotted element and root is inside a shadow tree", async ({
@@ -710,7 +764,7 @@ test.describe("previousnNode() with slotted children", () => {
       `
         <div>
           <template shadowrootmode="open">
-            <div data-testid="root">
+            <div id="root" data-testid="root">
               <div id="shadow-before"></div>
               <slot></slot>
               <div id="shadow-after"></div>
@@ -743,7 +797,52 @@ test.describe("previousnNode() with slotted children", () => {
       return result;
     });
 
-    expect(ids).toEqual(["slotted-before", "shadow-before"]);
+    expect(ids).toEqual(["slotted-before", "shadow-before", "root"]);
+  });
+
+  test("should walk the slotted chidren in order", async ({ page }) => {
+    await setupPage(
+      page,
+      `
+      <div id="root">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        <div id="slotted-1"></div>
+        <div id="slotted-2"></div>
+        <div id="slotted-3"></div>
+        <div id="slotted-4"></div>
+      </div>
+    `,
+    );
+
+    const ids = await page.locator("#root").evaluate(async (root) => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const walker = new ShadowTreeWalker(
+        document,
+        root,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      walker.currentNode = document.getElementById("slotted-4");
+
+      const result = [];
+      result.push(walker.currentNode.id);
+
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "slotted-4",
+      "slotted-3",
+      "slotted-2",
+      "slotted-1",
+      "root",
+    ]);
   });
 });
 
@@ -779,7 +878,7 @@ test.describe("previousNode() when root is a shadow host", () => {
       return result;
     });
 
-    expect(ids).toEqual(["b", "a"]);
+    expect(ids).toEqual(["b", "a", "root"]);
   });
 
   test("should walk backwards after forward exhaustion", async ({ page }) => {
@@ -801,7 +900,7 @@ test.describe("previousNode() when root is a shadow host", () => {
       return result;
     });
 
-    expect(ids).toEqual(["c", "b", "a"]);
+    expect(ids).toEqual(["c", "b", "a", "root"]);
   });
 
   test("should walk backwards from a position set via currentNode setter", async ({
@@ -823,7 +922,7 @@ test.describe("previousNode() when root is a shadow host", () => {
       return result;
     });
 
-    expect(ids).toEqual(["b", "a"]);
+    expect(ids).toEqual(["b", "a", "root"]);
   });
 
   test("should handle alternating forward and backward walks", async ({
@@ -853,7 +952,7 @@ test.describe("previousNode() when root is a shadow host", () => {
       return result;
     });
 
-    expect(ids).toEqual(["b", "a", "b", "c", "b", "a"]);
+    expect(ids).toEqual(["b", "a", "root", "a", "b", "c", "b", "a", "root"]);
   });
 });
 
@@ -940,7 +1039,7 @@ test.describe("currentNode setter across shadow boundaries", () => {
       return result;
     });
 
-    expect(ids).toEqual(["shadow-first", "host"]);
+    expect(ids).toEqual(["shadow-first", "host", "root"]);
   });
 
   test("should throw when setting currentNode to a node outside the root", async ({
@@ -1024,11 +1123,11 @@ test.describe("multiple shadow hosts at the same level", () => {
       return result;
     });
 
-    expect(ids).toEqual(["host-b", "shadow-a1", "host-a"]);
+    expect(ids).toEqual(["host-b", "shadow-a1", "host-a", "root"]);
   });
 });
 
-test.describe("shadow root as the walker root", () => {
+test.describe("shadow host as the walker root", () => {
   test.beforeEach(async ({ page }) => {
     await page.setContent(`
         <div id="host">
@@ -1066,6 +1165,66 @@ test.describe("shadow root as the walker root", () => {
       "shadow-child-a",
       "nested-host",
       "nested-shadow-child",
+    ]);
+  });
+});
+
+test.describe("shadow host with multiple shadow containing children", () => {
+  test("should walk in DOM order", async ({ page }) => {
+    await page.setContent(`
+      <my-tablist focusgroup="tablist" id="tablist">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        <my-tab tabindex="0" id="tab1">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          tab 1
+        </my-tab>
+        <my-tab tabindex="0" id="tab2">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          tab 2
+        </my-tab>
+        <my-tab tabindex="0" id="tab3">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          tab 3
+        </my-tab>
+      </my-tablist>
+    `);
+
+    const ids = await page.evaluate(async () => {
+      const { ShadowTreeWalker } = await import("/src/main.js");
+      const tablist = document.getElementById("tablist");
+      const walker = new ShadowTreeWalker(
+        document,
+        tablist,
+        NodeFilter.SHOW_ELEMENT,
+      );
+
+      const result = [];
+      result.push(walker.currentNode.id);
+      while (walker.nextNode()) {
+        result.push(walker.currentNode.id);
+      }
+      while (walker.previousNode()) {
+        result.push(walker.currentNode.id);
+      }
+      return result;
+    });
+
+    expect(ids).toEqual([
+      "tablist",
+      "tab1",
+      "tab2",
+      "tab3",
+      "tab2",
+      "tab1",
+      "tablist",
     ]);
   });
 });

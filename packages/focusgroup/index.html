@@ -9,23 +9,419 @@
     box-sizing: border-box;
   }
 
+  html {
+    color-scheme: light dark;
+  }
+
   body {
     font-family: sans-serif;
+    margin-inline: auto;
+    max-inline-size: 50rem;
+    padding: 2rem;
+  }
+
+  h2 {
+    margin-block-start: 0;
+  }
+
+  hr {
+    margin-block: 2rem;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  :is(div, span)[focusgroup]:not([focusgroup] [focusgroup]) {
+    width: stretch;
+  }
+
+  ::part(nested),
+  :is(div, span):is([focusgroup] [focusgroup]) {
+    display: inline-block;
+    border: 1px solid;
+    padding: 0.5rem;
+  }
+
+  ::part(fb),
+  .fb {
+    background-color: light-dark(#ddd, #444);
+    display: inline-block;
+    padding-block: 0.1rem;
+    padding-inline: 0.5rem;
+  }
+
+  .vlr,
+  .vrl {
+    max-inline-size: 20rem;
+  }
+
+  .vlr {
+    writing-mode: vertical-lr;
+  }
+
+  .vrl {
+    writing-mode: vertical-rl;
+  }
+
+  aside {
+    background-color: light-dark(#eee, #222);
+    border-radius: 0.5rem;
+    padding: 1rem 2rem;
+
+    summary {
+      cursor: pointer;
+    }
+
+    dt {
+      margin-block-start: 1rem;
+    }
+  }
+
+  [focusgroup]:empty::before {
+    content: "empty group";
+    color: hsl(from currentcolor h s l / 0.3);
   }
 </style>
 
 <h1><code>focusgroup</code> polyfill</h1>
 
-<div tabindex="0">before</div>
+<aside>
+  <details>
+    <summary>Legend</summary>
+    <dl>
+      <dt>boxes with border</dt>
+      <dd>A nested group</dd>
+      <dt>1</dt>
+      <dd>first item in a group</dd>
+      <dt>2*</dt>
+      <dd>second item in a group and it’s the <code>focusgroupstart</code> element</dd>
+      <dt>[3]</dt>
+      <dd>third item in a group and it’s in a shadow DOM</dd>
+      <dt>n.2</dt>
+      <dd>second item in a nested group that gets focus after the third item</dd>
+      <dt>n.[2]</dt>
+      <dd>second item in a nested group, and the nested group is in light DOM but has a shadow DOM, and the item
+        is in its shadow DOM</dd>
+      <dt>[n.2]</dt>
+      <dd>second item in a nested group, and the entire nested group is in a shadow DOM</dd>
+      <dt>[n].2</dt>
+      <dd>second item in a nested group, and the nested group is in a shadow DOM, but the item is slotted in from the
+        light DOM</dd>
+    </dl>
+  </details>
+</aside>
 
-<div focusgroup="toolbar inline">
-  <button>foo</button>
-  <button>bar</button>
-  <button>baz</button>
+<hr>
+
+<div><button>before</button></div>
+
+<hr>
+
+<h2>Default</h2>
+<div focusgroup="tablist">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
 </div>
 
-<div tabindex="0">after</div>
+<hr>
 
-<script type="module" src="./src/main.js"></script>
+<h2>Default (with custom elements)</h2>
+<div focusgroup="tablist">
+  <my-button class="fb" tabindex="0">1</my-button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
 
+<hr>
+
+<h2>No memory</h2>
+<div focusgroup="tablist nomemory">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Wrap</h2>
+<div focusgroup="tablist wrap">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Wrap (RTL)</h2>
+<div focusgroup="tablist wrap" dir="rtl">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Wrap (vertical-lr)</h2>
+<div focusgroup="tablist wrap" class="vlr">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Wrap (vertical-rl)</h2>
+<div focusgroup="tablist wrap" class="vrl">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Wrap (vertical-lr, RTL)</h2>
+<div focusgroup="tablist wrap" dir="rtl" class="vlr">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Wrap (vertical-rl, RTL)</h2>
+<div focusgroup="tablist wrap" dir="rtl" class="vrl">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span class="fb" tabindex="0">3</span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[4]</button>
+      <button>[5]</button>
+    </template>
+  </span>
+  <span>
+    <button>6</button>
+  </span>
+</div>
+
+<hr>
+
+<h2>Nested</h2>
+<div focusgroup="tablist wrap">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span focusgroup="toolbar wrap">
+    <span class="fb" tabindex="0">n.1</span>
+    <span class="fb" tabindex="0">n.2</span>
+  </span>
+  <span focusgroup="toolbar">
+    <template shadowrootmode="open">
+      <button>n.[1]</button>
+      <button focusgroupstart>n.[2*]</button>
+    </template>
+  </span>
+  <span>
+    <template shadowrootmode="open">
+      <span focusgroup="toolbar" part="nested">
+        <button>[n.1]</button>
+        <button>[n.2]</button>
+      </span>
+    </template>
+  </span>
+  <button>3</button>
+</div>
+
+<hr>
+
+<h2>Segments</h2>
+<div focusgroup="tablist wrap">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span focusgroup="none">
+    <span class="fb" tabindex="0">optout 1</span>
+    <span class="fb" tabindex="0">optout 2</span>
+  </span>
+  <span>
+    <template shadowrootmode="open">
+      <button>[3]</button>
+      <button>[4]</button>
+    </template>
+  </span>
+  <button>5</button>
+  <button>6</button>
+  <span focusgroup="toolbar">
+    <span class="fb" tabindex="0">n.1</span>
+    <span class="fb" tabindex="0" focusgroupstart>n.2*</span>
+  </span>
+  <button>7</button>
+  <button>8</button>
+  <span focusgroup="toolbar"></span>
+  <button>9</button>
+  <button>10</button>
+  <button focusgroup="none">opt out</button>
+  <button>11</button>
+  <button>12</button>
+</div>
+
+<hr>
+
+<h2>Segments (no memory)</h2>
+<div focusgroup="tablist wrap nomemory">
+  <button>1</button>
+  <button focusgroupstart>2*</button>
+  <span focusgroup="none">
+    <span class="fb" tabindex="0">optout 1</span>
+    <span class="fb" tabindex="0">optout 2</span>
+  </span>
+  <button>3</button>
+  <button>4</button>
+  <span focusgroup="toolbar"></span>
+  <button>5</button>
+  <button>6</button>
+</div>
+
+<hr>
+
+<h2>Key conflict</h2>
+<div focusgroup="toolbar">
+  <button>1</button>
+  <input>
+  <button>2</button>
+</div>
+
+<hr>
+
+<h2>Shadow group with slotted items</h2>
+<div focusgroup="toolbar">
+  <button>1</button>
+  <button>2</button>
+  <span>
+    <template shadowrootmode="open">
+      <span focusgroup="toolbar wrap" part="nested">
+        <button>[n.1]</button>
+        <slot></slot>
+        <button>[n.6]</button>
+      </span>
+    </template>
+    <button>[n].2</button>
+    <button focusgroupstart>[n].3*</button>
+    <button>[n].4</button>
+    <button>[n].5</button>
+  </span>
+  <button>3</button>
+  <button>4</button>
+</div>
+
+<hr>
+
+<h2>With custom elements</h2>
+<my-tablist focusgroup="tablist">
+  <template shadowrootmode="open">
+    <slot></slot>
+  </template>
+  <my-tab tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    tab 1
+  </my-tab>
+  <my-tab tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    tab 2
+  </my-tab>
+  <my-tab tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    tab 3
+  </my-tab>
+</my-tablist>
+
+<hr>
+
+<div><button>after</button></div>
+
+<script type="module">
+  import {polyfill} from "./src/main.js";
+
+  polyfill();
+</script>
+
+<a href="test.html">test</a>
 </html>
