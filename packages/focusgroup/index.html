@@ -136,6 +136,13 @@
 
 <hr>
 
+<h2>Single item</h2>
+<div focusgroup="tablist">
+  <button>1</button>
+</div>
+
+<hr>
+
 <h2>Default (with custom elements)</h2>
 <div focusgroup="tablist">
   <my-button class="fb" tabindex="0">1</my-button>
@@ -388,24 +395,62 @@
 
 <hr>
 
+<h2>focusgroup as slotted nested group</h2>
+<div focusgroup="tablist">
+  <template shadowrootmode="open">
+    <slot></slot>
+  </template>
+  <span tabindex="0" class="fb">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    1
+  </span>
+  <span tabindex="0" class="fb">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    2
+  </span>
+  <span tabindex="0" class="fb">
+    <template shadowrootmode="open">
+      <slot></slot>
+    </template>
+    3
+    <span focusgroup="tablist">
+      <template shadowrootmode="open">
+        <slot></slot>
+      </template>
+      <span tabindex="0" class="fb">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        n.1
+      </span>
+    </span>
+  </span>
+</div>
+
+<hr>
+
 <h2>With custom elements</h2>
 <my-tablist focusgroup="tablist">
   <template shadowrootmode="open">
     <slot></slot>
   </template>
-  <my-tab tabindex="0">
+  <my-tab tabindex="0" class="fb">
     <template shadowrootmode="open">
       <slot></slot>
     </template>
     tab 1
   </my-tab>
-  <my-tab tabindex="0">
+  <my-tab tabindex="0" class="fb">
     <template shadowrootmode="open">
       <slot></slot>
     </template>
     tab 2
   </my-tab>
-  <my-tab tabindex="0">
+  <my-tab tabindex="0" class="fb">
     <template shadowrootmode="open">
       <slot></slot>
     </template>
