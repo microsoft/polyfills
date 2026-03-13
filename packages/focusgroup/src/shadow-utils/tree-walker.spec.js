@@ -1169,62 +1169,288 @@ test.describe("shadow host as the walker root", () => {
   });
 });
 
-test.describe("shadow host with multiple shadow containing children", () => {
-  test("should walk in DOM order", async ({ page }) => {
-    await page.setContent(`
-      <my-tablist focusgroup="tablist" id="tablist">
+test("shadow host with multiple shadow containing children should walk in DOM order", async ({
+  page,
+}) => {
+  await page.setContent(`
+    <my-tablist focusgroup="tablist" id="tablist">
+      <template shadowrootmode="open">
+        <slot></slot>
+      </template>
+      <my-tab tabindex="0" id="tab1">
         <template shadowrootmode="open">
           <slot></slot>
         </template>
-        <my-tab tabindex="0" id="tab1">
-          <template shadowrootmode="open">
-            <slot></slot>
-          </template>
-          tab 1
-        </my-tab>
-        <my-tab tabindex="0" id="tab2">
-          <template shadowrootmode="open">
-            <slot></slot>
-          </template>
-          tab 2
-        </my-tab>
-        <my-tab tabindex="0" id="tab3">
-          <template shadowrootmode="open">
-            <slot></slot>
-          </template>
-          tab 3
-        </my-tab>
-      </my-tablist>
-    `);
+        tab 1
+      </my-tab>
+      <my-tab tabindex="0" id="tab2">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        tab 2
+      </my-tab>
+      <my-tab tabindex="0" id="tab3">
+        <template shadowrootmode="open">
+          <slot></slot>
+        </template>
+        tab 3
+      </my-tab>
+    </my-tablist>
+  `);
 
-    const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
-      const tablist = document.getElementById("tablist");
-      const walker = new ShadowTreeWalker(
-        document,
-        tablist,
-        NodeFilter.SHOW_ELEMENT,
-      );
+  const ids = await page.evaluate(async () => {
+    const { ShadowTreeWalker } = await import("/src/main.js");
+    const tablist = document.getElementById("tablist");
+    const walker = new ShadowTreeWalker(
+      document,
+      tablist,
+      NodeFilter.SHOW_ELEMENT,
+    );
 
-      const result = [];
+    const result = [];
+    result.push(walker.currentNode.id);
+    while (walker.nextNode()) {
       result.push(walker.currentNode.id);
-      while (walker.nextNode()) {
-        result.push(walker.currentNode.id);
-      }
-      while (walker.previousNode()) {
-        result.push(walker.currentNode.id);
-      }
-      return result;
-    });
-
-    expect(ids).toEqual([
-      "tablist",
-      "tab1",
-      "tab2",
-      "tab3",
-      "tab2",
-      "tab1",
-      "tablist",
-    ]);
+    }
+    while (walker.previousNode()) {
+      result.push(walker.currentNode.id);
+    }
+    return result;
   });
+
+  expect(ids).toEqual([
+    "tablist",
+    "tab1",
+    "tab2",
+    "tab3",
+    "tab2",
+    "tab1",
+    "tablist",
+  ]);
+});
+
+test("should walk shadow children of slotted hosts before next slotted sibling", async ({
+  page,
+}) => {
+  await setupPage(
+    page,
+    `
+    <div id="root">
+      <div id="item1">
+        <template shadowrootmode="open">
+          <slot></slot>
+          <div id="item1-subtree">
+            <slot name="item"></slot>
+          </div>
+        </template>
+        item 1
+        <div slot="item" id="item1-subtree-1">
+          <template shadowrootmode="open">
+            <slot></slot>
+            <div id="item1-subtree-1-subtree">
+              <slot name="item"></slot>
+            </div>
+          </template>
+          item 1.1
+          <div slot="item" id="item1-subtree-1-subtree-1">
+            <template shadowrootmode="open">
+              <slot></slot>
+              <div id="item1-subtree-1-subtree-1-subtree">
+                <slot name="item"></slot>
+              </div>
+            </template>
+            item 1.1.1
+          </div>
+          <div slot="item" id="item1-subtree-1-subtree-2">
+            <template shadowrootmode="open">
+              <slot></slot>
+              <div id="item1-subtree-1-subtree-2-subtree">
+                <slot name="item"></slot>
+              </div>
+            </template>
+            item 1.1.2
+          </div>
+        </div>
+        </div>
+        <div slot="item" id="item1-subtree-2">
+          <template shadowrootmode="open">
+            <slot></slot>
+            <div id="item1-subtree-2-subtree">
+              <slot name="item"></slot>
+            </div>
+          </template>
+          item 1.2
+        </div>
+      </div>
+      <div id="item2">
+        <template shadowrootmode="open">
+          <slot></slot>
+          <div id="item2-subtree">
+            <slot name="item"></slot>
+          </div>
+        </template>
+        item 2
+      </div>
+      <div id="item3">
+        <template shadowrootmode="open">
+          <slot></slot>
+          <div id="item3-subtree">
+            <slot name="item"></slot>
+          </div>
+        </template>
+        item 3
+        <div slot="item" id="item3-subtree-1">
+          <template shadowrootmode="open">
+            <slot></slot>
+            <div id="item3-subtree-1-subtree">
+              <slot name="item"></slot>
+            </div>
+          </template>
+          item 3.1
+        </div>
+        <div slot="item" id="item3-subtree-2">
+          <template shadowrootmode="open">
+            <slot></slot>
+            <div id="item3-subtree-2-subtree">
+              <slot name="item"></slot>
+            </div>
+          </template>
+          item 3.2
+        </div>
+      </div>
+    </div>
+  `,
+  );
+
+  const ids = await page.evaluate(async () => {
+    const { ShadowTreeWalker } = await import("/src/main.js");
+    const root = document.getElementById("root");
+    const walker = new ShadowTreeWalker(
+      document,
+      root,
+      NodeFilter.SHOW_ELEMENT,
+    );
+
+    const result = [];
+    result.push(walker.currentNode.id);
+    while (walker.nextNode()) {
+      result.push(walker.currentNode.id);
+    }
+    while (walker.previousNode()) {
+      result.push(walker.currentNode.id);
+    }
+    while (walker.nextNode()) {
+      result.push(walker.currentNode.id);
+    }
+    return result;
+  });
+
+  expect(ids).toEqual([
+    // nextNode()
+    "root",
+    "item1",
+    "item1-subtree",
+    "item1-subtree-1",
+    "item1-subtree-1-subtree",
+    "item1-subtree-1-subtree-1",
+    "item1-subtree-1-subtree-1-subtree",
+    "item1-subtree-1-subtree-2",
+    "item1-subtree-1-subtree-2-subtree",
+    "item1-subtree-2",
+    "item1-subtree-2-subtree",
+    "item2",
+    "item2-subtree",
+    "item3",
+    "item3-subtree",
+    "item3-subtree-1",
+    "item3-subtree-1-subtree",
+    "item3-subtree-2",
+    "item3-subtree-2-subtree",
+    // previousNode()
+    "item3-subtree-2",
+    "item3-subtree-1-subtree",
+    "item3-subtree-1",
+    "item3-subtree",
+    "item3",
+    "item2-subtree",
+    "item2",
+    "item1-subtree-2-subtree",
+    "item1-subtree-2",
+    "item1-subtree-1-subtree-2-subtree",
+    "item1-subtree-1-subtree-2",
+    "item1-subtree-1-subtree-1-subtree",
+    "item1-subtree-1-subtree-1",
+    "item1-subtree-1-subtree",
+    "item1-subtree-1",
+    "item1-subtree",
+    "item1",
+    "root",
+    // nextNode()
+    "item1",
+    "item1-subtree",
+    "item1-subtree-1",
+    "item1-subtree-1-subtree",
+    "item1-subtree-1-subtree-1",
+    "item1-subtree-1-subtree-1-subtree",
+    "item1-subtree-1-subtree-2",
+    "item1-subtree-1-subtree-2-subtree",
+    "item1-subtree-2",
+    "item1-subtree-2-subtree",
+    "item2",
+    "item2-subtree",
+    "item3",
+    "item3-subtree",
+    "item3-subtree-1",
+    "item3-subtree-1-subtree",
+    "item3-subtree-2",
+    "item3-subtree-2-subtree",
+  ]);
+});
+
+test("should enter shadow children after repositioning currentNode to a shadow host", async ({
+  page,
+}) => {
+  await setupPage(
+    page,
+    `
+    <div id="root">
+      <div id="host-a">
+        <template shadowrootmode="open">
+          <span id="shadow-a1"></span>
+          <span id="shadow-a2"></span>
+        </template>
+      </div>
+      <div id="host-b">
+        <template shadowrootmode="open">
+          <span id="shadow-b1"></span>
+        </template>
+      </div>
+    </div>
+  `,
+  );
+
+  const ids = await page.evaluate(async () => {
+    const { ShadowTreeWalker } = await import("/src/main.js");
+    const root = document.getElementById("root");
+    const walker = new ShadowTreeWalker(
+      document,
+      root,
+      NodeFilter.SHOW_ELEMENT,
+    );
+
+    // Walk forward to the end.
+    while (walker.nextNode()) {}
+
+    // Simulate a wrap-around: reposition to the first shadow host.
+    walker.currentNode = document.getElementById("host-a");
+
+    // Walk forward again — should enter host-a's shadow children.
+    const result = [];
+    while (walker.nextNode()) {
+      result.push(walker.currentNode.id);
+    }
+    return result;
+  });
+
+  expect(ids).toEqual(["shadow-a1", "shadow-a2", "host-b", "shadow-b1"]);
 });
