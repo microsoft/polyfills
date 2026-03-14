@@ -1271,7 +1271,6 @@ test("should walk shadow children of slotted hosts before next slotted sibling",
             item 1.1.2
           </div>
         </div>
-        </div>
         <div slot="item" id="item1-subtree-2">
           <template shadowrootmode="open">
             <slot></slot>
