@@ -232,9 +232,9 @@ export class ShadowTreeWalker {
     };
 
     // If currentNode is a slotted element, resolve to its assigned <slot>.
-    // These siblings go directly into #slotted — they are the immediate
-    // neighbors in traversal order and should be drained first.
-    this.#slotted = resolveSlot(this.#currentNode);
+    // The siblings are the immediate neighbors in traversal order.
+    const initialSlotted = resolveSlot(this.#currentNode);
+    this.#slotted = initialSlotted;
 
     // Walk up through shadow roots, creating a walker for each scope.
     while (currentNode && currentNode !== this.root) {
@@ -300,7 +300,17 @@ export class ShadowTreeWalker {
           { acceptNode: makeFilter() },
         );
 
-        stack.unshift({ walker: shadowWalker, hostNode: this.#currentNode });
+        // If the currentNode is both a shadow host and slotted, the
+        // slotted siblings collected in `initialSlotted` must be deferred
+        // until after the shadow children are fully traversed.  Attach
+        // them as `savedSlotted` on this entry so they are restored to
+        // `#slotted` when the shadow walker is popped.
+        const entry = { walker: shadowWalker, hostNode: this.#currentNode };
+        if (initialSlotted.length) {
+          entry.savedSlotted = initialSlotted;
+          this.#slotted = [];
+        }
+        stack.unshift(entry);
       }
     }
 

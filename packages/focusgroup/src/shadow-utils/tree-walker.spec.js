@@ -1341,6 +1341,16 @@ test("should walk shadow children of slotted hosts before next slotted sibling",
     while (walker.nextNode()) {
       result.push(walker.currentNode.id);
     }
+
+    while (walker.previousNode()) {
+      if (walker.currentNode.id === "item1-subtree-1") {
+        result.push(walker.currentNode.id);
+        break;
+      }
+    }
+    walker.nextNode();
+    result.push(walker.currentNode.id);
+
     return result;
   });
 
@@ -1403,6 +1413,9 @@ test("should walk shadow children of slotted hosts before next slotted sibling",
     "item3-subtree-1-subtree",
     "item3-subtree-2",
     "item3-subtree-2-subtree",
+    // Back and forth
+    "item1-subtree-1",
+    "item1-subtree-1-subtree",
   ]);
 });
 
