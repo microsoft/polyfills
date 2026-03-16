@@ -515,6 +515,142 @@ test.describe("guaranteed tab stop priority", () => {
 
     await expect(item).toBeFocused();
   });
+
+  test("an item nested in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    } else {
+      test.fixme();
+    }
+
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <div tabindex="0" data-testid="item">item</div>
+          </template>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+  });
+
+  test("an item deeper nested in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    } else {
+      test.fixme();
+    }
+
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <div tabindex="0">
+              <template shadowrootmode="open">
+                <div tabindex="0" data-testid="item">item</div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+  });
+
+  test("an item slotted in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    } else {
+      test.fixme();
+    }
+
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          <div tabindex="0" data-testid="item">item</div>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+  });
+
+  test("an item deeper slotted in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    } else {
+      test.fixme();
+    }
+
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <div tabindex="0">
+              <slot></slot>
+            </div>
+          </template>
+          <div tabindex="0" data-testid="item">item</div>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+  });
 });
 
 // sequential-navigation/empty-and-non-focusable.html
