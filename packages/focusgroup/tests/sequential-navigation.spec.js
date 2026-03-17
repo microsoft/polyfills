@@ -381,6 +381,33 @@ test.describe("focusgroup segments", () => {
     await page.keyboard.press("ArrowDown");
     await expect(page.getByTestId("help")).toBeFocused();
   });
+
+  test("nested group should not segment if it’s invisible", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+      <div focusgroup="toolbar">
+        <div tabindex="0" data-testid="item1">item 1</div>
+        <div tabindex="0" data-testid="item2">
+          item 2
+          <div focusgroup="toolbar" hidden>
+            <div tabindex="0" data-testid="item2-1">item 2.1</div>
+            <div tabindex="0" data-testid="item2-2">item 2.2</div>
+          </div>
+        </div>
+        <div tabindex="0" data-testid="item3">item 3</div>
+      </div>
+      <button data-testid="after">after</button>
+      `,
+    );
+
+    await page.getByTestId("item1").focus();
+    await page.keyboard.press("Tab");
+
+    await expect(page.getByTestId("after")).toBeFocused();
+  });
 });
 
 // sequential-navigation/memory-behavior.html
