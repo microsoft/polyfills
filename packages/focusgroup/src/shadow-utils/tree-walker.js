@@ -202,11 +202,9 @@ export class ShadowTreeWalker {
     let currentNode = this.#currentNode;
     let walkerCurrentNode = this.#currentNode;
 
-    /**
-     * If `node` is slotted, resolve to its assigned <slot> and return the
-     * remaining assigned siblings for the current direction.  Also updates
-     * `currentNode` and `walkerCurrentNode` to the slot element.
-     */
+    // If `node` is slotted, resolve to its assigned <slot> and return the
+    // remaining assigned siblings for the current direction.  Also updates
+    // `currentNode` and `walkerCurrentNode` to the slot element.
     const resolveSlot = (node) => {
       const slot = node.assignedSlot;
       if (!slot || !nodeContains(this.root, slot)) {
