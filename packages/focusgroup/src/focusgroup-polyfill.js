@@ -124,6 +124,14 @@ class FocusGroup {
   #memorized = null;
 
   /**
+   * Shadow host ancestors that have been given `tabindex=0` purely to keep
+   * the real tab stop reachable via Tab. Cleared and rebuilt whenever the tab
+   * stop changes.
+   * @type {Set<HTMLElement>}
+   */
+  #proxyHosts = new Set();
+
+  /**
    * @param {HTMLElement!} owner - The focus group owner element.
    */
   constructor(owner) {
@@ -306,12 +314,16 @@ class FocusGroup {
     if (startItem) {
       startItem.tabIndex = 0;
       this.#start = startItem;
+      this.#clearProxyTabbability();
+      this.#ensureAncestorTabbability(startItem);
     }
 
     flushAllObservers();
   }
 
   #undecorateItems() {
+    this.#clearProxyTabbability();
+
     const first = this.#getFirstItem();
 
     if (!first) {
@@ -421,6 +433,28 @@ class FocusGroup {
       return;
     }
 
+    const isExternalEntry =
+      !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
+
+    // Redirect Tab-from-outside that landed on a proxy host to the actual tab
+    // stop. A proxy host has tabindex=0 only so the browser can reach into its
+    // shadow root; the real tab stop lives deeper inside.
+    if (this.#proxyHosts.has(target) && isExternalEntry) {
+      const tabStop = this.#memorized || this.#start;
+      if (tabStop && tabStop !== target) {
+        tabStop.focus();
+        return;
+      }
+    }
+
+    // Once focus is inside the group (whether via redirect landing here or
+    // direct click/arrow), drop all proxy hosts back to tabindex=-1 so they
+    // don't create extra Tab stops when the user Shift+Tabs out.
+    if (this.#proxyHosts.size > 0) {
+      this.#clearProxyTabbability();
+      flushAllObservers();
+    }
+
     if (this.#memory) {
       this.#memorized = target;
     }
@@ -437,6 +471,21 @@ class FocusGroup {
 
   /** @param {FocusEvent!} evt */
   #handleFocusout(evt) {
+    const focusLeavingGroup =
+      !evt.relatedTarget || !this.#owner.contains(evt.relatedTarget);
+
+    // When focus leaves the group, re-enable proxy hosts so Tab can re-enter
+    // through shadow boundaries to reach the tab stop.
+    if (focusLeavingGroup) {
+      const tabStop = this.#memory
+        ? this.#memorized || this.#start
+        : this.#start;
+      if (tabStop) {
+        this.#ensureAncestorTabbability(tabStop);
+        flushAllObservers();
+      }
+    }
+
     if (
       (evt.relatedTarget && this.#owner.contains(evt.relatedTarget)) ||
       this.#memory ||
@@ -454,6 +503,8 @@ class FocusGroup {
         ? 0
         : -1;
     }
+
+    // Proxy hosts for the reset tab stop are already set above.
 
     flushAllObservers();
   }
@@ -474,6 +525,62 @@ class FocusGroup {
     return node.hasAttribute("focusgroup") && node !== this.#owner;
   }
 
+  /**
+   * Walk from `tabStop` up through shadow boundaries and slot assignments to
+   * `this.#owner`. For each shadow host ancestor that is a decorated item of
+   * this group, set `tabindex=0` so the browser can Tab into the shadow root
+   * that contains the real tab stop.
+   * @param {HTMLElement} tabStop
+   */
+  #ensureAncestorTabbability(tabStop) {
+    let node = tabStop;
+    while (node && node !== this.#owner) {
+      const slot = node.assignedSlot;
+      if (slot) {
+        const slotRoot = slot.getRootNode();
+        if (slotRoot instanceof ShadowRoot) {
+          const host = slotRoot.host;
+          if (
+            host !== this.#owner &&
+            host.getAttribute(DatasetName.ITEM) === this.#id &&
+            host !== tabStop
+          ) {
+            host.tabIndex = 0;
+            this.#proxyHosts.add(host);
+          }
+          node = host;
+          continue;
+        }
+      }
+      const rootNode = node.getRootNode();
+      if (rootNode instanceof ShadowRoot) {
+        const host = rootNode.host;
+        if (
+          host !== this.#owner &&
+          host.getAttribute(DatasetName.ITEM) === this.#id &&
+          host !== tabStop
+        ) {
+          host.tabIndex = 0;
+          this.#proxyHosts.add(host);
+        }
+        node = host;
+      } else {
+        node = node.parentNode;
+      }
+    }
+  }
+
+  /**
+   * Reset all proxy hosts back to `tabindex=-1` (or `0` if they are segment
+   * starts) and clear the tracking set.
+   */
+  #clearProxyTabbability() {
+    for (const host of this.#proxyHosts) {
+      host.tabIndex = host.hasAttribute(DatasetName.SEGMENT_START) ? 0 : -1;
+    }
+    this.#proxyHosts.clear();
+  }
+
   #setItemFocused(current, target, shouldCallFocus = false) {
     target.tabIndex = 0;
     if (shouldCallFocus) {
@@ -484,6 +591,11 @@ class FocusGroup {
       target.getAttribute(DatasetName.SEGMENT)
         ? -1
         : 0;
+
+    // Focus is moving within the group, so proxy hosts should stay cleared
+    // (they were cleared in #handleFocusin). Just clear+flush in case any
+    // lingered.
+    this.#clearProxyTabbability();
 
     flushAllObservers();
   }

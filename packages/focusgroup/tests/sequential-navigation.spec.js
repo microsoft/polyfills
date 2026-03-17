@@ -555,8 +555,6 @@ test.describe("guaranteed tab stop priority", () => {
   }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
-    } else {
-      test.fixme();
     }
 
     await setupPage(
@@ -592,8 +590,6 @@ test.describe("guaranteed tab stop priority", () => {
   }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
-    } else {
-      test.fixme();
     }
 
     await setupPage(
@@ -633,8 +629,6 @@ test.describe("guaranteed tab stop priority", () => {
   }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
-    } else {
-      test.fixme();
     }
 
     await setupPage(
@@ -671,8 +665,6 @@ test.describe("guaranteed tab stop priority", () => {
   }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
-    } else {
-      test.fixme();
     }
 
     await setupPage(
