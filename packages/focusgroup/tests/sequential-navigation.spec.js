@@ -562,6 +562,7 @@ test.describe("guaranteed tab stop priority", () => {
     await setupPage(
       page,
       `
+      <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
           <template shadowrootmode="open">
@@ -579,6 +580,10 @@ test.describe("guaranteed tab stop priority", () => {
     await page.keyboard.press("Shift+Tab");
 
     await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 
   test("an item deeper nested in another item’s shadow root can be a tab stop", async ({
@@ -594,6 +599,7 @@ test.describe("guaranteed tab stop priority", () => {
     await setupPage(
       page,
       `
+      <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
           <template shadowrootmode="open">
@@ -615,6 +621,10 @@ test.describe("guaranteed tab stop priority", () => {
     await page.keyboard.press("Shift+Tab");
 
     await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 
   test("an item slotted in another item’s shadow root can be a tab stop", async ({
@@ -630,6 +640,7 @@ test.describe("guaranteed tab stop priority", () => {
     await setupPage(
       page,
       `
+      <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
           <template shadowrootmode="open">
@@ -648,6 +659,10 @@ test.describe("guaranteed tab stop priority", () => {
     await page.keyboard.press("Shift+Tab");
 
     await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 
   test("an item deeper slotted in another item’s shadow root can be a tab stop", async ({
@@ -663,6 +678,7 @@ test.describe("guaranteed tab stop priority", () => {
     await setupPage(
       page,
       `
+      <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
           <template shadowrootmode="open">
@@ -683,6 +699,10 @@ test.describe("guaranteed tab stop priority", () => {
     await page.keyboard.press("Shift+Tab");
 
     await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 });
 
