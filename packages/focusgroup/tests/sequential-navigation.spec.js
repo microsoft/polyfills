@@ -479,6 +479,42 @@ test.describe("guaranteed tab stop priority", () => {
     await page.keyboard.press("Tab");
     await expect(page.getByTestId("item2")).toBeFocused();
   });
+
+  test("a single item in a group should not lose focusability", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+      <button data-testid="before">before</button>
+      <div focusgroup="tablist">
+        <button data-testid="item">Item</button>
+      </div>
+      <button data-testid="after">after</button>
+    `,
+    );
+
+    const before = page.getByTestId("before");
+    const after = page.getByTestId("after");
+    const item = page.getByTestId("item");
+
+    await before.focus();
+    await page.keyboard.press("Tab");
+
+    await expect(item).toBeFocused();
+
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item).toBeFocused();
+
+    await page.keyboard.press("Tab");
+
+    await expect(after).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+  });
 });
 
 // sequential-navigation/empty-and-non-focusable.html

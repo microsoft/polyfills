@@ -407,7 +407,7 @@ class FocusGroup {
         break;
     }
 
-    if (target) {
+    if (target && target !== current) {
       this.#setItemFocused(current, target, true);
       evt.preventDefault();
     }
