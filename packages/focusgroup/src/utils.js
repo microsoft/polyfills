@@ -158,23 +158,62 @@ export function isKeyConflictElement(el) {
  * - A non-focusable nested focusgroup whose subtree contains focusable
  *   elements (the subtree is an independent tab stop)
  *
- * @param {HTMLElement} node
+ * @param {HTMLElement} element
  * @returns {boolean}
  */
-export function isSegmentor(node) {
-  if (isKeyboardFocusable(node)) {
-    return node.getAttribute("focusgroup").includes("none");
+export function isSegmentor(element) {
+  if (!checkVisibility(element)) {
+    return false;
   }
-  const walker = new ShadowTreeWalker(document, node, NodeFilter.SHOW_ELEMENT);
+  if (isKeyboardFocusable(element)) {
+    return element.getAttribute("focusgroup").includes("none");
+  }
+  const walker = new ShadowTreeWalker(
+    document,
+    element,
+    NodeFilter.SHOW_ELEMENT,
+  );
   while (walker.nextNode()) {
     if (
-      walker.currentNode !== node &&
+      walker.currentNode !== element &&
       isKeyboardFocusable(walker.currentNode)
     ) {
       return true;
     }
   }
   return false;
+}
+
+/**
+ * A light-weight, non-comprehensive ponyfill for `Element.checkVisibility()`.
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
+ * @param {HTMLElement} element
+ * @returns {boolean}
+ */
+function checkVisibility(element) {
+  if (typeof element.checkVisibility === "function") {
+    return element.checkVisibility({
+      checkOpacity: true,
+      checkVisibility: true,
+      contentVisibilityAuto: true,
+    });
+  }
+
+  if (el.getClientRects().length === 0) {
+    return false;
+  }
+
+  const { visibility, opacity, contentVisibility } =
+    window.getComputedStyle(el);
+  if (
+    ["hidden", "collapse"].includes(visibility) ||
+    opacity === "0" ||
+    contentVisibility === "hidden"
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**

@@ -381,6 +381,33 @@ test.describe("focusgroup segments", () => {
     await page.keyboard.press("ArrowDown");
     await expect(page.getByTestId("help")).toBeFocused();
   });
+
+  test("nested group should not segment if it’s invisible", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+      <div focusgroup="toolbar">
+        <div tabindex="0" data-testid="item1">item 1</div>
+        <div tabindex="0" data-testid="item2">
+          item 2
+          <div focusgroup="toolbar" hidden>
+            <div tabindex="0" data-testid="item2-1">item 2.1</div>
+            <div tabindex="0" data-testid="item2-2">item 2.2</div>
+          </div>
+        </div>
+        <div tabindex="0" data-testid="item3">item 3</div>
+      </div>
+      <button data-testid="after">after</button>
+      `,
+    );
+
+    await page.getByTestId("item1").focus();
+    await page.keyboard.press("Tab");
+
+    await expect(page.getByTestId("after")).toBeFocused();
+  });
 });
 
 // sequential-navigation/memory-behavior.html
@@ -480,6 +507,39 @@ test.describe("guaranteed tab stop priority", () => {
     await expect(page.getByTestId("item2")).toBeFocused();
   });
 
+  test("focusgroupstart element in nested shadow tree is the guaranteed tab stop entry point", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    }
+
+    await setupPage(
+      page,
+      `<div data-testid="before" tabindex="0">Before</div>
+        <div data-testid="focusgroup" focusgroup="toolbar nomemory">
+          <button data-testid="item1">Item 1</button>
+          <div tabindex="0">
+            <template shadowrootmode="open">
+              <slot></slot>
+              <div>
+                <slot name="item"></slot>
+              </div>
+            </template>
+            Item 2
+            <button data-testid="item22" slot="item" focusgroupstart>Item 2.2</button>
+          </div>
+          <button data-testid="item3">Item 3</button>
+        </div>
+        <div data-testid="after" tabindex="0">After</div>`,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("item22")).toBeFocused();
+  });
+
   test("a single item in a group should not lose focusability", async ({
     page,
   }) => {
@@ -514,6 +574,154 @@ test.describe("guaranteed tab stop priority", () => {
     await page.keyboard.press("Shift+Tab");
 
     await expect(item).toBeFocused();
+  });
+
+  test("an item nested in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    }
+
+    await setupPage(
+      page,
+      `
+      <button data-testid="before">before</button>
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <div tabindex="0" data-testid="item">item</div>
+          </template>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
+  });
+
+  test("an item deeper nested in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    }
+
+    await setupPage(
+      page,
+      `
+      <button data-testid="before">before</button>
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <div tabindex="0">
+              <template shadowrootmode="open">
+                <div tabindex="0" data-testid="item">item</div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
+  });
+
+  test("an item slotted in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    }
+
+    await setupPage(
+      page,
+      `
+      <button data-testid="before">before</button>
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <slot></slot>
+          </template>
+          <div tabindex="0" data-testid="item">item</div>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
+  });
+
+  test("an item deeper slotted in another item’s shadow root can be a tab stop", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    }
+
+    await setupPage(
+      page,
+      `
+      <button data-testid="before">before</button>
+      <div focusgroup="tablist">
+        <div tabindex="0">
+          <template shadowrootmode="open">
+            <div tabindex="0">
+              <slot></slot>
+            </div>
+          </template>
+          <div tabindex="0" data-testid="item">item</div>
+        </div>
+      </div>
+      <button>after</button>
+    `,
+    );
+
+    const item = page.getByTestId("item");
+    await item.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(item).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 });
 

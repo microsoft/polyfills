@@ -460,6 +460,93 @@
 
 <hr>
 
+<h2>tree</h2>
+<div focusgroup="menu">
+  <div tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+      <div>
+        <slot name="item"></slot>
+      </div>
+    </template>
+    Item 1
+    <div tabindex="0" slot="item">
+      <template shadowrootmode="open">
+        <slot></slot>
+        <div>
+          <slot name="item"></slot>
+        </div>
+      </template>
+      Item 1.1
+      <div tabindex="0" slot="item">
+        <template shadowrootmode="open">
+          <slot></slot>
+          <div>
+            <slot name="item"></slot>
+          </div>
+        </template>
+        Item 1.1.1
+      </div>
+      <div tabindex="0" slot="item">
+        <template shadowrootmode="open">
+          <slot></slot>
+          <div>
+            <slot name="item"></slot>
+          </div>
+        </template>
+        Item 1.1.2
+      </div>
+    </div>
+    <div tabindex="0" slot="item">
+      <template shadowrootmode="open">
+        <slot></slot>
+        <div>
+          <slot name="item"></slot>
+        </div>
+      </template>
+      Item 1.2
+    </div>
+  </div>
+  <div tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+      <div>
+        <slot name="item"></slot>
+      </div>
+    </template>
+    Item 2
+  </div>
+  <div tabindex="0">
+    <template shadowrootmode="open">
+      <slot></slot>
+      <div>
+        <slot name="item"></slot>
+      </div>
+    </template>
+    Item 3
+    <div tabindex="0" slot="item">
+      <template shadowrootmode="open">
+        <slot></slot>
+        <div>
+          <slot name="item"></slot>
+        </div>
+      </template>
+      Item 3.1
+    </div>
+    <div tabindex="0" slot="item">
+      <template shadowrootmode="open">
+        <slot></slot>
+        <div>
+          <slot name="item"></slot>
+        </div>
+      </template>
+      Item 3.2
+    </div>
+  </div>
+</div>
+
+<hr>
+
 <div><button>after</button></div>
 
 <script type="module">
