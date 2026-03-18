@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("shadowClosest()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div class="a" data-testid="light-container">
         <div class="b-l" data-testid="light-unique-container">
@@ -119,7 +119,7 @@ test.describe("shadowClosest()", () => {
 
 test.describe("nodeContains()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div id="parent">
         <div id="child">
@@ -251,7 +251,7 @@ test.describe("nodeContains()", () => {
 
 test.describe("getLastElementChild()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div data-testid="light-parent">
         <span id="light-first"></span>
@@ -332,7 +332,7 @@ test.describe("getLastElementChild()", () => {
 
 test.describe("getLastElementDescendant()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div id="light-parent">
         <div id="light-mid">

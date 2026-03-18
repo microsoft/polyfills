@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { setupPage } from "../../tests/utils";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/test.html");
 });
 
 test.describe("nextNode() across shadow boundaries", () => {

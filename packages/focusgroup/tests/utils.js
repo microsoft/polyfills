@@ -9,7 +9,7 @@ export async function setupPage(page, html) {
   await page.goto("/test.html");
   await page.setContent(html);
   await page.evaluate(async () => {
-    const { polyfill } = await import("/src/focusgroup-polyfill.js");
+    const { polyfill } = await import("/src/polyfill.js");
     polyfill();
   });
 }

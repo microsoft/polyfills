@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("isKeyboardFocusable()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
   });
 
   test("returns true if element has contenteditable=true", async ({ page }) => {
