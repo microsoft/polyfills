@@ -8,7 +8,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns true if element has contenteditable=true", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const div = Object.assign(document.createElement("div"), {
           contentEditable: "true",
         });
@@ -26,7 +26,7 @@ test.describe("isKeyboardFocusable()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const div = Object.assign(document.createElement("div"), {
           contentEditable: "plaintext-only",
         });
@@ -44,7 +44,7 @@ test.describe("isKeyboardFocusable()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         return isKeyboardFocusable(
           Object.assign(document.createElement("div"), {
             contentEditable: "false",
@@ -59,7 +59,7 @@ test.describe("isKeyboardFocusable()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         return isKeyboardFocusable(
           Object.assign(document.createElement("div"), {
             contentEditable: "false",
@@ -75,7 +75,7 @@ test.describe("isKeyboardFocusable()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         return isKeyboardFocusable(document.createElement("button"));
       }),
     ).toBe(true);
@@ -84,7 +84,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns true for element with tabindex=0", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         return isKeyboardFocusable(
           Object.assign(document.createElement("div"), { tabIndex: 0 }),
         );
@@ -95,7 +95,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false for element with tabindex=-1", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         return isKeyboardFocusable(
           Object.assign(document.createElement("div"), { tabIndex: -1 }),
         );
@@ -106,7 +106,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false if element is disabled", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.disabled = true;
         return isKeyboardFocusable(el);
@@ -117,7 +117,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false if element has disabled attribute", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.tabIndex = 0;
         el.setAttribute("disabled", "");
@@ -129,7 +129,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false for anchor without href", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("a");
         return isKeyboardFocusable(el);
       }),
@@ -137,7 +137,7 @@ test.describe("isKeyboardFocusable()", () => {
 
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("a");
         el.tabIndex = 0;
         return isKeyboardFocusable(el);
@@ -148,7 +148,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns true for anchor with href", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("a");
         el.href = "#";
         return isKeyboardFocusable(el);
@@ -159,7 +159,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false if element is inert", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.inert = true;
         return isKeyboardFocusable(el);
@@ -170,7 +170,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false if element is hidden", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.hidden = true;
         return isKeyboardFocusable(el);
@@ -181,7 +181,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false for input type=hidden", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("input");
         el.type = "hidden";
         return isKeyboardFocusable(el);
@@ -192,7 +192,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns false for audio without controls", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("audio");
         el.tabIndex = 0;
         return isKeyboardFocusable(el);
@@ -203,7 +203,7 @@ test.describe("isKeyboardFocusable()", () => {
   test("returns true for audio with controls", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { isKeyboardFocusable } = await import("/src/main.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("audio");
         el.controls = true;
         return isKeyboardFocusable(el);
@@ -216,9 +216,8 @@ test.describe("isKeyboardFocusable()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { DatasetName, isKeyboardFocusable } = await import(
-          "/src/main.js"
-        );
+        const { DatasetName } = await import("/src/constants.js");
+        const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.setAttribute(DatasetName.AUTHOR_TABINDEX, "0");
         return isKeyboardFocusable(el);
@@ -237,7 +236,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.tabIndex = 0;
         el.setAttribute("focusgroup", "none");
@@ -252,7 +251,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.tabIndex = 0;
         el.setAttribute("focusgroup", "");
@@ -267,7 +266,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.setAttribute("focusgroup", "");
         const child = document.createElement("button");
@@ -283,7 +282,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.setAttribute("focusgroup", "");
         const child = document.createElement("span");
@@ -299,7 +298,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.setAttribute("focusgroup", "");
         document.body.append(el);
@@ -313,7 +312,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.tabIndex = 0;
         el.setAttribute("focusgroup", "inline none");
@@ -328,7 +327,7 @@ test.describe("isSegmentor()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { isSegmentor } = await import("/src/main.js");
+        const { isSegmentor } = await import("/src/utils.js");
         const el = document.createElement("div");
         el.setAttribute("focusgroup", "");
         const wrapper = document.createElement("div");
@@ -352,7 +351,7 @@ test.describe("inferRole()", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("div");
       inferRole(el, "tablist", "owner");
       return {
@@ -368,7 +367,7 @@ test.describe("inferRole()", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("span");
       inferRole(el, "tablist", "child");
       return {
@@ -382,7 +381,7 @@ test.describe("inferRole()", () => {
 
   test("does not overwrite author-defined role", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("div");
       el.setAttribute("role", "navigation");
       inferRole(el, "tablist", "owner");
@@ -397,7 +396,7 @@ test.describe("inferRole()", () => {
 
   test("overwrites previously inferred role", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("div");
       inferRole(el, "tablist", "owner");
       inferRole(el, "menu", "owner");
@@ -414,7 +413,7 @@ test.describe("inferRole()", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("div");
       inferRole(el, "tablist", "owner");
       inferRole(el, "none", "owner");
@@ -429,7 +428,7 @@ test.describe("inferRole()", () => {
 
   test("no-op when no mapped role and no inferred role", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("div");
       inferRole(el, "none", "owner");
       return {
@@ -445,7 +444,7 @@ test.describe("inferRole()", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("span");
       inferRole(el, "toolbar", "child");
       return {
@@ -461,7 +460,7 @@ test.describe("inferRole()", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { inferRole } = await import("/src/main.js");
+      const { inferRole } = await import("/src/utils.js");
       const el = document.createElement("span");
       inferRole(el, "tablist", "child");
       inferRole(el, "toolbar", "child");
@@ -607,7 +606,7 @@ test.describe("getNavigationDirection()", () => {
   function evaluate(page, { eventInit, ownerStyle, axis }) {
     return page.evaluate(
       async ({ eventInit, ownerStyle, axis }) => {
-        const { getNavigationDirection } = await import("/src/main.js");
+        const { getNavigationDirection } = await import("/src/utils.js");
         const owner = document.createElement("div");
 
         document.body.appendChild(owner);
