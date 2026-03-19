@@ -5,9 +5,9 @@
  * @see https://github.com/microsoft/tabster/tree/master/src/Shadowdomize
  */
 
-import { nodeContains } from "./dom";
+import { nodeContains } from "./dom.js";
 
-export class ShadowMutationObserver {
+class ShadowMutationObserver {
   static #shadowObservers = new Set();
 
   #root;
@@ -197,4 +197,8 @@ export class ShadowMutationObserver {
 
     return records;
   }
+}
+
+export function createMutationObserver(callback) {
+  return new ShadowMutationObserver(callback);
 }

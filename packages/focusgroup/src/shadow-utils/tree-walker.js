@@ -7,7 +7,7 @@
 
 import { getLastElementDescendant, nodeContains } from "./dom.js";
 
-export class ShadowTreeWalker {
+class ShadowTreeWalker {
   filter;
   root;
   whatToShow;
@@ -610,4 +610,8 @@ export class ShadowTreeWalker {
     this.#backwardStack.unshift({ walker, hostNode, savedSlotted });
     return this.#walkBackward();
   }
+}
+
+export function createTreeWalker(doc, root, whatToShow, filter) {
+  return new ShadowTreeWalker(doc, root, whatToShow, filter);
 }

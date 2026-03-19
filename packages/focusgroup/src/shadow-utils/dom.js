@@ -14,13 +14,13 @@
  * @param {Element|ShadowRoot} start
  * @param {string} selector
  */
-export function shadowClosest(start, selector) {
+export function getClosestElement(start, selector) {
   if (!start || !selector) {
     return null;
   }
 
   if (start instanceof ShadowRoot) {
-    return shadowClosest(start.host, selector);
+    return getClosestElement(start.host, selector);
   }
 
   const assignedSlot = start.assignedSlot;
@@ -30,10 +30,10 @@ export function shadowClosest(start, selector) {
       // ancestors, treating the slotted element as a child of the slot.
       start.matches(selector)
       ? start
-      : shadowClosest(assignedSlot, selector)
+      : getClosestElement(assignedSlot, selector)
     : (start.closest(selector) ??
         (start.getRootNode() instanceof ShadowRoot
-          ? shadowClosest(start.getRootNode().host, selector)
+          ? getClosestElement(start.getRootNode().host, selector)
           : null));
 }
 

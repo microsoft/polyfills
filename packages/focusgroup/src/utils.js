@@ -4,11 +4,11 @@
  */
 
 import { BehaviorMap, DatasetName } from "./constants.js";
-import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
+import { createTreeWalker } from "./shadow-utils/index.js";
 
 /**
  * Whether the current user agent has the `document` global object.
- * 
+ *
  * @returns {boolean}
  */
 export function hasDocument() {
@@ -177,11 +177,7 @@ export function isSegmentor(element) {
   if (isKeyboardFocusable(element)) {
     return element.getAttribute("focusgroup").includes("none");
   }
-  const walker = new ShadowTreeWalker(
-    document,
-    element,
-    NodeFilter.SHOW_ELEMENT,
-  );
+  const walker = createTreeWalker(document, element, NodeFilter.SHOW_ELEMENT);
   while (walker.nextNode()) {
     if (
       walker.currentNode !== element &&
