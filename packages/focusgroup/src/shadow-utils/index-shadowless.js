@@ -1,5 +1,5 @@
 export function getClosestElement(element, selector) {
-  return element.getClosestElement(selector);
+  return element.closest(selector);
 }
 
 export function nodeContains(node, otherNode) {
