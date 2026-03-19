@@ -7,6 +7,15 @@ import { BehaviorMap, DatasetName } from "./constants.js";
 import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
 
 /**
+ * Whether the current user agent has the `document` global object.
+ * 
+ * @returns {boolean}
+ */
+export function hasDocument() {
+  return typeof document !== "undefined";
+}
+
+/**
  * Whether the current user agent supports focusgroup.
  *
  * @returns {boolean}
