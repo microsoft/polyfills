@@ -21,12 +21,12 @@ test.describe("observing mutations inside shadow roots", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { ShadowMutationObserver } = await import(
+      const { createMutationObserver } = await import(
         "/src/shadow-utils/mutation-observer.js"
       );
 
       return new Promise((resolve) => {
-        const observer = new ShadowMutationObserver((mutations) => {
+        const observer = createMutationObserver((mutations) => {
           const added = mutations.flatMap((m) =>
             Array.from(m.addedNodes)
               .filter((n) => n.nodeType === Node.ELEMENT_NODE)
@@ -57,7 +57,7 @@ test.describe("observing mutations inside shadow roots", () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const { ShadowMutationObserver } = await import(
+      const { createMutationObserver } = await import(
         "/src/shadow-utils/mutation-observer.js"
       );
 
@@ -72,7 +72,7 @@ test.describe("observing mutations inside shadow roots", () => {
       await new Promise((r) => setTimeout(r, 0));
 
       return new Promise((resolve) => {
-        const observer = new ShadowMutationObserver((mutations) => {
+        const observer = createMutationObserver((mutations) => {
           const removed = mutations.flatMap((m) =>
             Array.from(m.removedNodes)
               .filter((n) => n.nodeType === Node.ELEMENT_NODE)
@@ -105,12 +105,12 @@ test("should detect mutations inside a shadow root attached after observe()", as
     `);
 
   const result = await page.evaluate(async () => {
-    const { ShadowMutationObserver } = await import(
+    const { createMutationObserver } = await import(
       "/src/shadow-utils/mutation-observer.js"
     );
 
     return new Promise((resolve) => {
-      const observer = new ShadowMutationObserver((mutations) => {
+      const observer = createMutationObserver((mutations) => {
         const added = mutations.flatMap((m) =>
           Array.from(m.addedNodes)
             .filter((n) => n.nodeType === Node.ELEMENT_NODE)
@@ -152,12 +152,12 @@ test("should detect mutations inside nested shadow roots", async ({ page }) => {
     `);
 
   const result = await page.evaluate(async () => {
-    const { ShadowMutationObserver } = await import(
+    const { createMutationObserver } = await import(
       "/src/shadow-utils/mutation-observer.js"
     );
 
     return new Promise((resolve) => {
-      const observer = new ShadowMutationObserver((mutations) => {
+      const observer = createMutationObserver((mutations) => {
         const added = mutations.flatMap((m) =>
           Array.from(m.addedNodes)
             .filter((n) => n.nodeType === Node.ELEMENT_NODE)
@@ -199,12 +199,12 @@ test("disconnect() should stop observing shadow root mutations after disconnect"
     `);
 
   const result = await page.evaluate(async () => {
-    const { ShadowMutationObserver } = await import(
+    const { createMutationObserver } = await import(
       "/src/shadow-utils/mutation-observer.js"
     );
 
     let callCount = 0;
-    const observer = new ShadowMutationObserver(() => {
+    const observer = createMutationObserver(() => {
       callCount++;
     });
 
@@ -240,11 +240,11 @@ test("takeRecords() should return pending records from shadow sub-observers", as
     `);
 
   const result = await page.evaluate(async () => {
-    const { ShadowMutationObserver } = await import(
+    const { createMutationObserver } = await import(
       "/src/shadow-utils/mutation-observer.js"
     );
 
-    const observer = new ShadowMutationObserver(() => {});
+    const observer = createMutationObserver(() => {});
 
     const root = document.getElementById("root");
     observer.observe(root, { childList: true, subtree: true });
@@ -285,13 +285,13 @@ test("should not fire callbacks for a removed shadow host", async ({
     `);
 
   const result = await page.evaluate(async () => {
-    const { ShadowMutationObserver } = await import(
+    const { createMutationObserver } = await import(
       "/src/shadow-utils/mutation-observer.js"
     );
 
     let shadowCallbackCount = 0;
 
-    const observer = new ShadowMutationObserver((mutations) => {
+    const observer = createMutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
           if (

@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["./packages/*/{src,tests}/**"],
+    "includes": ["./packages/**/*.{css,js,mjs,ts,mts,json}", "!build", "!dist"],
     "ignoreUnknown": false
   },
   "formatter": {

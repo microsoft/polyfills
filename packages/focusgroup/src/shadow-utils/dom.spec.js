@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("shadowClosest()", () => {
+test.describe("getClosestElement()", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/test.html");
     await page.setContent(`
@@ -37,36 +37,36 @@ test.describe("shadowClosest()", () => {
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".c") === el;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".c") === el;
       }),
     ).toBe(true);
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".a")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".a")?.dataset.testid;
       }),
     ).toBe("light-container");
 
     expect(
       await page.getByTestId("shadow1-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".a")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".a")?.dataset.testid;
       }),
     ).toBe("shadow1-container");
 
     expect(
       await page.getByTestId("shadow2-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".a")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".a")?.dataset.testid;
       }),
     ).toBe("shadow2-container");
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".none");
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".none");
       }),
     ).toBeNull();
   });
@@ -74,15 +74,15 @@ test.describe("shadowClosest()", () => {
   test("should be able to find its own host element", async ({ page }) => {
     expect(
       await page.getByTestId("shadow1-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".d")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".d")?.dataset.testid;
       }),
     ).toBe("light-host");
 
     expect(
       await page.getByTestId("shadow2-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".d")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".d")?.dataset.testid;
       }),
     ).toBe("shadow1-host");
   });
@@ -92,15 +92,15 @@ test.describe("shadowClosest()", () => {
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".b-s1")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".b-s1")?.dataset.testid;
       }),
     ).toBe("shadow1-unique-container");
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".b-l")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".b-l")?.dataset.testid;
       }),
     ).toBe("light-unique-container");
   });
@@ -110,8 +110,8 @@ test.describe("shadowClosest()", () => {
   }) => {
     expect(
       await page.getByTestId("slotted-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
-        return shadowClosest(el, ".a")?.dataset.testid;
+        const { getClosestElement } = await import("/src/shadow-utils/dom.js");
+        return getClosestElement(el, ".a")?.dataset.testid;
       }),
     ).toBe("shadow1-container");
   });

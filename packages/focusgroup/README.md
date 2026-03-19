@@ -29,3 +29,15 @@ polyfill();
 const myElement = document.querySelector(".my-element");
 polyfill(myElement);
 ```
+
+If your project doesn’t need Shadow DOM support, you can use the “shadowless” bundle, which has smaller file size:
+
+```js
+import { polyfill } from "@microsoft/focusgroup-polyfill/shadowless";
+// Polyfill the entire document
+polyfill();
+
+// Polyfill a subtree of the document
+const myElement = document.querySelector(".my-element");
+polyfill(myElement);
+```

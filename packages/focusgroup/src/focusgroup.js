@@ -9,9 +9,12 @@ import {
   BehaviorToken,
   DatasetName,
 } from "./constants.js";
-import { nodeContains, shadowClosest } from "./shadow-utils/dom.js";
-import { ShadowMutationObserver } from "./shadow-utils/mutation-observer.js";
-import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
+import {
+  createMutationObserver,
+  createTreeWalker,
+  getClosestElement,
+  nodeContains,
+} from "./shadow-utils/index.js";
 import {
   generateUniqueId,
   getNavigationDirection,
@@ -114,7 +117,7 @@ export class FocusGroup {
     }
 
     this.#owner = owner;
-    this.#itemWalker = new ShadowTreeWalker(
+    this.#itemWalker = createTreeWalker(
       document,
       this.#owner,
       NodeFilter.SHOW_ELEMENT,
@@ -143,9 +146,7 @@ export class FocusGroup {
       }
     }
 
-    const observer = new ShadowMutationObserver(
-      this.#processMutations.bind(this),
-    );
+    const observer = createMutationObserver(this.#processMutations.bind(this));
     observer.observe(owner, {
       attributes: true,
       attributeFilter: [
@@ -209,7 +210,7 @@ export class FocusGroup {
       return;
     }
 
-    const walker = new ShadowTreeWalker(
+    const walker = createTreeWalker(
       document,
       this.#owner,
       NodeFilter.SHOW_ELEMENT,
@@ -358,14 +359,14 @@ export class FocusGroup {
       return;
     }
 
-    const closestGroup = shadowClosest(evtTarget, "[focusgroup]");
+    const closestGroup = getClosestElement(evtTarget, "[focusgroup]");
 
     if (closestGroup) {
       evt.stopPropagation();
     }
 
     // Avoid focus group navigation if the focus is on an opted-out element.
-    if (closestGroup.getAttribute("focusgroup").includes("none")) {
+    if (closestGroup?.getAttribute("focusgroup").includes("none")) {
       return;
     }
 
@@ -490,8 +491,8 @@ export class FocusGroup {
       // if the element is yet to be decorated
       (isKeyboardFocusable(node) &&
         (node.assignedSlot
-          ? shadowClosest(node.assignedSlot, "[focusgroup]") === this.#owner
-          : shadowClosest(node.parentNode, "[focusgroup]") === this.#owner))
+          ? getClosestElement(node.assignedSlot, "[focusgroup]") === this.#owner
+          : getClosestElement(node.parentNode, "[focusgroup]") === this.#owner))
     );
   }
 

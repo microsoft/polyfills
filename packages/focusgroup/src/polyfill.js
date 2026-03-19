@@ -4,7 +4,7 @@
  */
 
 import { FocusGroup } from "./focusgroup.js";
-import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
+import { createTreeWalker } from "./shadow-utils/index.js";
 import { hasDocument, supportsFocusGroup } from "./utils.js";
 
 /**
@@ -22,7 +22,7 @@ export function polyfill(root) {
     root = document.body;
   }
 
-  const walker = new ShadowTreeWalker(
+  const walker = createTreeWalker(
     document,
     root,
     NodeFilter.SHOW_ELEMENT,
