@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("shadowClosest()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div class="a" data-testid="light-container">
         <div class="b-l" data-testid="light-unique-container">
@@ -37,35 +37,35 @@ test.describe("shadowClosest()", () => {
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".c") === el;
       }),
     ).toBe(true);
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".a")?.dataset.testid;
       }),
     ).toBe("light-container");
 
     expect(
       await page.getByTestId("shadow1-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".a")?.dataset.testid;
       }),
     ).toBe("shadow1-container");
 
     expect(
       await page.getByTestId("shadow2-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".a")?.dataset.testid;
       }),
     ).toBe("shadow2-container");
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".none");
       }),
     ).toBeNull();
@@ -74,14 +74,14 @@ test.describe("shadowClosest()", () => {
   test("should be able to find its own host element", async ({ page }) => {
     expect(
       await page.getByTestId("shadow1-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".d")?.dataset.testid;
       }),
     ).toBe("light-host");
 
     expect(
       await page.getByTestId("shadow2-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".d")?.dataset.testid;
       }),
     ).toBe("shadow1-host");
@@ -92,14 +92,14 @@ test.describe("shadowClosest()", () => {
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".b-s1")?.dataset.testid;
       }),
     ).toBe("shadow1-unique-container");
 
     expect(
       await el.evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".b-l")?.dataset.testid;
       }),
     ).toBe("light-unique-container");
@@ -110,7 +110,7 @@ test.describe("shadowClosest()", () => {
   }) => {
     expect(
       await page.getByTestId("slotted-child").evaluate(async (el) => {
-        const { shadowClosest } = await import("/src/main.js");
+        const { shadowClosest } = await import("/src/shadow-utils/dom.js");
         return shadowClosest(el, ".a")?.dataset.testid;
       }),
     ).toBe("shadow1-container");
@@ -119,7 +119,7 @@ test.describe("shadowClosest()", () => {
 
 test.describe("nodeContains()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div id="parent">
         <div id="child">
@@ -140,7 +140,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const parent = document.getElementById("parent");
         const child = document.getElementById("child");
         return nodeContains(parent, child);
@@ -153,7 +153,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const child = document.getElementById("child");
         const shadowChild = child.shadowRoot.getElementById("shadow-child");
         return nodeContains(child, shadowChild);
@@ -166,7 +166,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const parent = document.getElementById("parent");
         const shadowChild = document
           .getElementById("child")
@@ -181,7 +181,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const shadowContainer = document
           .getElementById("child")
           .shadowRoot.getElementById("shadow-container");
@@ -196,7 +196,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const child = document.getElementById("child");
         const slottedChild = document.getElementById("slotted-child");
         return nodeContains(child, slottedChild);
@@ -209,7 +209,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const parent = document.getElementById("parent");
         const slottedChild = document.getElementById("slotted-child");
         return nodeContains(parent, slottedChild);
@@ -220,14 +220,14 @@ test.describe("nodeContains()", () => {
   test("should return false when either argument is null", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         return nodeContains(null, document.body);
       }),
     ).toBe(false);
 
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         return nodeContains(document.body, null);
       }),
     ).toBe(false);
@@ -238,7 +238,7 @@ test.describe("nodeContains()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { nodeContains } = await import("/src/main.js");
+        const { nodeContains } = await import("/src/shadow-utils/dom.js");
         const parent = document.getElementById("parent");
         const shadowChild = document
           .getElementById("child")
@@ -251,7 +251,7 @@ test.describe("nodeContains()", () => {
 
 test.describe("getLastElementChild()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div data-testid="light-parent">
         <span id="light-first"></span>
@@ -280,7 +280,9 @@ test.describe("getLastElementChild()", () => {
   }) => {
     expect(
       await page.getByTestId("light-parent").evaluate(async (parent) => {
-        const { getLastElementChild } = await import("/src/main.js");
+        const { getLastElementChild } = await import(
+          "/src/shadow-utils/dom.js"
+        );
 
         return getLastElementChild(parent) === parent.lastElementChild;
       }),
@@ -292,7 +294,9 @@ test.describe("getLastElementChild()", () => {
   }) => {
     expect(
       await page.getByTestId("shadow-host").evaluate(async (host) => {
-        const { getLastElementChild } = await import("/src/main.js");
+        const { getLastElementChild } = await import(
+          "/src/shadow-utils/dom.js"
+        );
 
         return getLastElementChild(host)?.id;
       }),
@@ -302,7 +306,9 @@ test.describe("getLastElementChild()", () => {
   test("should return null for an empty element", async ({ page }) => {
     expect(
       await page.getByTestId("empty").evaluate(async (node) => {
-        const { getLastElementChild } = await import("/src/main.js");
+        const { getLastElementChild } = await import(
+          "/src/shadow-utils/dom.js"
+        );
 
         return getLastElementChild(node);
       }),
@@ -314,7 +320,9 @@ test.describe("getLastElementChild()", () => {
   }) => {
     expect(
       await page.getByTestId("shadow-host2").evaluate(async (host) => {
-        const { getLastElementChild } = await import("/src/main.js");
+        const { getLastElementChild } = await import(
+          "/src/shadow-utils/dom.js"
+        );
 
         return getLastElementChild(host)?.id;
       }),
@@ -324,7 +332,7 @@ test.describe("getLastElementChild()", () => {
 
 test.describe("getLastElementDescendant()", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/test.html");
     await page.setContent(`
       <div id="light-parent">
         <div id="light-mid">
@@ -351,7 +359,9 @@ test.describe("getLastElementDescendant()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { getLastElementDescendant } = await import("/src/main.js");
+        const { getLastElementDescendant } = await import(
+          "/src/shadow-utils/dom.js"
+        );
         return getLastElementDescendant(document.getElementById("light-parent"))
           ?.id;
       }),
@@ -363,7 +373,9 @@ test.describe("getLastElementDescendant()", () => {
   }) => {
     expect(
       await page.evaluate(async () => {
-        const { getLastElementDescendant } = await import("/src/main.js");
+        const { getLastElementDescendant } = await import(
+          "/src/shadow-utils/dom.js"
+        );
         return getLastElementDescendant(document.getElementById("shadow-host"))
           ?.id;
       }),
@@ -373,7 +385,9 @@ test.describe("getLastElementDescendant()", () => {
   test("should return null for an empty container", async ({ page }) => {
     expect(
       await page.evaluate(async () => {
-        const { getLastElementDescendant } = await import("/src/main.js");
+        const { getLastElementDescendant } = await import(
+          "/src/shadow-utils/dom.js"
+        );
         return getLastElementDescendant(document.getElementById("empty"));
       }),
     ).toBeNull();

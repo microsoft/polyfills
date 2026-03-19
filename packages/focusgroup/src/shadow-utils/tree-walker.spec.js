@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { setupPage } from "../../tests/utils";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/test.html");
 });
 
 test.describe("nextNode() across shadow boundaries", () => {
@@ -24,7 +24,9 @@ test.describe("nextNode() across shadow boundaries", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -45,7 +47,9 @@ test.describe("nextNode() across shadow boundaries", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -70,7 +74,9 @@ test.describe("nextNode() across shadow boundaries", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -117,7 +123,9 @@ test.describe("nextNode() with nested shadow roots", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -163,7 +171,9 @@ test.describe("nextNode() with slotted children", () => {
     `);
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -203,7 +213,9 @@ test.describe("nextNode() with slotted children", () => {
     `);
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -240,7 +252,9 @@ test.describe("nextNode() with slotted children", () => {
     );
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -283,7 +297,9 @@ test.describe("nextNode() with slotted children", () => {
     );
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -328,7 +344,9 @@ test.describe("nextNode() with slotted children", () => {
     );
 
     const ids = await page.getByTestId("root").evaluate(async (root) => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const walker = new ShadowTreeWalker(
         document,
         root,
@@ -372,7 +390,9 @@ test.describe("nextNode() with slotted children", () => {
     );
 
     const ids = await page.getByTestId("root").evaluate(async (root) => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const walker = new ShadowTreeWalker(
         document,
         root,
@@ -411,7 +431,9 @@ test.describe("nextNode() with slotted children", () => {
     );
 
     const ids = await page.locator("#root").evaluate(async (root) => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const walker = new ShadowTreeWalker(
         document,
         root,
@@ -455,7 +477,9 @@ test.describe("previousNode() across shadow boundaries", () => {
 
   test("should walk backwards through shadow boundaries", async ({ page }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -476,7 +500,9 @@ test.describe("previousNode() across shadow boundaries", () => {
 
   test("should return null when at the beginning", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -512,7 +538,9 @@ test.describe("previousNode() with nested shadow roots", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -554,7 +582,9 @@ test.describe("previousnNode() with slotted children", () => {
     `);
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -597,7 +627,9 @@ test.describe("previousnNode() with slotted children", () => {
     `);
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -636,7 +668,9 @@ test.describe("previousnNode() with slotted children", () => {
     );
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -684,7 +718,9 @@ test.describe("previousnNode() with slotted children", () => {
     );
 
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -729,7 +765,9 @@ test.describe("previousnNode() with slotted children", () => {
     );
 
     const ids = await page.getByTestId("root").evaluate(async (root) => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const walker = new ShadowTreeWalker(
         document,
         root,
@@ -778,7 +816,9 @@ test.describe("previousnNode() with slotted children", () => {
     );
 
     const ids = await page.getByTestId("root").evaluate(async (root) => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const walker = new ShadowTreeWalker(
         document,
         root,
@@ -817,7 +857,9 @@ test.describe("previousnNode() with slotted children", () => {
     );
 
     const ids = await page.locator("#root").evaluate(async (root) => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const walker = new ShadowTreeWalker(
         document,
         root,
@@ -863,7 +905,9 @@ test.describe("previousNode() when root is a shadow host", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -883,7 +927,9 @@ test.describe("previousNode() when root is a shadow host", () => {
 
   test("should walk backwards after forward exhaustion", async ({ page }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -907,7 +953,9 @@ test.describe("previousNode() when root is a shadow host", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -929,7 +977,9 @@ test.describe("previousNode() when root is a shadow host", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -975,7 +1025,9 @@ test.describe("currentNode setter across shadow boundaries", () => {
     page,
   }) => {
     const id = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -996,7 +1048,9 @@ test.describe("currentNode setter across shadow boundaries", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -1021,7 +1075,9 @@ test.describe("currentNode setter across shadow boundaries", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -1046,7 +1102,9 @@ test.describe("currentNode setter across shadow boundaries", () => {
     page,
   }) => {
     const threw = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -1087,7 +1145,9 @@ test.describe("multiple shadow hosts at the same level", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -1108,7 +1168,9 @@ test.describe("multiple shadow hosts at the same level", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const root = document.getElementById("root");
       const walker = new ShadowTreeWalker(
         document,
@@ -1147,7 +1209,9 @@ test.describe("shadow host as the walker root", () => {
     page,
   }) => {
     const ids = await page.evaluate(async () => {
-      const { ShadowTreeWalker } = await import("/src/main.js");
+      const { ShadowTreeWalker } = await import(
+        "/src/shadow-utils/tree-walker.js"
+      );
       const host = document.getElementById("host");
       const walker = new ShadowTreeWalker(
         document,
@@ -1199,7 +1263,9 @@ test("shadow host with multiple shadow containing children should walk in DOM or
   `);
 
   const ids = await page.evaluate(async () => {
-    const { ShadowTreeWalker } = await import("/src/main.js");
+    const { ShadowTreeWalker } = await import(
+      "/src/shadow-utils/tree-walker.js"
+    );
     const tablist = document.getElementById("tablist");
     const walker = new ShadowTreeWalker(
       document,
@@ -1322,7 +1388,9 @@ test("should walk shadow children of slotted hosts before next slotted sibling",
   );
 
   const ids = await page.evaluate(async () => {
-    const { ShadowTreeWalker } = await import("/src/main.js");
+    const { ShadowTreeWalker } = await import(
+      "/src/shadow-utils/tree-walker.js"
+    );
     const root = document.getElementById("root");
     const walker = new ShadowTreeWalker(
       document,
@@ -1442,7 +1510,9 @@ test("should enter shadow children after repositioning currentNode to a shadow h
   );
 
   const ids = await page.evaluate(async () => {
-    const { ShadowTreeWalker } = await import("/src/main.js");
+    const { ShadowTreeWalker } = await import(
+      "/src/shadow-utils/tree-walker.js"
+    );
     const root = document.getElementById("root");
     const walker = new ShadowTreeWalker(
       document,

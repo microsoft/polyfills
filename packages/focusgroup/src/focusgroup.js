@@ -41,33 +41,7 @@ function flushAllObservers() {
   }
 }
 
-/**
- * Polyfill the `focusgroup` HTML attribute for the given element and its
- * descendants.
- *
- * @param {HTMLElement} root - The polyfill target. Defaults to `<body>`.
- */
-export function polyfill(root = document.body) {
-  if (supportsFocusGroup() || !root) {
-    return;
-  }
-
-  const walker = new ShadowTreeWalker(
-    document,
-    root,
-    NodeFilter.SHOW_ELEMENT,
-    (node) =>
-      node.hasAttribute("focusgroup")
-        ? NodeFilter.FILTER_ACCEPT
-        : NodeFilter.FILTER_SKIP,
-  );
-
-  do {
-    new FocusGroup(walker.currentNode);
-  } while (walker.nextNode());
-}
-
-class FocusGroup {
+export class FocusGroup {
   /**
    * The focus group owner element.
    * @type {HTMLElement!}

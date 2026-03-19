@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 
-const entry = resolve(import.meta.dirname, "src/focusgroup-polyfill.js");
+const entry = resolve(import.meta.dirname, "src/index.js");
 
 export default ({ mode }) => ({
 	build: {
