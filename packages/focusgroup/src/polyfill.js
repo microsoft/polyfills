@@ -5,7 +5,7 @@
 
 import { FocusGroup } from "./focusgroup.js";
 import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
-import { supportsFocusGroup } from "./utils.js";
+import { hasDocument, supportsFocusGroup } from "./utils.js";
 
 /**
  * Polyfill the `focusgroup` HTML attribute for the given element and its
@@ -14,7 +14,7 @@ import { supportsFocusGroup } from "./utils.js";
  * @param {HTMLElement} root - The polyfill target. Defaults to `<body>`.
  */
 export function polyfill(root) {
-  if (!supportsFocusGroup()) {
+  if (supportsFocusGroup() || !hasDocument()) {
     return;
   }
 
