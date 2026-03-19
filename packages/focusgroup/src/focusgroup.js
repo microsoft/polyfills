@@ -366,7 +366,7 @@ export class FocusGroup {
     }
 
     // Avoid focus group navigation if the focus is on an opted-out element.
-    if (closestGroup.getAttribute("focusgroup").includes("none")) {
+    if (closestGroup?.getAttribute("focusgroup").includes("none")) {
       return;
     }
 
