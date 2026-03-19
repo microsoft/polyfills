@@ -12,6 +12,10 @@ import { ShadowTreeWalker } from "./shadow-utils/tree-walker.js";
  * @returns {boolean}
  */
 export function supportsFocusGroup() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  
   return "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {});
 }
 

@@ -13,9 +13,13 @@ import { supportsFocusGroup } from "./utils.js";
  *
  * @param {HTMLElement} root - The polyfill target. Defaults to `<body>`.
  */
-export function polyfill(root = document.body) {
-  if (supportsFocusGroup() || !root) {
+export function polyfill(root) {
+  if (!supportsFocusGroup()) {
     return;
+  }
+
+  if (!root) {
+    root = document.body;
   }
 
   const walker = new ShadowTreeWalker(
