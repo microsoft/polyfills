@@ -9,3 +9,23 @@ The polyfill follows these principles:
 - **Migration**: Make it easy to migrate to new updates if/when the spec evolves.
 
 For more information about focusgroup itself, see: https://open-ui.org/components/scoped-focusgroup.explainer/
+
+## Usage
+
+```bash
+# npm
+npm install @microsoft/focusgroup-polyfill
+
+# yarn
+yarn add @microsoft/focusgroup-polyfill
+```
+
+```js
+import { polyfill } from "@microsoft/focusgroup-polyfill";
+// Polyfill the entire document
+polyfill();
+
+// Polyfill a subtree of the document
+const myElement = document.querySelector(".my-element");
+polyfill(myElement);
+```
