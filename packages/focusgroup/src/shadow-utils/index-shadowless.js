@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 export function getClosestElement(element, selector) {
   return element.closest(selector);
 }

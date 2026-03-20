@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { expect, test } from "@playwright/test";
 
 test.describe("getClosestElement()", () => {
