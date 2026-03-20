@@ -879,6 +879,41 @@ test.describe("current tab stop element", () => {
       await expect(item1).toBeFocused();
     });
   });
+
+  test.describe("hidden", () => {
+    test("should move tab stop to the nearest item", async ({
+      page,
+      channel,
+    }) => {
+      if (channel !== "chrome-canary") {
+        test.fixme();
+      }
+
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="toolbar">
+          <button data-testid="item1">item1</button>
+          <div data-testid="target">
+            <button data-testid="item2">item2</button>
+          </div>
+          <button data-testid="item3">item3</button>
+        </div>
+      `,
+      );
+
+      await page.getByTestId("item2").focus();
+      await page.getByTestId("target").evaluate((node) => {
+        node.hidden = true;
+      });
+
+      await page.getByTestId("before").focus();
+      await page.keyboard.press("Tab");
+
+      await expect(page.getByTestId("item1")).toBeFocused();
+    });
+  });
 });
 
 test.describe("segmentor", () => {
@@ -1042,5 +1077,57 @@ test.describe("segmentor", () => {
 
       await expect(item1).toBeFocused();
     });
+  });
+});
+
+test.describe("visibility", () => {
+  test("hiding an item removes it from diretional navigation", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <button data-testid="item1">item1</button>
+        <div data-testid="target">
+          <button data-testid="item2">item2</button>
+        </div>
+        <button data-testid="item3">item3</button>
+      </div>
+    `,
+    );
+
+    await page.getByTestId("target").evaluate((node) => {
+      node.hidden = true;
+    });
+
+    await page.getByTestId("item1").focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(page.getByTestId("item3")).toBeFocused();
+  });
+
+  test("showing an item adds it to diretional navigation", async ({ page }) => {
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <button data-testid="item1">item1</button>
+        <div data-testid="target" hidden>
+          <button data-testid="item2">item2</button>
+        </div>
+        <button data-testid="item3">item3</button>
+      </div>
+    `,
+    );
+
+    await page.getByTestId("target").evaluate((node) => {
+      node.hidden = false;
+    });
+
+    await page.getByTestId("item1").focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(page.getByTestId("item2")).toBeFocused();
   });
 });

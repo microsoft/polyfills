@@ -616,6 +616,26 @@ test.describe("Vertical writing-mode swaps inline and block axes", () => {
   });
 });
 
+test("skip hidden candidates", async ({ page }) => {
+  await setupPage(
+    page,
+    `
+    <div focusgroup="tablist">
+      <button data-testid="item1">item1</button>
+      <div hidden>
+        <button>item2</button>
+      </div>
+      <button data-testid="item3">item3</button>
+    </div>
+  `,
+  );
+
+  await page.getByTestId("item1").focus();
+  await page.keyboard.press("ArrowRight");
+
+  await expect(page.getByTestId("item3")).toBeFocused();
+});
+
 // forward-navigation/horizontal/does-not-move-when-axis-not-supported.html
 test("horizontal: does not move when axis (ArrowRight) is not supported (block only)", async ({
   page,

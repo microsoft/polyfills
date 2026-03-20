@@ -413,6 +413,30 @@ test.describe("focusgroup segments", () => {
   });
 });
 
+test("hidden items should not be segment tab stop", async ({ page }) => {
+  await setupPage(
+    page,
+    `
+    <div focusgroup="toolbar">
+      <button data-testid="item1">item 1</button>
+      <div focusgroup="toolbar">
+        <button>nested item 1</button>
+      </div>
+      <div hidden>
+        <button>item 2</button>
+      </div>
+      <button data-testid="item3">item 3</button>
+    </div>
+  `,
+  );
+
+  await page.getByTestId("item1").focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+
+  await expect(page.getByTestId("item3")).toBeFocused();
+});
+
 // sequential-navigation/memory-behavior.html
 test.describe("memory behavior", () => {
   test("focusgroup with memory remembers last focused item on re-entry", async ({
