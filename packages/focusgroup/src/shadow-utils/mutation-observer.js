@@ -1,9 +1,7 @@
-/*!
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License.
- *
- * @see https://github.com/microsoft/tabster/tree/master/src/Shadowdomize
- */
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+/** @see https://github.com/microsoft/tabster/tree/master/src/Shadowdomize */
 
 import { nodeContains } from "./dom.js";
 

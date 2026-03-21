@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 import { test } from "@playwright/test";
 import { expect, setupPage } from "./utils.js";
 
