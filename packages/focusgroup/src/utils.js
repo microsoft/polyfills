@@ -193,9 +193,11 @@ export function isSegmentor(element) {
  * @returns {boolean}
  */
 function checkVisibility(element) {
-  if (typeof element.checkVisibility === "function") {
+  if (
+    "checkVisibility" in element &&
+    typeof element.checkVisibility === "function"
+  ) {
     return element.checkVisibility({
-      checkOpacity: true,
       checkVisibility: true,
       contentVisibilityAuto: true,
     });
@@ -205,11 +207,11 @@ function checkVisibility(element) {
     return false;
   }
 
-  const { visibility, opacity, contentVisibility } =
-    window.getComputedStyle(el);
+  // FIXME: skipped if itself is visibility: hidden, or nested in an element
+  // with visibility/content-visibility: hidden
+  const { visibility, contentVisibility } = window.getComputedStyle(el);
   if (
     ["hidden", "collapse"].includes(visibility) ||
-    opacity === "0" ||
     contentVisibility === "hidden"
   ) {
     return false;
