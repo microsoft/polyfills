@@ -941,14 +941,7 @@ test.describe("current tab stop element", () => {
   });
 
   test.describe("hidden", () => {
-    test("should move tab stop to the nearest item", async ({
-      page,
-      channel,
-    }) => {
-      if (channel !== "chrome-canary") {
-        test.fixme();
-      }
-
+    test("should move tab stop to the nearest item", async ({ page }) => {
       await setupPage(
         page,
         `
@@ -976,14 +969,7 @@ test.describe("current tab stop element", () => {
   });
 
   test.describe("opt-out", () => {
-    test("should move tab stop to the nearest item", async ({
-      page,
-      channel,
-    }) => {
-      if (channel !== "chrome-canary") {
-        test.fixme();
-      }
-
+    test("should move tab stop to the nearest item", async ({ page }) => {
       await setupPage(
         page,
         `

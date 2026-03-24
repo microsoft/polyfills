@@ -280,8 +280,23 @@ export class FocusGroup {
       startItem = firstItem;
     }
 
+    if (!this.#memorized?.isConnected) {
+      this.#memorized = null;
+    }
+
     if (this.#memorized) {
-      startItem = this.#memorized;
+      // Verify the memorized element is still a valid item in this group.
+      // It may have become ineligible (disabled, hidden, moved to a nested
+      // group, etc.) since it was last focused.
+      if (this.#memorized.getAttribute(DatasetName.ITEM) === this.#id) {
+        startItem = this.#memorized;
+      } else {
+        // The memorized element is no longer a valid item. Pick the closest
+        // item in document order as the tab stop, but don't update #memorized
+        // — memory should only be set by actual focus events.
+        startItem = this.#findClosestItem(this.#memorized) || startItem;
+        this.#memorized = null;
+      }
     }
 
     if (startItem) {
@@ -347,6 +362,43 @@ export class FocusGroup {
     } while (this.#itemWalker?.nextNode());
 
     return last;
+  }
+
+  /**
+   * Find the closest valid item to a reference node that is no longer in the
+   * walker (e.g. became ineligible). Compares document position of each item
+   * to the reference, returning the nearest preceding item, or failing that,
+   * the nearest following item.
+   *
+   * @param {HTMLElement} referenceNode - The node to find the closest item to.
+   * @returns {HTMLElement|null}
+   */
+  #findClosestItem(referenceNode) {
+    const first = this.#getFirstItem();
+
+    if (!first) {
+      return null;
+    }
+
+    let closestBefore = null;
+    let closestAfter = null;
+
+    do {
+      const item = this.#itemWalker.currentNode;
+      const position = referenceNode.compareDocumentPosition(item);
+
+      if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+        // item is before referenceNode
+        closestBefore = item;
+      } else if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+        // item is after referenceNode — take the first one and stop
+        if (!closestAfter) {
+          closestAfter = item;
+        }
+      }
+    } while (this.#itemWalker.nextNode());
+
+    return closestBefore || closestAfter;
   }
 
   /** @param {KeyboardEvent!} evt */
