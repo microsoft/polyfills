@@ -485,6 +485,66 @@ test.describe("opt-out", () => {
   });
 });
 
+test.describe("opt-in", () => {
+  let group;
+  let item1;
+  let item2;
+  let item3;
+
+  test.beforeEach(async ({ page }) => {
+    group = page.getByTestId("group");
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+    item3 = page.getByTestId("item3");
+  });
+
+  test("should add the opt-in item from directional navigation", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" focusgroup="none">item 2</button>
+        </div>
+      `,
+    );
+
+    await item2.evaluate((node) => {
+      node.removeAttribute("focusgroup");
+    });
+
+    await item1.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item2).toBeFocused();
+  });
+
+  test("should add directional navigation to the opt-in group", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div data-testid="group" focusgroup="none">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+    );
+
+    await group.evaluate((node) => {
+      node.setAttribute("focusgroup", "listbox");
+    });
+
+    await item1.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item2).toBeFocused();
+  });
+});
+
 test.describe("`focusgroupstart` item", () => {
   let item1;
   let item2;
@@ -912,6 +972,41 @@ test.describe("current tab stop element", () => {
       await page.keyboard.press("Tab");
 
       await expect(page.getByTestId("item1")).toBeFocused();
+    });
+  });
+
+  test.describe("opt-out", () => {
+    test("should move tab stop to the nearest item", async ({
+      page,
+      channel,
+    }) => {
+      if (channel !== "chrome-canary") {
+        test.fixme();
+      }
+
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="toolbar">
+          <button data-testid="item1">item1</button>
+          <button data-testid="item2">item2</button>
+        </div>
+      `,
+      );
+
+      const item1 = page.getByTestId("item1");
+      const item2 = page.getByTestId("item2");
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+      await item2.evaluate((node) => {
+        node.setAttribute("focusgroup", "none");
+      });
+
+      await page.getByTestId("before").focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item1).toBeFocused();
     });
   });
 });
