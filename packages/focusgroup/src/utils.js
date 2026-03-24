@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { BehaviorMap, DatasetName } from "./constants.js";
-import { createTreeWalker } from "./shadow-utils/index.js";
+import { createTreeWalker, getParentElement } from "./shadow-utils/index.js";
 
 /**
  * Whether the current user agent has the `document` global object.
@@ -189,32 +189,43 @@ export function isSegmentor(element) {
 /**
  * A light-weight, non-comprehensive ponyfill for `Element.checkVisibility()`.
  * @see https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
- * @param {HTMLElement} element
+ * @param {HTMLElement} element - The element whose visibility to check.
+ * @param {HTMLElement=} ancestor - An element in the ancestry chain of
+ *     `element`. When provided, walk up from `element` to `ancestor`
+ *     (inclusive) checking `visibility` and `content-visibility` on ancestors.
+ *     When omitted, only `element` itself is checked.
  * @returns {boolean}
  */
-function checkVisibility(element) {
-  if (
-    "checkVisibility" in element &&
-    typeof element.checkVisibility === "function"
-  ) {
+function checkVisibility(element, ancestor) {
+  if ("checkVisibility" in Element.prototype) {
     return element.checkVisibility({
-      checkVisibility: true,
+      visibilityProperty: true,
       contentVisibilityAuto: true,
     });
   }
 
-  if (el.getClientRects().length === 0) {
+  if (element.getClientRects().length === 0) {
     return false;
   }
 
-  // FIXME: skipped if itself is visibility: hidden, or nested in an element
-  // with visibility/content-visibility: hidden
-  const { visibility, contentVisibility } = window.getComputedStyle(el);
-  if (
-    ["hidden", "collapse"].includes(visibility) ||
-    contentVisibility === "hidden"
-  ) {
-    return false;
+  // Walk the ancestry chain checking two properties:
+  // - `visibility: hidden/collapse` — hides the element itself, so check from
+  //   `element` upward.
+  // - `content-visibility: hidden` — hides an element's *content* (descendants,
+  //   not itself), so check from `element`'s parent upward.
+  let current = element;
+  while (current) {
+    const { visibility, contentVisibility } = window.getComputedStyle(current);
+    if (["hidden", "collapse"].includes(visibility)) {
+      return false;
+    }
+    if (current !== element && contentVisibility === "hidden") {
+      return false;
+    }
+    if (!ancestor || current === ancestor) {
+      break;
+    }
+    current = getParentElement(current);
   }
 
   return true;

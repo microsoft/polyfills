@@ -252,6 +252,127 @@ test.describe("nodeContains()", () => {
   });
 });
 
+test.describe("getParentElement()", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/test.html");
+    await page.setContent(`
+      <div id="grandparent">
+        <div id="parent">
+          <div id="child"></div>
+        </div>
+        <div id="shadow-host">
+          <template shadowrootmode="open">
+            <div id="shadow-container">
+              <div id="shadow-child"></div>
+              <slot></slot>
+            </div>
+          </template>
+          <div id="slotted-child"></div>
+        </div>
+        <div id="nested-shadow-host">
+          <template shadowrootmode="open">
+            <div id="outer-shadow-container">
+              <div id="inner-shadow-host">
+                <template shadowrootmode="open">
+                  <div id="inner-shadow-child"></div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    `);
+  });
+
+  test("should return the parent element in light DOM", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        return getParentElement(document.getElementById("child"))?.id;
+      }),
+    ).toBe("parent");
+  });
+
+  test("should return the parent element inside a shadow root", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        const host = document.getElementById("shadow-host");
+        const shadowChild = host.shadowRoot.getElementById("shadow-child");
+        return getParentElement(shadowChild)?.id;
+      }),
+    ).toBe("shadow-container");
+  });
+
+  test("should return the shadow host when at the top of a shadow tree", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        const host = document.getElementById("shadow-host");
+        const shadowContainer =
+          host.shadowRoot.getElementById("shadow-container");
+        return getParentElement(shadowContainer)?.id;
+      }),
+    ).toBe("shadow-host");
+  });
+
+  test("should return the assigned slot for a slotted element", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        const slottedChild = document.getElementById("slotted-child");
+        return getParentElement(slottedChild)?.tagName;
+      }),
+    ).toBe("SLOT");
+  });
+
+  test("should cross nested shadow boundaries", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        const outerHost = document.getElementById("nested-shadow-host");
+        const innerHost =
+          outerHost.shadowRoot.getElementById("inner-shadow-host");
+        const innerChild =
+          innerHost.shadowRoot.getElementById("inner-shadow-child");
+        // inner-shadow-child -> inner-shadow-host -> outer-shadow-container -> nested-shadow-host
+        const p1 = getParentElement(innerChild);
+        const p2 = getParentElement(p1);
+        const p3 = getParentElement(p2);
+        return [p1?.id, p2?.id, p3?.id];
+      }),
+    ).toEqual([
+      "inner-shadow-host",
+      "outer-shadow-container",
+      "nested-shadow-host",
+    ]);
+  });
+
+  test("should return null for the document element", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        return getParentElement(document.documentElement);
+      }),
+    ).toBeNull();
+  });
+
+  test("should return null when given null", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getParentElement } = await import("/src/shadow-utils/dom.js");
+        return getParentElement(null);
+      }),
+    ).toBeNull();
+  });
+});
+
 test.describe("getLastElementChild()", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/test.html");

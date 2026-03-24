@@ -64,6 +64,34 @@ export function nodeContains(node, otherNode) {
   return false;
 }
 
+/**
+ * Gets the parent element of the given node, crossing shadow boundaries.
+ * Like `Node.parentElement`, but:
+ * - Slotted elements are treated as children of their assigned slot.
+ * - Elements at a shadow root boundary return the shadow host.
+ *
+ * @param {Node} node
+ * @returns {Element|null}
+ */
+export function getParentElement(node) {
+  if (!node) {
+    return null;
+  }
+
+  if (typeof node.assignedElements !== "function" && node.assignedSlot) {
+    // Element is slotted — its logical parent is the assigned slot.
+    return node.assignedSlot;
+  }
+
+  const root = node.getRootNode();
+  if (root instanceof ShadowRoot) {
+    // At the top of a shadow tree — cross into the host.
+    return node.parentElement ?? root.host;
+  }
+
+  return node.parentElement;
+}
+
 export function getLastElementChild(node) {
   return node
     ? (node.lastElementChild ?? getLastElementChild(node.shadowRoot))
