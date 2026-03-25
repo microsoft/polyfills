@@ -304,6 +304,7 @@ export class FocusGroup {
       this.#start = startItem;
       this.#clearProxyTabbability();
       this.#ensureAncestorTabbability(startItem);
+      this.#itemWalker.currentNode = startItem;
     }
 
     flushAllObservers();

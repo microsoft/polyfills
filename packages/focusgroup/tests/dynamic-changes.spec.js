@@ -938,6 +938,38 @@ test.describe("current tab stop element", () => {
 
       await expect(item1).toBeFocused();
     });
+
+    test("should keep the active focus", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="toolbar">
+          <span tabindex="0" data-testid="item1">item1</span>
+          <span tabindex="0" data-testid="item2">
+            item2
+            <span tabindex="0" data-testid="item2-1" focusgroupstart>item2.1</span>
+          </span>
+          <span tabindex="0" data-testid="item3">item3</span>
+        </div>
+        <button data-testid="after">after</button>
+      `,
+      );
+
+      const item2 = page.getByTestId("item2");
+      await item2.focus();
+
+      const item21 = page.getByTestId("item2-1");
+      await item21.evaluate((node) => {
+        node.setAttribute("focusgroup", "none");
+      });
+
+      await expect(item2).toBeFocused();
+
+      await page.keyboard.press("ArrowRight");
+
+      await expect(page.getByTestId("item3")).toBeFocused();
+    });
   });
 
   test.describe("hidden", () => {
