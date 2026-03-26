@@ -35,9 +35,10 @@ export function generateUniqueId() {
  * Whether the given element is keyboard focusable (tabbable).
  *
  * @param {HTMLElement} element
+ * @param {HTMLElement=} owner
  * @returns {boolean}
  */
-export function isKeyboardFocusable(element) {
+export function isKeyboardFocusable(element, owner) {
   return (
     // Is content editable
     (element.isContentEditable ||
@@ -56,7 +57,7 @@ export function isKeyboardFocusable(element) {
         // Not inert
         element.inert ||
         // Not hidden
-        !checkVisibility(element) ||
+        !checkVisibility(element, owner) ||
         // Not a media element without controls
         element.matches(":is(audio, video):not([controls])") ||
         // Has not been assigned a tabindex by the polyfill
@@ -165,20 +166,21 @@ export function isKeyConflictElement(el) {
  *   elements (the subtree is an independent tab stop)
  *
  * @param {HTMLElement} element
+ * @param {HTMLElement=} owner
  * @returns {boolean}
  */
-export function isSegmentor(element) {
+export function isSegmentor(element, owner) {
   if (!checkVisibility(element)) {
     return false;
   }
-  if (isKeyboardFocusable(element)) {
+  if (isKeyboardFocusable(element, owner)) {
     return element.getAttribute("focusgroup").includes("none");
   }
   const walker = createTreeWalker(document, element, NodeFilter.SHOW_ELEMENT);
   while (walker.nextNode()) {
     if (
       walker.currentNode !== element &&
-      isKeyboardFocusable(walker.currentNode)
+      isKeyboardFocusable(walker.currentNode, owner)
     ) {
       return true;
     }
