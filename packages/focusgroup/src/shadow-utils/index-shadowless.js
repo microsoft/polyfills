@@ -16,3 +16,7 @@ export function createMutationObserver(callback) {
 export function createTreeWalker(doc, root, whatToShow, filter) {
   return doc.createTreeWalker(root, whatToShow, filter);
 }
+
+export function getParentElement(node) {
+  return node.parentElement;
+}

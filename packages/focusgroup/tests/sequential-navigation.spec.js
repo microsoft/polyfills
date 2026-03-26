@@ -413,6 +413,30 @@ test.describe("focusgroup segments", () => {
   });
 });
 
+test("hidden items should not be segment tab stop", async ({ page }) => {
+  await setupPage(
+    page,
+    `
+    <div focusgroup="toolbar">
+      <button data-testid="item1">item 1</button>
+      <div focusgroup="toolbar">
+        <button>nested item 1</button>
+      </div>
+      <div hidden>
+        <button>item 2</button>
+      </div>
+      <button data-testid="item3">item 3</button>
+    </div>
+  `,
+  );
+
+  await page.getByTestId("item1").focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+
+  await expect(page.getByTestId("item3")).toBeFocused();
+});
+
 // sequential-navigation/memory-behavior.html
 test.describe("memory behavior", () => {
   test("focusgroup with memory remembers last focused item on re-entry", async ({
@@ -769,12 +793,12 @@ test("dynamic focusgroupstart changes affect entry element selection", async ({
 
   await expect(page.getByTestId("item1")).toBeFocused();
 
+  await before.focus();
   const item2 = page.getByTestId("item2");
   await item2.evaluate((node) => {
     node.setAttribute("focusgroupstart", "");
   });
 
-  await before.focus();
   await page.keyboard.press("Tab");
 
   await expect(item2).toBeFocused();
@@ -806,11 +830,11 @@ test("enabling disabled elements makes them available for tab stop", async ({
 
   await expect(btn2).toBeFocused();
 
+  await before.focus();
   await btn1.evaluate((node) => {
     node.removeAttribute("disabled");
   });
 
-  await before.focus();
   await page.keyboard.press("Tab");
 
   await expect(btn1).toBeFocused();

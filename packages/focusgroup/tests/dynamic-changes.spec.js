@@ -485,6 +485,64 @@ test.describe("opt-out", () => {
   });
 });
 
+test.describe("opt-in", () => {
+  let group;
+  let item1;
+  let item2;
+
+  test.beforeEach(async ({ page }) => {
+    group = page.getByTestId("group");
+    item1 = page.getByTestId("item1");
+    item2 = page.getByTestId("item2");
+  });
+
+  test("should add the opt-in item from directional navigation", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div focusgroup="listbox">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2" focusgroup="none">item 2</button>
+        </div>
+      `,
+    );
+
+    await item2.evaluate((node) => {
+      node.removeAttribute("focusgroup");
+    });
+
+    await item1.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item2).toBeFocused();
+  });
+
+  test("should add directional navigation to the opt-in group", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+        <div data-testid="group" focusgroup="none">
+          <button data-testid="item1">item 1</button>
+          <button data-testid="item2">item 2</button>
+        </div>
+      `,
+    );
+
+    await group.evaluate((node) => {
+      node.setAttribute("focusgroup", "listbox");
+    });
+
+    await item1.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(item2).toBeFocused();
+  });
+});
+
 test.describe("`focusgroupstart` item", () => {
   let item1;
   let item2;
@@ -878,6 +936,92 @@ test.describe("current tab stop element", () => {
 
       await expect(item1).toBeFocused();
     });
+
+    test("should keep the active focus when no menory", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <div focusgroup="toolbar nomemory">
+          <span tabindex="0" data-testid="item1">item1</span>
+          <span tabindex="0" data-testid="item2">
+            item2
+            <span tabindex="0" data-testid="item2-1" focusgroupstart>item2.1</span>
+          </span>
+          <span tabindex="0" data-testid="item3">item3</span>
+        </div>
+      `,
+      );
+
+      const item2 = page.getByTestId("item2");
+      const item21 = page.getByTestId("item2-1");
+
+      await item2.focus();
+      await item21.evaluate((node) => {
+        node.setAttribute("focusgroup", "none");
+      });
+
+      await expect(item2).toBeFocused();
+
+      await page.keyboard.press("ArrowRight");
+
+      await expect(page.getByTestId("item3")).toBeFocused();
+    });
+  });
+
+  test.describe("hidden", () => {
+    test("should move tab stop to the nearest item", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="toolbar">
+          <button data-testid="item1">item1</button>
+          <div data-testid="target">
+            <button data-testid="item2">item2</button>
+          </div>
+          <button data-testid="item3">item3</button>
+        </div>
+      `,
+      );
+
+      await page.getByTestId("item2").focus();
+      await page.getByTestId("target").evaluate((node) => {
+        node.hidden = true;
+      });
+
+      await page.getByTestId("before").focus();
+      await page.keyboard.press("Tab");
+
+      await expect(page.getByTestId("item1")).toBeFocused();
+    });
+  });
+
+  test.describe("opt-out", () => {
+    test("should move tab stop to the nearest item", async ({ page }) => {
+      await setupPage(
+        page,
+        `
+        <button data-testid="before">before</button>
+        <div focusgroup="toolbar">
+          <button data-testid="item1">item1</button>
+          <button data-testid="item2">item2</button>
+        </div>
+      `,
+      );
+
+      const item1 = page.getByTestId("item1");
+      const item2 = page.getByTestId("item2");
+      await item1.focus();
+      await page.keyboard.press("ArrowRight");
+      await item2.evaluate((node) => {
+        node.setAttribute("focusgroup", "none");
+      });
+
+      await page.getByTestId("before").focus();
+      await page.keyboard.press("Tab");
+
+      await expect(item1).toBeFocused();
+    });
   });
 });
 
@@ -1042,5 +1186,57 @@ test.describe("segmentor", () => {
 
       await expect(item1).toBeFocused();
     });
+  });
+});
+
+test.describe("visibility", () => {
+  test("hiding an item removes it from diretional navigation", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <button data-testid="item1">item1</button>
+        <div data-testid="target">
+          <button data-testid="item2">item2</button>
+        </div>
+        <button data-testid="item3">item3</button>
+      </div>
+    `,
+    );
+
+    await page.getByTestId("target").evaluate((node) => {
+      node.hidden = true;
+    });
+
+    await page.getByTestId("item1").focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(page.getByTestId("item3")).toBeFocused();
+  });
+
+  test("showing an item adds it to diretional navigation", async ({ page }) => {
+    await setupPage(
+      page,
+      `
+      <div focusgroup="tablist">
+        <button data-testid="item1">item1</button>
+        <div data-testid="target" hidden>
+          <button data-testid="item2">item2</button>
+        </div>
+        <button data-testid="item3">item3</button>
+      </div>
+    `,
+    );
+
+    await page.getByTestId("target").evaluate((node) => {
+      node.hidden = false;
+    });
+
+    await page.getByTestId("item1").focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(page.getByTestId("item2")).toBeFocused();
   });
 });

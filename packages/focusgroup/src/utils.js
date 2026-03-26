@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { BehaviorMap, DatasetName } from "./constants.js";
-import { createTreeWalker } from "./shadow-utils/index.js";
+import { createTreeWalker, getParentElement } from "./shadow-utils/index.js";
 
 /**
  * Whether the current user agent has the `document` global object.
@@ -35,9 +35,10 @@ export function generateUniqueId() {
  * Whether the given element is keyboard focusable (tabbable).
  *
  * @param {HTMLElement} element
+ * @param {HTMLElement=} owner
  * @returns {boolean}
  */
-export function isKeyboardFocusable(element) {
+export function isKeyboardFocusable(element, owner) {
   return (
     // Is content editable
     (element.isContentEditable ||
@@ -56,8 +57,7 @@ export function isKeyboardFocusable(element) {
         // Not inert
         element.inert ||
         // Not hidden
-        element.hidden ||
-        element.matches("input[type='hidden']") ||
+        !checkVisibility(element, owner) ||
         // Not a media element without controls
         element.matches(":is(audio, video):not([controls])") ||
         // Has not been assigned a tabindex by the polyfill
@@ -166,20 +166,21 @@ export function isKeyConflictElement(el) {
  *   elements (the subtree is an independent tab stop)
  *
  * @param {HTMLElement} element
+ * @param {HTMLElement=} owner
  * @returns {boolean}
  */
-export function isSegmentor(element) {
+export function isSegmentor(element, owner) {
   if (!checkVisibility(element)) {
     return false;
   }
-  if (isKeyboardFocusable(element)) {
+  if (isKeyboardFocusable(element, owner)) {
     return element.getAttribute("focusgroup").includes("none");
   }
   const walker = createTreeWalker(document, element, NodeFilter.SHOW_ELEMENT);
   while (walker.nextNode()) {
     if (
       walker.currentNode !== element &&
-      isKeyboardFocusable(walker.currentNode)
+      isKeyboardFocusable(walker.currentNode, owner)
     ) {
       return true;
     }
@@ -190,30 +191,43 @@ export function isSegmentor(element) {
 /**
  * A light-weight, non-comprehensive ponyfill for `Element.checkVisibility()`.
  * @see https://developer.mozilla.org/en-US/docs/Web/API/Element/checkVisibility
- * @param {HTMLElement} element
+ * @param {HTMLElement} element - The element whose visibility to check.
+ * @param {HTMLElement=} ancestor - An element in the ancestry chain of
+ *     `element`. When provided, walk up from `element` to `ancestor`
+ *     (inclusive) checking `visibility` and `content-visibility` on ancestors.
+ *     When omitted, only `element` itself is checked.
  * @returns {boolean}
  */
-function checkVisibility(element) {
-  if (typeof element.checkVisibility === "function") {
+function checkVisibility(element, ancestor) {
+  if ("checkVisibility" in Element.prototype) {
     return element.checkVisibility({
-      checkOpacity: true,
-      checkVisibility: true,
+      visibilityProperty: true,
       contentVisibilityAuto: true,
     });
   }
 
-  if (el.getClientRects().length === 0) {
+  if (element.getClientRects().length === 0) {
     return false;
   }
 
-  const { visibility, opacity, contentVisibility } =
-    window.getComputedStyle(el);
-  if (
-    ["hidden", "collapse"].includes(visibility) ||
-    opacity === "0" ||
-    contentVisibility === "hidden"
-  ) {
-    return false;
+  // Walk the ancestry chain checking two properties:
+  // - `visibility: hidden/collapse` — hides the element itself, so check from
+  //   `element` upward.
+  // - `content-visibility: hidden` — hides an element's *content* (descendants,
+  //   not itself), so check from `element`'s parent upward.
+  let current = element;
+  while (current) {
+    const { visibility, contentVisibility } = window.getComputedStyle(current);
+    if (["hidden", "collapse"].includes(visibility)) {
+      return false;
+    }
+    if (current !== element && contentVisibility === "hidden") {
+      return false;
+    }
+    if (!ancestor || current === ancestor) {
+      break;
+    }
+    current = getParentElement(current);
   }
 
   return true;

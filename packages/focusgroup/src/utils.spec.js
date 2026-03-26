@@ -48,11 +48,11 @@ test.describe("isKeyboardFocusable()", () => {
     expect(
       await page.evaluate(async () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
-        return isKeyboardFocusable(
-          Object.assign(document.createElement("div"), {
-            contentEditable: "false",
-          }),
-        );
+        const element = Object.assign(document.createElement("div"), {
+          contentEditable: "false",
+        });
+        document.body.append(element);
+        return isKeyboardFocusable(element);
       }),
     ).toBe(false);
   });
@@ -63,12 +63,12 @@ test.describe("isKeyboardFocusable()", () => {
     expect(
       await page.evaluate(async () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
-        return isKeyboardFocusable(
-          Object.assign(document.createElement("div"), {
-            contentEditable: "false",
-            tabIndex: 0,
-          }),
-        );
+        const element = Object.assign(document.createElement("div"), {
+          contentEditable: "false",
+          tabIndex: 0,
+        });
+        document.body.append(element);
+        return isKeyboardFocusable(element);
       }),
     ).toBe(true);
   });
@@ -79,7 +79,9 @@ test.describe("isKeyboardFocusable()", () => {
     expect(
       await page.evaluate(async () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
-        return isKeyboardFocusable(document.createElement("button"));
+        const element = document.createElement("button");
+        document.body.append(element);
+        return isKeyboardFocusable(element);
       }),
     ).toBe(true);
   });
@@ -88,9 +90,11 @@ test.describe("isKeyboardFocusable()", () => {
     expect(
       await page.evaluate(async () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
-        return isKeyboardFocusable(
-          Object.assign(document.createElement("div"), { tabIndex: 0 }),
-        );
+        const element = Object.assign(document.createElement("div"), {
+          tabIndex: 0,
+        });
+        document.body.append(element);
+        return isKeyboardFocusable(element);
       }),
     ).toBe(true);
   });
@@ -99,9 +103,11 @@ test.describe("isKeyboardFocusable()", () => {
     expect(
       await page.evaluate(async () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
-        return isKeyboardFocusable(
-          Object.assign(document.createElement("div"), { tabIndex: -1 }),
-        );
+        const element = Object.assign(document.createElement("div"), {
+          tabIndex: -1,
+        });
+        document.body.append(element);
+        return isKeyboardFocusable(element);
       }),
     ).toBe(false);
   });
@@ -112,6 +118,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.disabled = true;
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -124,6 +131,7 @@ test.describe("isKeyboardFocusable()", () => {
         const el = document.createElement("div");
         el.tabIndex = 0;
         el.setAttribute("disabled", "");
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -134,6 +142,7 @@ test.describe("isKeyboardFocusable()", () => {
       await page.evaluate(async () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("a");
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -143,6 +152,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("a");
         el.tabIndex = 0;
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -154,6 +164,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("a");
         el.href = "#";
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(true);
@@ -165,6 +176,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.inert = true;
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -176,6 +188,23 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.hidden = true;
+        document.body.append(el);
+        return isKeyboardFocusable(el);
+      }),
+    ).toBe(false);
+  });
+
+  test("returns false if element is inside another hidden element", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyboardFocusable } = await import("/src/utils.js");
+        const el = document.createElement("div");
+        el.hidden = true;
+        const child = document.createElement("button");
+        el.append(child);
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -187,6 +216,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("input");
         el.type = "hidden";
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -198,6 +228,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("audio");
         el.tabIndex = 0;
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);
@@ -209,6 +240,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("audio");
         el.controls = true;
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(true);
@@ -223,6 +255,7 @@ test.describe("isKeyboardFocusable()", () => {
         const { isKeyboardFocusable } = await import("/src/utils.js");
         const el = document.createElement("button");
         el.setAttribute(DatasetName.AUTHOR_TABINDEX, "0");
+        document.body.append(el);
         return isKeyboardFocusable(el);
       }),
     ).toBe(false);

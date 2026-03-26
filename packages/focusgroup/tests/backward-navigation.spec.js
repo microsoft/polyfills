@@ -241,6 +241,26 @@ test("skips unrelated root focusgroup subtree when navigating backward", async (
   await expect(page.getByTestId("item1")).toBeFocused();
 });
 
+test("skip hidden candidates", async ({ page }) => {
+  await setupPage(
+    page,
+    `
+    <div focusgroup="tablist">
+      <button data-testid="item1">item1</button>
+      <div hidden>
+        <button>item2</button>
+      </div>
+      <button data-testid="item3">item3</button>
+    </div>
+  `,
+  );
+
+  await page.getByTestId("item3").focus();
+  await page.keyboard.press("ArrowLeft");
+
+  await expect(page.getByTestId("item1")).toBeFocused();
+});
+
 // backward-navigation/wraps-successfully-complex-case.html
 test("wraps successfully when there are non-item elements before and after items", async ({
   page,
