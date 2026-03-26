@@ -793,12 +793,12 @@ test("dynamic focusgroupstart changes affect entry element selection", async ({
 
   await expect(page.getByTestId("item1")).toBeFocused();
 
+  await before.focus();
   const item2 = page.getByTestId("item2");
   await item2.evaluate((node) => {
     node.setAttribute("focusgroupstart", "");
   });
 
-  await before.focus();
   await page.keyboard.press("Tab");
 
   await expect(item2).toBeFocused();
@@ -830,11 +830,11 @@ test("enabling disabled elements makes them available for tab stop", async ({
 
   await expect(btn2).toBeFocused();
 
+  await before.focus();
   await btn1.evaluate((node) => {
     node.removeAttribute("disabled");
   });
 
-  await before.focus();
   await page.keyboard.press("Tab");
 
   await expect(btn1).toBeFocused();

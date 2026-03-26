@@ -481,9 +481,7 @@ export class FocusGroup {
       flushAllObservers();
     }
 
-    if (this.#memory) {
-      this.#memorized = target;
-    }
+    this.#memorized = target;
 
     if (this.#itemWalker.currentNode === target) {
       return;
@@ -521,6 +519,7 @@ export class FocusGroup {
     }
 
     // Clear the memory.
+    this.#memorized = null;
     this.#start.tabIndex = 0;
     this.#itemWalker.currentNode = this.#start;
     while (this.#itemWalker.nextNode()) {
