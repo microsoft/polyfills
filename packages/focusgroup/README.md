@@ -41,3 +41,15 @@ polyfill();
 const myElement = document.querySelector(".my-element");
 polyfill(myElement);
 ```
+
+## Testing
+
+See [TESTING.md](TESTING.md) for details on how to test this project.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Support
+
+See [SUPPORT.md](SUPPORT.md).
