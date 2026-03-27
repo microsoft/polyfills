@@ -55,7 +55,7 @@ polyfill(myElement);
     * Polyfill will not be able to avoid role inference on items that have non-generic roles defined via their `ElementInternals`
 * When an focusgroup item has arrow/home/end key handlers, polyfill is inconsistent with the native implementation because it can’t access author event listeners:
     * Custom element: unless the custom element calls `event.preventDefault()`, adding arrow/home/end key handler will not stop the polyfill from handling directional navigation
-    * Built-in elements that have key conflict (e.g. <input>): cancelling default arrow/home/end key behavior won’t enable the polyfill to add directional navigation
+    * Built-in elements that have key conflict (e.g. `<input>`): cancelling default arrow/home/end key behavior won’t enable the polyfill to add directional navigation
 * If an item’s keyboard focusability changed by a method that doesn’t reflect on any attribute changes, polyfill will not be able to exclude the item from continuing participating the directional navigation
     * For example, a custom element (as a focusgroup item) gets disabled through a property change or other mechanism without reflecting its disabled state to a `disabled` attribute
 * After initial polyfill, visibility changes on elements that matter to the focusgroup’s behaviors will not automatically update the group’s behavior:
