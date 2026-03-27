@@ -44,7 +44,7 @@ polyfill(myElement);
 
 ## Limitations
 
-* The `focusgroup` spec is still evolving, the polyfill may not reflect the latest spec changes and the native implementations in browsers that support `focusgroup`
+* The `focusgroup` spec is still evolving, the polyfill may not reflect the latest spec changes and the native implementations, check the [CHANGELOG.md](./CHANGELOG.md) for details
 * Doesn’t support `focusgroup` property
     * If the polyfill adds `focusgroup` property to `HTMLElement.prototype`, it will break feature detection when `polyfill()` is called again. But if it only adds `focusgroup` property to individual HTML elements, it can’t changing `focusgroup` property’s value on an arbitrary element
 * Polyfill explicitly manipulates `tabindex` attributes
