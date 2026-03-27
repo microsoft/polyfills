@@ -1,6 +1,6 @@
 # Web Platform Polyfills
 
-A collection of polyfills for new and upcoming web platform features.
+A collection of polyfills for new and upcoming web platform features. See [packages](packages/) for available polyfills.
 
 ## Third-Party Code
 
@@ -13,10 +13,6 @@ For information on how to get support, please see [SUPPORT.md](SUPPORT.md).
 ## Contributing
 
 This project welcomes contributions and suggestions. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-## Testing
-
-For information on testing, please see [TESTING.md](TESTING.md).
 
 ## Security
 
