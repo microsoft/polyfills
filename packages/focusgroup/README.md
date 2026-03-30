@@ -73,7 +73,7 @@ import { polyfill } from "@microsoft/focusgroup-polyfill";
 
 class MyTablist extends HTMLElement {
   connectedCallback() {
-    // Other tasks to do for initiate the tablist component
+    // Other tasks for initiating the tablist component
 
     queueMicrotask(() => {
       polyfill(this);

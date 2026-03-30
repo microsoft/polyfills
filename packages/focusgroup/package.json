@@ -15,7 +15,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MicrosoftEdge/focusgroup-polyfill.git"
+    "url": "git+https://github.com/Microsoft/polyfills.git",
+    "directory": "packages/focusgroup"
   },
   "keywords": [
     "focusgroup",
@@ -23,7 +24,7 @@
     "edge",
     "html"
   ],
-  "author": "MicrosoftEdge",
+  "author": "Microsoft",
   "license": "MIT",
   "type": "module",
   "module": "./build/focusgroup-polyfill.min.mjs",
@@ -56,9 +57,9 @@
     }
   ],
   "bugs": {
-    "url": "https://github.com/MicrosoftEdge/focusgroup-polyfill/issues"
+    "url": "https://github.com/Microsoft/polyfills/issues"
   },
-  "homepage": "https://github.com/MicrosoftEdge/focusgroup-polyfill#readme",
+  "homepage": "https://github.com/microsoft/polyfills/tree/main/packages/focusgroup#readme",
   "devDependencies": {
     "@playwright/test": "1.58.2",
     "@size-limit/preset-small-lib": "12.0.0",
