@@ -11,7 +11,9 @@
     "build:lib:shadowless": "npm run build:lib -- --mode shadowless",
     "build:lib:shadowless-min": "npm run build:lib -- --mode shadowless-minified",
     "test": "playwright test",
-    "size": "size-limit"
+    "size": "size-limit",
+    "publish": "beachball publish",
+    "publish-ci": "beachball publish -y --no-publish"
   },
   "repository": {
     "type": "git",
@@ -64,6 +66,7 @@
     "@playwright/test": "1.58.2",
     "@size-limit/preset-small-lib": "12.0.0",
     "@types/node": "^25.4.0",
+    "beachball": "2.64.0",
     "size-limit": "12.0.0",
     "terser": "5.46.0",
     "vite": "7.3.1"
