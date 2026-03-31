@@ -10,6 +10,8 @@
     "build": "npm run build --workspaces --if-present",
     "check": "biome check",
     "fix": "biome check --fix",
+    "change": "beachball change --dependent-change-type none",
+    "checkchange": "beachball check --changehint \"Run 'npm run change' to generate a change file\"",
     "publish": "beachball publish",
     "publish-ci": "beachball publish -y --no-publish"
   },
