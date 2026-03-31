@@ -7,8 +7,11 @@
     "packages/*"
   ],
   "scripts": {
+    "build": "npm run build --workspaces --if-present",
     "check": "biome check",
-    "fix": "biome check --fix"
+    "fix": "biome check --fix",
+    "publish": "beachball publish",
+    "publish-ci": "beachball publish -y --no-publish"
   },
   "repository": {
     "type": "git",
@@ -26,6 +29,7 @@
   "homepage": "https://github.com/microsoft/polyfills#readme",
   "devDependencies": {
     "@biomejs/biome": "2.4.6",
+    "beachball": "2.64.0",
     "lefthook": "2.1.1"
   }
 }
