@@ -90,6 +90,54 @@ class MyTablist extends HTMLElement {
 Currently the polyfill doesn’t support observing visibility changes on items or nested groups. As a workaround, you should add `tabindex="0"` to all items, and if an item is nested inside a hidden container, or itself is hidden, also add `focusgroup="none"` to opt out of the directional navigation. When the item becomes visible, remove the `focusgroup="none"` attribute.
 You may want to make the `focusgroup="none"` attribute changes after the visibility changes and inside a `requestAnimationFrame` callback function.
 
+### Selecting focusgroup items
+
+In some UI design patterns, e.g. tab list and tabs, you’ll not only need to handle directional navigation, but also changing an item’s selection state, e.g. activating a tab and deactivating another. Since focusgroup is designed to only handle directional navigation, as a developer, you’ll still have to handle selection by yourself.
+
+Take the tab list and tab patterns as an example, to manage selection, here are some recommendations:
+
+* Set tab list’s `focusgroup` with no memory
+* Update selection in a `focusin` event handler
+* Add `focusgroupstart` attribute to the selected tab (and remove from the deselected one)
+
+```html
+<my-tablist focusgroup="tablist nomemory">
+  <my-tab>tab 1</my-tab>
+  <my-tab>tab 2</my-tab>
+  <my-tab>tab 3</my-tab>
+  <my-tab>tab 4</my-tab>
+</my-tablist>
+```
+
+```js
+class MyTablist extends HTMLElement {
+  // ...
+
+  // This method listens to the `focusin` event on the tab list element itself.
+  handleFocusInEvent(event) {
+    const { target } = event;
+
+    // Assuming no nested focusable element inside each tab element.
+    if (!isTab(target) || target.disabled) {
+      return;
+    }
+
+    const currentSelected = this.querySelector("my-tab[aria-selected='true']");
+    if (currentSelected) {
+      currentSelected.removeAttribute("aria-selected");
+      currentSelected.removeAttribute("focusgroupstart");
+      // Hide the associated tab panel.
+    }
+
+    target.setAttribute("aria-selected", "true");
+    target.setAttribute("focusgroupstart", "");
+    // Show the associated tab panel.
+  }
+}
+```
+
+If the focusgroup’s reentry point doesn’t need to align with the element that has the selected state within a group, you can skip the `focusgroupstart` attribute manipulation and feel free to remove `nomemory` as you see fit, but it’s still recommended to use `focusin` event on the focusgroup owner element to update selection states.
+
 ## Testing
 
 See [TESTING.md](./TESTING.md) for details on how to test this project.
