@@ -22,7 +22,7 @@ jobs:
 
     - uses: actions/setup-node@v6
       with:
-        node-version: 22
+        node-version: 20
 
     - name: Cache multiple paths
       uses: actions/cache@v4
@@ -42,7 +42,7 @@ jobs:
     - name: Check for the presence of changed files inside ./change
       run: npm run checkchange
 
-    # Switch Node to 24, 22 was used for beachball compat
+    # Switch Node to 24, 20 was used for beachball compat
     - uses: actions/setup-node@v6
       with:
         node-version: 24
