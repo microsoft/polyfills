@@ -1,5 +1,8 @@
 # Focusgroup Polyfill
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://badge.fury.io/js/%40microsoft%2Ffocusgroup-polyfill.svg)](https://badge.fury.io/js/%40microsoft%2Ffocusgroup-polyfill)
+
 Applications can adopt `focusgroup` before it is widely available in the Web Platform.
 
 The polyfill follows these principles:
