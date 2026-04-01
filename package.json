@@ -31,8 +31,8 @@
   },
   "homepage": "https://github.com/microsoft/polyfills#readme",
   "devDependencies": {
-    "@biomejs/biome": "2.4.6",
+    "@biomejs/biome": "2.4.10",
     "beachball": "2.64.0",
-    "lefthook": "2.1.1"
+    "lefthook": "2.1.4"
   }
 }
