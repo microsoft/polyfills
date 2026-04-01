@@ -43,7 +43,7 @@ jobs:
       run: npm run checkchange
 
     - name: Check Biome formatting
-      run: npm run format:check
+      run: npm run check
 
     - name: Build workspaces
       run: npm run build
