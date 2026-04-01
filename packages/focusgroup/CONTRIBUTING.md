@@ -33,4 +33,4 @@ On a high-level, the polyfill works in 3 stages:
     * Observes to a list of attribute changes in the subtree of the group
     * Runs the decoration stage again to update the states on affected item elements
 
-And for each of these 3 stages, because the focusgroup spec supports Shadow DOM, the polyfill uses [utilities](./src/shadow-utils/) that are ergonomically similar to native DOM API but are able to pierce through shadow boundaries.
+And for each of these 3 stages, because the focusgroup spec supports Shadow DOM, the polyfill uses [utilities](./src/shadow-utils/) that are ergonomically similar to native DOM API but are able to pierce through open shadow boundaries.
