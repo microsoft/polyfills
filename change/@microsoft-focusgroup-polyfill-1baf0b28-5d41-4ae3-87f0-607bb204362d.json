@@ -1,0 +1,7 @@
+{
+  "type": "major",
+  "comment": "pubilsh the first version of focugroup polyfill to npm",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "machi@microsoft.com",
+  "dependentChangeType": "none"
+}
