@@ -93,11 +93,11 @@ export function polyfill(root) {
  * and polyfills any newly added focusgroups.
  */
 export function polyfillAllAndObserve() {
-  globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY = true;
-
-  if (!hasDocument() || elementPolyfillMap.has(document.body)) {
+  if (!hasDocument() || globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY) {
     return;
   }
 
+  globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY = true;
   polyfill();
+  console.log(1);
 }
