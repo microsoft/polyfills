@@ -78,10 +78,9 @@ export default ({ mode }) => {
           preserve_annotations: false,
         },
       },
-      rollupOptions: {
+      rolldownOptions: {
         treeshake: {
           propertyReadSideEffects: false,
-          tryCatchDeoptimization: false,
         },
       },
       outDir: "build",
