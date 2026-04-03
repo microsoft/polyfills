@@ -552,10 +552,11 @@
 <div><button>after</button></div>
 
 <script type="module">
-  import {polyfill} from "./src/polyfill.js";
+  import { polyfillAllAndObserve } from "./src/polyfill.js";
 
-  polyfill();
+  polyfillAllAndObserve();
 </script>
 
 <a href="test.html">test</a>
+
 </html>
