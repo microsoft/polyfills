@@ -1,0 +1,7 @@
+{
+  "type": "major",
+  "comment": "publish focusgroup polyfill to npm",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "machi@microsoft.com",
+  "dependentChangeType": "none"
+}
