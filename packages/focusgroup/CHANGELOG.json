@@ -1,0 +1,20 @@
+{
+  "name": "@microsoft/focusgroup-polyfill",
+  "entries": [
+    {
+      "date": "Fri, 03 Apr 2026 21:11:52 GMT",
+      "version": "1.0.0",
+      "tag": "@microsoft/focusgroup-polyfill_v1.0.0",
+      "comments": {
+        "major": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "32957001ece1e95252811a532f2bc9e7540eafc3",
+            "comment": "publish focusgroup polyfill to npm"
+          }
+        ]
+      }
+    }
+  ]
+}
