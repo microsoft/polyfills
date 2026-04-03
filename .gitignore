@@ -13,3 +13,6 @@ playwright/.auth/
 # Build
 build/
 dist/
+
+# Pack directory
+publish_artifacts/
