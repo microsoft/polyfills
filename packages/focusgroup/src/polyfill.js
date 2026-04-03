@@ -99,5 +99,4 @@ export function polyfillAllAndObserve() {
 
   globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY = true;
   polyfill();
-  console.log(1);
 }
