@@ -1,9 +1,20 @@
+import { copyFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const src = (path) => resolve(import.meta.dirname, path);
 
 const entry = src("src/index.js");
 const shadowlessUtils = src("src/shadow-utils/index-shadowless.js");
+
+/** @returns {import("vite").Plugin} */
+function copyTypes() {
+  return {
+    name: "copy-types",
+    closeBundle() {
+      copyFileSync(src("src/index.d.ts"), src("build/index.d.ts"));
+    },
+  };
+}
 
 /** @returns {import("vite").Plugin} */
 function stripPureAnnotations() {
@@ -27,7 +38,10 @@ export default ({ mode }) => {
   const min = isMinified ? ".min" : "";
 
   return {
-    plugins: mode === "minified" ? [stripPureAnnotations()] : [],
+    plugins: [
+      copyTypes(),
+      ...(mode === "minified" ? [stripPureAnnotations()] : []),
+    ],
     build: {
       lib: {
         entry,
