@@ -1,8 +1,16 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Sat, 04 Apr 2026 00:02:33 GMT and should not be manually modified. -->
+<!-- This log was last generated on Sat, 04 Apr 2026 00:07:50 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.1.0
+
+Sat, 04 Apr 2026 00:07:50 GMT
+
+### Minor changes
+
+- add typescript declaration file for public API (machi@microsoft.com)
 
 ## 1.1.0
 
