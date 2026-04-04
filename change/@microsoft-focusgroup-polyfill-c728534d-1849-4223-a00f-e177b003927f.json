@@ -1,7 +1,0 @@
-{
-  "type": "minor",
-  "comment": "add typescript declaration file for public API",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}

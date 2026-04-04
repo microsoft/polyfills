@@ -2,6 +2,21 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Sat, 04 Apr 2026 00:02:33 GMT",
+      "version": "1.1.0",
+      "tag": "@microsoft/focusgroup-polyfill_v1.1.0",
+      "comments": {
+        "minor": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "09c989b4738ace29e63c0c1102fdba7f87605893",
+            "comment": "add typescript declaration file for public API"
+          }
+        ]
+      }
+    },
+    {
       "date": "Fri, 03 Apr 2026 21:11:52 GMT",
       "version": "1.0.0",
       "tag": "@microsoft/focusgroup-polyfill_v1.0.0",
