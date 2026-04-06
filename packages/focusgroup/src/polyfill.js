@@ -37,11 +37,7 @@ if (
         }
 
         for (const node of entry.addedNodes) {
-          if (
-            node.nodeType === Node.ELEMENT_NODE &&
-            node.hasAttribute("focusgroup") &&
-            !elementPolyfillMap.has(node)
-          ) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
             polyfill(node);
           }
         }
@@ -63,9 +59,7 @@ export function polyfill(root) {
     return;
   }
 
-  if (!root) {
-    root = document.body;
-  }
+  root ??= document.body;
 
   const walker = createTreeWalker(
     document,
@@ -84,7 +78,10 @@ export function polyfill(root) {
       continue;
     }
 
-    elementPolyfillMap.set(element, new FocusGroup(walker.currentNode));
+    // Make sure the element is ready during initial polyfilling.
+    requestAnimationFrame(() => {
+      elementPolyfillMap.set(element, new FocusGroup(element));
+    });
   } while (walker.nextNode());
 }
 
@@ -92,8 +89,8 @@ export function polyfill(root) {
  * Polyfills all potential focusgroups in `document.body`, observes DOM changes,
  * and polyfills any newly added focusgroups.
  */
-export function polyfillAllAndObserve() {
-  if (!hasDocument() || globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY) {
+export function polyfillBodyAndObserve() {
+  if (!hasDocument()) {
     return;
   }
 
