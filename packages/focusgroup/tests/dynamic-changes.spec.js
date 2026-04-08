@@ -16,7 +16,7 @@ test.describe("`focusgroup` attribute", () => {
   });
 
   test.describe("behavior token", () => {
-    test("should change role inferrence", async ({ page }) => {
+    test("should change role inference", async ({ page }) => {
       await setupPage(
         page,
         `
@@ -579,7 +579,7 @@ test.describe("`focusgroupstart` item", () => {
       await page.keyboard.press("Tab");
 
       await item1.evaluate((node) => {
-        node.setAttribute("focusgroupstart", "");
+        node.toggleAttribute("focusgroupstart", true);
       });
 
       await page.keyboard.press("Shift+Tab");
@@ -589,7 +589,7 @@ test.describe("`focusgroupstart` item", () => {
 
     test("should move the tab stop to the element", async ({ page }) => {
       await item2.evaluate((node) => {
-        node.setAttribute("focusgroupstart", "");
+        node.toggleAttribute("focusgroupstart", true);
       });
 
       await after.focus();
@@ -657,7 +657,7 @@ test.describe("`focusgroupstart` item", () => {
       );
 
       await item1.evaluate((node) => {
-        node.setAttribute("focusgroupstart", "");
+        node.toggleAttribute("focusgroupstart", true);
       });
 
       await before.focus();
@@ -682,7 +682,7 @@ test.describe("`focusgroupstart` item", () => {
       );
 
       await item3.evaluate((node) => {
-        node.setAttribute("focusgroupstart", "");
+        node.toggleAttribute("focusgroupstart", true);
       });
 
       await before.focus();
@@ -692,7 +692,7 @@ test.describe("`focusgroupstart` item", () => {
     });
   });
 
-  test.describe("removed with anthor focusgroupstart element", () => {
+  test.describe("removed with anothor focusgroupstart element", () => {
     test("should move the tab stop to the other one if removed before it", async ({
       page,
     }) => {
@@ -717,6 +717,41 @@ test.describe("`focusgroupstart` item", () => {
 
       await expect(item3).toBeFocused();
     });
+  });
+
+  test("should keep `focusgroupstart` position after moving when no memory", async ({
+    page,
+  }) => {
+    await setupPage(
+      page,
+      `
+      <button data-testid="before">before</button>
+      <div focusgroup="tablist nomemory" data-testid="tablist">
+        <button data-testid="item1">tab 1</button>
+        <button data-testid="item2" focusgroupstart>tab 2</button>
+        <button data-testid="item3">tab 3</button>
+      </div>
+      `,
+    );
+
+    const tablist = page.getByTestId("tablist");
+
+    await tablist.evaluate((node) => {
+      const tabs = node.querySelectorAll("button");
+      node.addEventListener("focusin", (evt) => {
+        tabs.forEach((tab) => {
+          tab.toggleAttribute("focusgroupstart", tab === evt.target);
+        });
+      });
+    });
+
+    await before.focus();
+    await page.keyboard.press("Tab"); // on item2
+    await page.keyboard.press("ArrowRight"); // on item3
+    await before.focus(); // on before
+    await page.keyboard.press("Tab"); // on item3
+
+    await expect(item3).toBeFocused();
   });
 });
 
@@ -1190,7 +1225,7 @@ test.describe("segmentor", () => {
 });
 
 test.describe("visibility", () => {
-  test("hiding an item removes it from diretional navigation", async ({
+  test("hiding an item removes it from directional navigation", async ({
     page,
   }) => {
     await setupPage(
@@ -1216,7 +1251,9 @@ test.describe("visibility", () => {
     await expect(page.getByTestId("item3")).toBeFocused();
   });
 
-  test("showing an item adds it to diretional navigation", async ({ page }) => {
+  test("showing an item adds it to directional navigation", async ({
+    page,
+  }) => {
     await setupPage(
       page,
       `

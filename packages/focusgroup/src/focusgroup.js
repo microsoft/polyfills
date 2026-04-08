@@ -481,16 +481,26 @@ export class FocusGroup {
       return;
     }
 
-    // Clear the memory.
+    // Clear the memory and reset tab stops, but make sure the `focusgroupstart`
+    // element, if any, is considered as the new starting element (it’s possible
+    // that the author moved the `focusgroupstart` element and the polyfill
+    // should respect that.
     this.#memorized = null;
-    this.#start.tabIndex = 0;
-    this.#itemWalker.currentNode = this.#start;
-    while (this.#itemWalker.nextNode()) {
+    const first = this.#firstItem();
+    let startItem = null;
+    do {
       const current = this.#itemWalker.currentNode;
+      if (!startItem && current.hasAttribute("focusgroupstart")) {
+        startItem = current;
+      }
       current.tabIndex = current.hasAttribute(DatasetName.SEGMENT_START)
         ? 0
         : -1;
-    }
+    } while (this.#itemWalker.nextNode());
+
+    this.#start = startItem || first;
+    this.#start.tabIndex = 0;
+    this.#itemWalker.currentNode = this.#start;
 
     // Proxy hosts for the reset tab stop are already set above.
 
