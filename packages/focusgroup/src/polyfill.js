@@ -19,6 +19,7 @@ if (
   elementPolyfillMap = globalThis.__FOCUSGROUP_POLYFILL_ELEMENT_POLYFILL_MAP;
 
   if (!globalThis.__FOCUSGROUP_POLYFILL_GLOBAL_OBSERVER) {
+    // Only observe light DOM for perfoamance.
     const observer = new MutationObserver((entries) => {
       for (const entry of entries) {
         if (entry.type !== "childList") {
