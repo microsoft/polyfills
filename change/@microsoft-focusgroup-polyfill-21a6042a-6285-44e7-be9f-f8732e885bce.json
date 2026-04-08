@@ -1,6 +1,6 @@
 {
   "type": "minor",
-  "comment": "add `polyfillAllAndObserve` to polyfill and observe `document.body`",
+  "comment": "add `polyfillBodyAndObserve()` function to polyfill and observe `document.body`",
   "packageName": "@microsoft/focusgroup-polyfill",
   "email": "machi@microsoft.com",
   "dependentChangeType": "none"
