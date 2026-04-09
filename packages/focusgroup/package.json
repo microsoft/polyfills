@@ -28,24 +28,28 @@
   "author": "Microsoft",
   "license": "MIT",
   "type": "module",
-  "module": "./build/focusgroup-polyfill.min.mjs",
+  "module": "./build/focusgroup-polyfill.mjs",
   "types": "./build/index.d.ts",
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill.min.mjs"
+      "import": "./build/focusgroup-polyfill.min.mjs",
+      "require": "./build/focusgroup-polyfill.min.mjs"
     },
     "./unminified": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill.mjs"
+      "import": "./build/focusgroup-polyfill.mjs",
+      "require": "./build/focusgroup-polyfill.mjs"
     },
     "./shadowless": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill-shadowless.min.mjs"
+      "import": "./build/focusgroup-polyfill-shadowless.min.mjs",
+      "require": "./build/focusgroup-polyfill-shadowless.min.mjs"
     },
     "./shadowless-unminified": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill-shadowless.mjs"
+      "import": "./build/focusgroup-polyfill-shadowless.mjs",
+      "require": "./build/focusgroup-polyfill-shadowless.mjs"
     }
   },
   "files": [
