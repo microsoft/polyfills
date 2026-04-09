@@ -34,7 +34,7 @@ const myElement = document.querySelector(".my-element");
 polyfill(myElement);
 ```
 
-If your project doesn’t need Shadow DOM support, you can use the "shadowless" bundle, which has smaller file size:
+If your project doesn’t need Shadow DOM support, you can use the “shadowless” bundle, which has smaller file size:
 
 ```js
 import { polyfill } from "@microsoft/focusgroup-polyfill/shadowless";
@@ -46,9 +46,19 @@ const myElement = document.querySelector(".my-element");
 polyfill(myElement);
 ```
 
+Alternatively, you can polyfill the entire `document.body` and observe any DOM changes, if new focusgroup elements are added to the light DOM, they will be automatically polyfilled:
+
+```js
+import { polyfillBodyAndObserve } from "@microsoft/focusgroup-polyfill";
+
+polyfillBodyAndObserve();
+```
+
+The same function also exists in the “shadowless” bundle.
+
 ## Limitations
 
-While one of the polyfill’s principles is "correctness", it’s still bound to the web platform’s limitations, especially when considering performance.
+While one of the polyfill’s principles is “correctness”, it’s still bound to the web platform’s limitations, especially when considering performance.
 
 * The `focusgroup` spec is still evolving, the polyfill may not reflect the latest spec changes and the native implementations, check the [CHANGELOG.md](./CHANGELOG.md) for details
 * Doesn’t support `focusgroup` property
