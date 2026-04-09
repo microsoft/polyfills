@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "make sure focusgroupstart changes are respected if a focusgroup has nomemory",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}

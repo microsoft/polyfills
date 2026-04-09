@@ -2,6 +2,29 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Thu, 09 Apr 2026 02:00:38 GMT",
+      "version": "1.2.0",
+      "tag": "@microsoft/focusgroup-polyfill_v1.2.0",
+      "comments": {
+        "minor": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "85e72b36cac9e8e97670300569315dabdca6f01e",
+            "comment": "add `polyfillBodyAndObserve()` function to polyfill and observe `document.body`"
+          }
+        ],
+        "patch": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "e5d705597b8e05ff730e03ef2a61a70c494cbe44",
+            "comment": "make sure focusgroupstart changes are respected if a focusgroup has nomemory"
+          }
+        ]
+      }
+    },
+    {
       "date": "Sat, 04 Apr 2026 00:07:50 GMT",
       "version": "1.1.0",
       "tag": "@microsoft/focusgroup-polyfill_v1.1.0",
