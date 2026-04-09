@@ -33,19 +33,19 @@
   "exports": {
     ".": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill.min.mjs"
+      "default": "./build/focusgroup-polyfill.min.mjs"
     },
     "./unminified": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill.mjs"
+      "default": "./build/focusgroup-polyfill.mjs"
     },
     "./shadowless": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill-shadowless.min.mjs"
+      "default": "./build/focusgroup-polyfill-shadowless.min.mjs"
     },
     "./shadowless-unminified": {
       "types": "./build/index.d.ts",
-      "import": "./build/focusgroup-polyfill-shadowless.mjs"
+      "default": "./build/focusgroup-polyfill-shadowless.mjs"
     }
   },
   "files": [
