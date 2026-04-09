@@ -1,0 +1,7 @@
+{
+  "type": "patch",
+  "comment": "add require field to exports",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "machi@microsoft.com",
+  "dependentChangeType": "none"
+}
