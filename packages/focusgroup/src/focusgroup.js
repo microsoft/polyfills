@@ -30,6 +30,7 @@ import {
 // Add it to the `window` object in case the polyfill script being loaded
 // multiple times.
 globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS ??= new Set();
+/** @type {Set<MutationObserver>} */
 const observers = globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS;
 
 /**
@@ -118,6 +119,12 @@ export class FocusGroup {
   #proxyHosts = new Set();
 
   /**
+   * The mutation observer.
+   * @type {MutationObserver}
+   */
+  #observer;
+
+  /**
    * @param {HTMLElement!} owner - The focus group owner element.
    */
   constructor(owner) {
@@ -155,8 +162,8 @@ export class FocusGroup {
       }
     }
 
-    const observer = createMutationObserver(this.#processMutations.bind(this));
-    observer.observe(owner, {
+    this.#observer = createMutationObserver(this.#processMutations.bind(this));
+    this.#observer.observe(owner, {
       attributes: true,
       attributeFilter: [
         "focusgroup",
@@ -172,11 +179,26 @@ export class FocusGroup {
       childList: true,
       subtree: true,
     });
-    addObserver(observer);
+    addObserver(this.#observer);
 
     this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this));
     this.#owner.addEventListener("focusin", this.#handleFocusin.bind(this));
     this.#owner.addEventListener("focusout", this.#handleFocusout.bind(this));
+  }
+
+  /**
+   * Recycles the focusgroup and release observers for garbage collection.
+   * NOTE: This method does not undecorate the elements, it should be called
+   * after the focusgroup owner being removed from DOM.
+   */
+  recycle() {
+    observers.delete(this.#observer);
+    this.#observer?.disconnect();
+    this.#owner = null;
+    this.#start = null;
+    this.#itemWalker = null;
+    this.#memorized = null;
+    this.#proxyHosts.clear();
   }
 
   #updateDefinition() {
