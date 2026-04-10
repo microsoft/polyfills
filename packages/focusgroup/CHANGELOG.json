@@ -2,6 +2,21 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Fri, 10 Apr 2026 17:18:38 GMT",
+      "version": "1.2.1",
+      "tag": "@microsoft/focusgroup-polyfill_v1.2.1",
+      "comments": {
+        "patch": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "a741ebcda7cb3e6c7e2b30c8b2290631d19d52a3",
+            "comment": "replace import with default in package json exports"
+          }
+        ]
+      }
+    },
+    {
       "date": "Thu, 09 Apr 2026 02:00:38 GMT",
       "version": "1.2.0",
       "tag": "@microsoft/focusgroup-polyfill_v1.2.0",

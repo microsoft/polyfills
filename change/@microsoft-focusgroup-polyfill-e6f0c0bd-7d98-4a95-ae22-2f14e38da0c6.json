@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "replace import with default in package json exports",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}
