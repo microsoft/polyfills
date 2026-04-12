@@ -1070,7 +1070,7 @@ test.describe("current tab stop element", () => {
       await expect(item1).toBeFocused();
     });
 
-    test("should keep the active focus when no memory", async ({ page }, {
+    test("should keep the active focus when no menory", async ({ page }, {
       project,
     }) => {
       await setupPage(
