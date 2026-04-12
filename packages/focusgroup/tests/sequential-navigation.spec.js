@@ -545,6 +545,43 @@ test.describe("guaranteed tab stop priority", () => {
     await setupPage(
       page,
       `<div data-testid="before" tabindex="0">Before</div>
+        <div data-testid="focusgroup" focusgroup="toolbar">
+          <button data-testid="item1">Item 1</button>
+          <div tabindex="0">
+            <template shadowrootmode="open">
+              <slot></slot>
+              <div>
+                <slot name="item"></slot>
+              </div>
+            </template>
+            Item 2
+            <button data-testid="item22" slot="item" focusgroupstart>Item 2.2</button>
+          </div>
+          <button data-testid="item3">Item 3</button>
+        </div>
+        <div data-testid="after" tabindex="0">After</div>`,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("item22")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("after")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("item22")).toBeFocused();
+  });
+
+  test("focusgroupstart element in nested shadow tree is the guaranteed tab stop entry point with nomemory", async ({
+    page,
+    channel,
+  }) => {
+    if (channel === "chrome-canary") {
+      test.skip("chromium implementation has a bug");
+    }
+
+    await setupPage(
+      page,
+      `<div data-testid="before" tabindex="0">Before</div>
         <div data-testid="focusgroup" focusgroup="toolbar nomemory">
           <button data-testid="item1">Item 1</button>
           <div tabindex="0">
@@ -564,6 +601,10 @@ test.describe("guaranteed tab stop priority", () => {
 
     await page.getByTestId("before").focus();
     await page.keyboard.press("Tab");
+    await expect(page.getByTestId("item22")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("after")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
     await expect(page.getByTestId("item22")).toBeFocused();
   });
 

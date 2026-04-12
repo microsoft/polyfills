@@ -524,6 +524,10 @@ export class FocusGroup {
     this.#start.tabIndex = 0;
     this.#itemWalker.currentNode = this.#start;
 
+    if (focusLeavingGroup) {
+      this.#enableKeyboardFocusabilityForProxyHost(this.#start);
+    }
+
     // Proxy hosts for the reset tab stop are already set above.
 
     flushAllObservers();
