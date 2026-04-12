@@ -577,8 +577,6 @@ test.describe("guaranteed tab stop priority", () => {
       test.skip("chromium implementation has a bug");
     }
 
-    test.fixme();
-
     await setupPage(
       page,
       project,
