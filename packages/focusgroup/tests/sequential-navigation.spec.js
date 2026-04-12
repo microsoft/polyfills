@@ -610,13 +610,14 @@ test.describe("guaranteed tab stop priority", () => {
   test("focusgroupstart element in nested shadow tree is the guaranteed tab stop entry point with nomemory", async ({
     page,
     channel,
-  }) => {
+  }, { project }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
     }
 
     await setupPage(
       page,
+      project,
       `<div data-testid="before" tabindex="0">Before</div>
         <div data-testid="focusgroup" focusgroup="toolbar nomemory">
           <button data-testid="item1">Item 1</button>
