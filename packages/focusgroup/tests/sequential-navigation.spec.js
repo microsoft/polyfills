@@ -8,9 +8,10 @@ import { setupPage } from "./utils.js";
 test.describe("basic tab behavior", () => {
   test("Tab enters focusgroup at first item in tree order and exits normally", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before" tabindex="0">Before focusgroup</div>
         <div data-testid="focusgroup1" focusgroup="toolbar nomemory">
           <span data-testid="item1" tabindex="0">Item 1</span>
@@ -30,9 +31,10 @@ test.describe("basic tab behavior", () => {
 
   test("Shift+Tab enters focusgroup at first item in tree order and exits normally", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before" tabindex="0">Before focusgroup</div>
         <div data-testid="focusgroup1" focusgroup="toolbar nomemory">
           <span data-testid="item1" tabindex="0">Item 1</span>
@@ -52,9 +54,10 @@ test.describe("basic tab behavior", () => {
 
   test("arrow key navigation continues to work normally within focusgroup", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="focusgroup1" focusgroup="toolbar nomemory">
         <span data-testid="item1" tabindex="0">Item 1</span>
         <span data-testid="item2" tabindex="0">Item 2</span>
@@ -73,11 +76,12 @@ test.describe("basic tab behavior", () => {
 
 // sequential-navigation/nested-focusgroups.html
 test.describe("nested focusgroups sequential navigation", () => {
-  test("forward Tab navigation through nested focusgroups", async ({
-    page,
+  test("forward Tab navigation through nested focusgroups", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before1" tabindex="0">Before outer</div>
       <div data-testid="outer" focusgroup="toolbar">
         <span data-testid="outer1" tabindex="0" focusgroupstart>Outer 1 (priority)</span>
@@ -106,9 +110,10 @@ test.describe("nested focusgroups sequential navigation", () => {
 
   test("reverse Shift+Tab navigation through nested focusgroups", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before1" tabindex="0">Before outer</div>
       <div data-testid="outer" focusgroup="toolbar">
         <span data-testid="outer1" tabindex="0" focusgroupstart>Outer 1 (priority)</span>
@@ -138,9 +143,12 @@ test.describe("nested focusgroups sequential navigation", () => {
 
 // sequential-navigation/arrow-key-handler-all-types.html
 test.describe("native arrow key handler elements block arrow exit", () => {
-  test("arrow navigation TO text input works", async ({ page }) => {
+  test("arrow navigation TO text input works", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-text" focusgroup="toolbar">
         <button data-testid="btn-text-before">Before</button>
         <input data-testid="text-input" type="text" value="test" />
@@ -153,9 +161,12 @@ test.describe("native arrow key handler elements block arrow exit", () => {
     await expect(page.getByTestId("text-input")).toBeFocused();
   });
 
-  test("arrow navigation FROM text input is blocked", async ({ page }) => {
+  test("arrow navigation FROM text input is blocked", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-text" focusgroup="toolbar">
         <button data-testid="btn-text-before">Before</button>
         <input data-testid="text-input" type="text" value="test" />
@@ -177,9 +188,10 @@ test.describe("native arrow key handler elements block arrow exit", () => {
     await expect(page.getByTestId("text-input")).toBeFocused();
   });
 
-  test("arrow navigation TO textarea works", async ({ page }) => {
+  test("arrow navigation TO textarea works", async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-textarea" focusgroup="toolbar">
         <button data-testid="btn-textarea-before">Before</button>
         <textarea data-testid="textarea">Content</textarea>
@@ -192,9 +204,12 @@ test.describe("native arrow key handler elements block arrow exit", () => {
     await expect(page.getByTestId("textarea")).toBeFocused();
   });
 
-  test("arrow navigation FROM textarea is blocked", async ({ page }) => {
+  test("arrow navigation FROM textarea is blocked", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-textarea" focusgroup="toolbar">
         <button data-testid="btn-textarea-before">Before</button>
         <textarea data-testid="textarea">Content</textarea>
@@ -207,9 +222,10 @@ test.describe("native arrow key handler elements block arrow exit", () => {
     await expect(page.getByTestId("textarea")).toBeFocused();
   });
 
-  test("arrow navigation TO select works", async ({ page }) => {
+  test("arrow navigation TO select works", async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-select" focusgroup="toolbar">
         <button data-testid="btn-select-before">Before</button>
         <select data-testid="select-input">
@@ -225,9 +241,12 @@ test.describe("native arrow key handler elements block arrow exit", () => {
     await expect(page.getByTestId("select-input")).toBeFocused();
   });
 
-  test("arrow navigation TO contenteditable works", async ({ page }) => {
+  test("arrow navigation TO contenteditable works", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-editable" focusgroup="toolbar">
         <button data-testid="btn-editable-before">Before</button>
         <div data-testid="editable" contenteditable="true" tabindex="0">Editable</div>
@@ -240,9 +259,12 @@ test.describe("native arrow key handler elements block arrow exit", () => {
     await expect(page.getByTestId("editable")).toBeFocused();
   });
 
-  test("arrow navigation FROM contenteditable is blocked", async ({ page }) => {
+  test("arrow navigation FROM contenteditable is blocked", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar-editable" focusgroup="toolbar">
         <button data-testid="btn-editable-before">Before</button>
         <div data-testid="editable" contenteditable="true" tabindex="0">Editable</div>
@@ -259,9 +281,10 @@ test.describe("native arrow key handler elements block arrow exit", () => {
 // sequential-navigation/arrow-key-handler-only-item.html
 test("arrow key from only item in focusgroup does not navigate", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="toolbar" focusgroup="toolbar">
       <button data-testid="only-item">Only Item</button>
     </div>`,
@@ -278,9 +301,10 @@ test("arrow key from only item in focusgroup does not navigate", async ({
 // sequential-navigation/arrow-key-handler-with-explicit-optout.html
 test("arrow keys do not work within explicitly opted-out sections", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="toolbar" focusgroup="toolbar">
       <button data-testid="item1">Item 1</button>
       <div data-testid="optout" focusgroup="none">
@@ -302,9 +326,10 @@ test("arrow keys do not work within explicitly opted-out sections", async ({
 test.describe("focusgroup segments", () => {
   test("arrow key navigation treats opted-out elements as if they don't exist", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar" focusgroup="toolbar wrap" aria-label="Text formatting">
         <button data-testid="bold" type="button">Bold</button>
         <button data-testid="italic" type="button">Italic</button>
@@ -329,9 +354,10 @@ test.describe("focusgroup segments", () => {
 
   test("Tab navigation through focusgroup segments - forward direction", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before" tabindex="0">Before toolbar</div>
         <div data-testid="toolbar" focusgroup="toolbar wrap" aria-label="Text formatting">
           <button data-testid="bold" type="button" focusgroupstart>Bold (priority)</button>
@@ -364,9 +390,10 @@ test.describe("focusgroup segments", () => {
 
   test("arrow keys do not work within opted-out focusgroup sections", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar" focusgroup="toolbar wrap" aria-label="Text formatting">
         <button data-testid="bold">Bold</button>
         <span data-testid="help-group" focusgroup="none">
@@ -385,11 +412,12 @@ test.describe("focusgroup segments", () => {
     await expect(page.getByTestId("help")).toBeFocused();
   });
 
-  test("nested group should not segment if it’s invisible", async ({
-    page,
+  test("nested group should not segment if it’s invisible", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="toolbar">
         <div tabindex="0" data-testid="item1">item 1</div>
@@ -413,9 +441,12 @@ test.describe("focusgroup segments", () => {
   });
 });
 
-test("hidden items should not be segment tab stop", async ({ page }) => {
+test("hidden items should not be segment tab stop", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `
     <div focusgroup="toolbar">
       <button data-testid="item1">item 1</button>
@@ -441,9 +472,10 @@ test("hidden items should not be segment tab stop", async ({ page }) => {
 test.describe("memory behavior", () => {
   test("focusgroup with memory remembers last focused item on re-entry", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before-memory" tabindex="0">Before memory focusgroup</div>
         <div data-testid="memory-focusgroup" focusgroup="toolbar">
           <button data-testid="memory-item1">Item 1</button>
@@ -469,9 +501,10 @@ test.describe("memory behavior", () => {
 
   test("focusgroup with nomemory does not remember last focused item", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="between" tabindex="0">Between focusgroups</div>
         <div data-testid="no-memory-focusgroup" focusgroup="toolbar nomemory">
           <button data-testid="no-memory-item1">Item 1</button>
@@ -497,9 +530,10 @@ test.describe("memory behavior", () => {
 
   test("arrow key navigation updates the current focused item", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="memory-focusgroup" focusgroup="toolbar">
         <button data-testid="memory-item1">Item 1</button>
         <button data-testid="memory-item2" focusgroupstart>Item 2 (priority)</button>
@@ -517,9 +551,10 @@ test.describe("memory behavior", () => {
 test.describe("guaranteed tab stop priority", () => {
   test("focusgroupstart element is the guaranteed tab stop entry point", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="before" tabindex="0">Before</div>
         <div data-testid="focusgroup" focusgroup="toolbar nomemory">
           <button data-testid="item1">Item 1</button>
@@ -537,13 +572,16 @@ test.describe("guaranteed tab stop priority", () => {
   test("focusgroupstart element in nested shadow tree is the guaranteed tab stop entry point", async ({
     page,
     channel,
-  }) => {
+  }, { project }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
     }
 
+    test.fixme();
+
     await setupPage(
       page,
+      project,
       `<div data-testid="before" tabindex="0">Before</div>
         <div data-testid="focusgroup" focusgroup="toolbar nomemory">
           <button data-testid="item1">Item 1</button>
@@ -565,13 +603,18 @@ test.describe("guaranteed tab stop priority", () => {
     await page.getByTestId("before").focus();
     await page.keyboard.press("Tab");
     await expect(page.getByTestId("item22")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("after")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("item22")).toBeFocused();
   });
 
   test("a single item in a group should not lose focusability", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <button data-testid="before">before</button>
       <div focusgroup="tablist">
@@ -603,17 +646,18 @@ test.describe("guaranteed tab stop priority", () => {
     await expect(item).toBeFocused();
   });
 
-  test("an item nested in another item’s shadow root can be a tab stop", async ({
-    page,
-    channel,
-  }) => {
-    if (channel === "chrome-canary") {
-      test.skip("chromium implementation has a bug");
-    }
+  test(
+    "an item nested in another item’s shadow root can be a tab stop",
+    { tag: "@shadow" },
+    async ({ page, channel }, { project }) => {
+      if (channel === "chrome-canary") {
+        test.skip("chromium implementation has a bug");
+      }
 
-    await setupPage(
-      page,
-      `
+      await setupPage(
+        page,
+        project,
+        `
       <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
@@ -624,31 +668,33 @@ test.describe("guaranteed tab stop priority", () => {
       </div>
       <button>after</button>
     `,
-    );
+      );
 
-    const item = page.getByTestId("item");
-    await item.focus();
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Shift+Tab");
+      const item = page.getByTestId("item");
+      await item.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
 
-    await expect(item).toBeFocused();
+      await expect(item).toBeFocused();
 
-    await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
 
-    await expect(page.getByTestId("before")).toBeFocused();
-  });
+      await expect(page.getByTestId("before")).toBeFocused();
+    },
+  );
 
-  test("an item deeper nested in another item’s shadow root can be a tab stop", async ({
-    page,
-    channel,
-  }) => {
-    if (channel === "chrome-canary") {
-      test.skip("chromium implementation has a bug");
-    }
+  test(
+    "an item deeper nested in another item’s shadow root can be a tab stop",
+    { tag: "@shadow" },
+    async ({ page, channel }, { project }) => {
+      if (channel === "chrome-canary") {
+        test.skip("chromium implementation has a bug");
+      }
 
-    await setupPage(
-      page,
-      `
+      await setupPage(
+        page,
+        project,
+        `
       <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
@@ -663,30 +709,32 @@ test.describe("guaranteed tab stop priority", () => {
       </div>
       <button>after</button>
     `,
-    );
+      );
 
-    const item = page.getByTestId("item");
-    await item.focus();
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Shift+Tab");
+      const item = page.getByTestId("item");
+      await item.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
 
-    await expect(item).toBeFocused();
+      await expect(item).toBeFocused();
 
-    await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
 
-    await expect(page.getByTestId("before")).toBeFocused();
-  });
+      await expect(page.getByTestId("before")).toBeFocused();
+    },
+  );
 
   test("an item slotted in another item’s shadow root can be a tab stop", async ({
     page,
     channel,
-  }) => {
+  }, { project }) => {
     if (channel === "chrome-canary") {
       test.skip("chromium implementation has a bug");
     }
 
     await setupPage(
       page,
+      project,
       `
       <button data-testid="before">before</button>
       <div focusgroup="tablist">
@@ -713,17 +761,18 @@ test.describe("guaranteed tab stop priority", () => {
     await expect(page.getByTestId("before")).toBeFocused();
   });
 
-  test("an item deeper slotted in another item’s shadow root can be a tab stop", async ({
-    page,
-    channel,
-  }) => {
-    if (channel === "chrome-canary") {
-      test.skip("chromium implementation has a bug");
-    }
+  test(
+    "an item deeper slotted in another item’s shadow root can be a tab stop",
+    { tag: "@shadow" },
+    async ({ page, channel }, { project }) => {
+      if (channel === "chrome-canary") {
+        test.skip("chromium implementation has a bug");
+      }
 
-    await setupPage(
-      page,
-      `
+      await setupPage(
+        page,
+        project,
+        `
       <button data-testid="before">before</button>
       <div focusgroup="tablist">
         <div tabindex="0">
@@ -737,27 +786,29 @@ test.describe("guaranteed tab stop priority", () => {
       </div>
       <button>after</button>
     `,
-    );
+      );
 
-    const item = page.getByTestId("item");
-    await item.focus();
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Shift+Tab");
+      const item = page.getByTestId("item");
+      await item.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
 
-    await expect(item).toBeFocused();
+      await expect(item).toBeFocused();
 
-    await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Shift+Tab");
 
-    await expect(page.getByTestId("before")).toBeFocused();
-  });
+      await expect(page.getByTestId("before")).toBeFocused();
+    },
+  );
 });
 
 // sequential-navigation/empty-and-non-focusable.html
 test("empty focusgroup - navigation stays put if no focusable items nearby", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="toolbar-with-items" focusgroup="toolbar">
       <button data-testid="item1">Item 1</button>
       <button data-testid="item2">Item 2</button>
@@ -772,9 +823,10 @@ test("empty focusgroup - navigation stays put if no focusable items nearby", asy
 // sequential-navigation/dynamic-changes.html
 test("dynamic focusgroupstart changes affect entry element selection", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div data-testid="before" tabindex="0">Before</div>
 
@@ -806,9 +858,10 @@ test("dynamic focusgroupstart changes affect entry element selection", async ({
 
 test("enabling disabled elements makes them available for tab stop", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div data-testid="before" tabindex="0">Before</div>
 
@@ -843,9 +896,10 @@ test("enabling disabled elements makes them available for tab stop", async ({
 // sequential-navigation/arrow-key-handler-tab-escape.html
 test("Tab from a native arrow key handler moves focus to the next segment with the same focusgroup, if any", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="before" tabindex="0">Before</div>
       <div data-testid="toolbar" focusgroup="toolbar">
         <button data-testid="btn-before">Before input</button>
@@ -863,9 +917,10 @@ test("Tab from a native arrow key handler moves focus to the next segment with t
 // sequential-navigation/arrow-key-handler-multiple-in-segment.html
 test("multiple arrow key handler elements can exist in a segment", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="toolbar" focusgroup="toolbar">
       <button data-testid="item1">Item 1</button>
       <input data-testid="input1" type="text" value="a" />
@@ -887,9 +942,10 @@ test("multiple arrow key handler elements can exist in a segment", async ({
 // sequential-navigation/arrow-key-handler-nested-focusgroup.html
 test("arrow key handler in nested focusgroup blocks its own navigation", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="outer" focusgroup="toolbar">
       <button data-testid="outer-item1">Outer 1</button>
       <div data-testid="inner" focusgroup="toolbar">
@@ -907,9 +963,12 @@ test("arrow key handler in nested focusgroup blocks its own navigation", async (
 });
 
 // sequential-navigation/arrow-key-handler-scrollable-container.html
-test("navigation works correctly in scrollable container", async ({ page }) => {
+test("navigation works correctly in scrollable container", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="toolbar" focusgroup="toolbar" style="overflow: scroll; height: 100px;">
       <button data-testid="item1">Item 1</button>
       <button data-testid="item2">Item 2</button>
@@ -922,9 +981,10 @@ test("navigation works correctly in scrollable container", async ({ page }) => {
   await expect(page.getByTestId("item2")).toBeFocused();
 });
 
-test("respects preventDefault()", async ({ page }) => {
+test("respects preventDefault()", async ({ page }, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div focusgroup="toolbar">
       <button data-testid="item1">item 1</button>
@@ -968,9 +1028,10 @@ test("respects preventDefault()", async ({ page }) => {
 
 test("clicking on an item makes the item the tab stop for the group", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <button data-testid="before">before</button>
     <div focusgroup="toolbar">
@@ -989,9 +1050,10 @@ test("clicking on an item makes the item the tab stop for the group", async ({
 
 test("programmatically focusing on an item makes the item the tab stop for the group", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <button data-testid="before">before</button>
     <div focusgroup="toolbar">

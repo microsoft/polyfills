@@ -6,9 +6,10 @@ import { setupPage } from "./utils.js";
 
 // untraversable-tabindex-minus-one.html
 test.describe("elements with tabindex=-1 participate in focusgroup navigation when focused, otherwise skipped", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div focusgroup="toolbar">
           <button data-testid="b1">Button 1</button>
           <div data-testid="b2" tabindex="-1">Button 2</div>
@@ -51,9 +52,10 @@ test.describe("elements with tabindex=-1 participate in focusgroup navigation wh
 });
 
 test.describe("navigation respects bounds when edges are tabindex=-1", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div focusgroup="toolbar">
         <div data-testid="start" tabindex="-1">Start</div>
         <button data-testid="mid">Mid</button>
@@ -92,9 +94,10 @@ test.describe("navigation respects bounds when edges are tabindex=-1", () => {
 });
 
 test.describe("wrapping logic skips items with tabindex=-1", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div focusgroup="toolbar wrap">
         <div data-testid="w1" tabindex="-1">W1</div>
         <button data-testid="w2">W2</button>

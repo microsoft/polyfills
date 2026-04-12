@@ -111,3 +111,7 @@ export function getLastElementDescendant(container) {
 
   return descendant;
 }
+
+export function getAssignedSlot(element) {
+  return element.assignedSlot;
+}

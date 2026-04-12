@@ -8,9 +8,10 @@ import { setupPage } from "./utils.js";
 test.describe("focusgroup with shadow items", () => {
   let item1, item2, item3;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="toolbar inline">
         <template shadowrootmode="open">
@@ -27,23 +28,27 @@ test.describe("focusgroup with shadow items", () => {
     item3 = page.getByTestId("item3");
   });
 
-  test("ArrowRight navigates between shadow root items", async ({ page }) => {
+  test("ArrowRight navigates between shadow root items", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await item1.focus();
     await page.keyboard.press("ArrowRight");
 
     await expect(item2).toBeFocused();
   });
 
-  test("ArrowRight does not wrap when at last shadow item (no wrap token)", async ({
-    page,
-  }) => {
+  test("ArrowRight does not wrap when at last shadow item (no wrap token)", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await item3.focus();
     await page.keyboard.press("ArrowRight");
 
     await expect(item3).toBeFocused();
   });
 
-  test("ArrowLeft navigates backward", async ({ page }) => {
+  test("ArrowLeft navigates backward", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await item2.focus();
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowRight");
@@ -60,9 +65,10 @@ test.describe("focusgroup with shadow items", () => {
 test.describe("nested shadow focusgroup", () => {
   let outer1, outer2, inner1, inner2;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="toolbar inline">
         <button data-testid="outer1">Outer 1</button>
@@ -85,27 +91,27 @@ test.describe("nested shadow focusgroup", () => {
     inner2 = page.getByTestId("inner2");
   });
 
-  test("outer navigation skips shadow host containing inner focusgroup", async ({
-    page,
-  }) => {
+  test("outer navigation skips shadow host containing inner focusgroup", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await outer1.focus();
     await page.keyboard.press("ArrowRight");
 
     await expect(outer2).toBeFocused();
   });
 
-  test("inner shadow focusgroup navigation advances within its own scope", async ({
-    page,
-  }) => {
+  test("inner shadow focusgroup navigation advances within its own scope", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await inner1.focus();
     await page.keyboard.press("ArrowRight");
 
     await expect(inner2).toBeFocused();
   });
 
-  test("inner shadow navigation does not wrap past last item", async ({
-    page,
-  }) => {
+  test("inner shadow navigation does not wrap past last item", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await inner2.focus();
     await page.keyboard.press("ArrowRight");
 
@@ -114,9 +120,10 @@ test.describe("nested shadow focusgroup", () => {
 });
 
 test.describe("focusgroup with slotted items", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="toolbar">
         <template shadowrootmode="open">
@@ -130,9 +137,9 @@ test.describe("focusgroup with slotted items", () => {
     );
   });
 
-  test("ArrowRight navigates between shadow and slotted items", async ({
-    page,
-  }) => {
+  test("ArrowRight navigates between shadow and slotted items", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await page.getByTestId("item1").focus();
     await page.keyboard.press("ArrowRight");
 
@@ -145,9 +152,10 @@ test.describe("focusgroup with slotted items", () => {
 });
 
 test.describe("focusgroup with light and shadow items", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="toolbar inline">
         <button data-testid="item1">One</button>
@@ -162,9 +170,9 @@ test.describe("focusgroup with light and shadow items", () => {
     );
   });
 
-  test("ArrowRight navigates between light and shadow items", async ({
-    page,
-  }) => {
+  test("ArrowRight navigates between light and shadow items", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await page.getByTestId("item1").focus();
     await page.keyboard.press("ArrowRight");
 
@@ -177,9 +185,10 @@ test.describe("focusgroup with light and shadow items", () => {
 });
 
 test.describe("focusgroup with light, shadow, and slotted items", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="toolbar inline">
         <button data-testid="item1">One</button>
@@ -197,9 +206,9 @@ test.describe("focusgroup with light, shadow, and slotted items", () => {
     );
   });
 
-  test("navigates between light, shadow, and slotted items", async ({
-    page,
-  }) => {
+  test("navigates between light, shadow, and slotted items", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await page.getByTestId("item1").focus();
 
     await page.keyboard.press("ArrowRight");
@@ -238,9 +247,10 @@ test.describe("focusgroup with light, shadow, and slotted items", () => {
 });
 
 test.describe("focusgroup with nested group mixed with shadow and slotted children", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div data-testid="before" tabindex="0">before</div>
       <div focusgroup="toolbar">
@@ -266,7 +276,9 @@ test.describe("focusgroup with nested group mixed with shadow and slotted childr
     );
   });
 
-  test("navigates between parent and nested groups", async ({ page }) => {
+  test("navigates between parent and nested groups", {
+    tag: "@shadow",
+  }, async ({ page }) => {
     await page.getByTestId("before").focus();
 
     await page.keyboard.press("Tab");
@@ -303,5 +315,70 @@ test.describe("focusgroup with nested group mixed with shadow and slotted childr
     await page.keyboard.press("Tab");
 
     await expect(page.getByTestId("item3")).toBeFocused();
+  });
+});
+
+// NOTE: DO NOT add “@shadow” tag to these tests because they need to pass in
+// shadowless bundle.
+test.describe("focusable shadow hosts as focusgroup items", () => {
+  let before;
+  let after;
+  let tab1;
+  let tab2;
+  let tab3;
+
+  test.beforeEach(async ({ page }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+    <button data-testid="before">before</button>
+    <div focusgroup="tablist">
+      <template shadowrootmode="open"><slot></slot></template>
+      <span tabindex="0" data-testid="tab1">
+        <template shadowrootmode="open"><slot></slot></template>
+        tab 1
+      </span>
+      <span tabindex="0" data-testid="tab2">
+        <template shadowrootmode="open"><slot></slot></template>
+        tab 2
+      </span>
+      <span tabindex="0" data-testid="tab3">
+        <template shadowrootmode="open"><slot></slot></template>
+        tab 3
+      </span>
+    </div>
+    <button data-testid="after">after</button>
+  `,
+    );
+
+    before = page.getByTestId("before");
+    after = page.getByTestId("after");
+    tab1 = page.getByTestId("tab1");
+    tab2 = page.getByTestId("tab2");
+    tab3 = page.getByTestId("tab3");
+  });
+
+  test("should have a single tab stop", async ({ page }) => {
+    await before.focus();
+    await page.keyboard.press("Tab");
+
+    await expect(tab1).toBeFocused();
+
+    await page.keyboard.press("Tab");
+
+    await expect(after).toBeFocused();
+  });
+
+  test("should gain directional navigation", async ({ page }) => {
+    await tab2.focus();
+    await page.keyboard.press("ArrowRight");
+
+    await expect(tab3).toBeFocused();
+
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+
+    await expect(tab1).toBeFocused();
   });
 });

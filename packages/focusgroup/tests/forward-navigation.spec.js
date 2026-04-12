@@ -5,9 +5,12 @@ import { expect, test } from "@playwright/test";
 import { setupPage } from "./utils.js";
 
 // forward-navigation/moves-to-next-item.html
-test("moves to next item on ArrowDown and ArrowRight", async ({ page }) => {
+test("moves to next item on ArrowDown and ArrowRight", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -24,11 +27,12 @@ test("moves to next item on ArrowDown and ArrowRight", async ({ page }) => {
 });
 
 // forward-navigation/moves-to-next-item-and-skips-non-focusable.html
-test("moves to next item and skips non-focusable elements", async ({
-  page,
+test("moves to next item and skips non-focusable elements", async ({ page }, {
+  project,
 }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2">item2</span>
@@ -46,9 +50,12 @@ test("moves to next item and skips non-focusable elements", async ({
 });
 
 // forward-navigation/does-not-move-when-on-focusgroup-root.html
-test("does not move when focused on focusgroup root", async ({ page }) => {
+test("does not move when focused on focusgroup root", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" tabindex="0" focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -66,9 +73,10 @@ test("does not move when focused on focusgroup root", async ({ page }) => {
 // forward-navigation/does-not-move-when-on-non-item.html
 test("does not move when focused on focusable element that is not a focusgroup item", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<span data-testid="nonitem1" tabindex="0">nonitem1</span>
     <div tabindex="0" focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
@@ -87,9 +95,10 @@ test("does not move when focused on focusable element that is not a focusgroup i
 // forward-navigation/does-not-move-when-outside-focusgroup.html
 test("does not move when focused on element outside focusgroup", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<span data-testid="out" tabindex="0">out</span>
     <div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
@@ -106,9 +115,12 @@ test("does not move when focused on element outside focusgroup", async ({
 });
 
 // forward-navigation/does-not-move-when-only-one-item.html
-test("does not move when there is only one item", async ({ page }) => {
+test("does not move when there is only one item", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
     </div>`,
@@ -125,9 +137,10 @@ test("does not move when there is only one item", async ({ page }) => {
 // forward-navigation/does-not-move-when-only-one-item-and-wraps.html
 test("does not move when there is only one item even with wrap", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
     </div>`,
@@ -142,9 +155,12 @@ test("does not move when there is only one item even with wrap", async ({
 });
 
 // forward-navigation/does-not-wrap-when-not-supported.html
-test("does not wrap when wrap is not supported", async ({ page }) => {
+test("does not wrap when wrap is not supported", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -160,9 +176,12 @@ test("does not wrap when wrap is not supported", async ({ page }) => {
 });
 
 // forward-navigation/wraps-successfully.html
-test("wraps successfully from last item to first", async ({ page }) => {
+test("wraps successfully from last item to first", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -180,11 +199,12 @@ test("wraps successfully from last item to first", async ({ page }) => {
 
 // forward-navigation/nested-focusgroup-is-item-of-parent.html
 test.describe("nested focusgroup is item of parent focusgroup", () => {
-  test("arrow right navigates TO nested focusgroup element", async ({
-    page,
+  test("arrow right navigates TO nested focusgroup element", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<button data-testid="before" tabindex="0">before</button>
       <div data-testid="outer" focusgroup="toolbar nomemory">
         <button data-testid="btn1">btn1</button>
@@ -205,11 +225,12 @@ test.describe("nested focusgroup is item of parent focusgroup", () => {
     await expect(page.getByTestId("inner")).toBeFocused();
   });
 
-  test("arrow left navigates TO nested focusgroup element", async ({
-    page,
+  test("arrow left navigates TO nested focusgroup element", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="outer" focusgroup="toolbar nomemory">
         <button data-testid="btn3">btn3</button>
         <div data-testid="inner" focusgroup="toolbar nomemory" tabindex="0">
@@ -226,9 +247,10 @@ test.describe("nested focusgroup is item of parent focusgroup", () => {
 
   test("arrow right from nested focusgroup navigates to next sibling in parent", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="outer" focusgroup="toolbar nomemory">
         <button data-testid="btn3">btn3</button>
         <div data-testid="inner" focusgroup="toolbar nomemory" tabindex="0">
@@ -245,9 +267,10 @@ test.describe("nested focusgroup is item of parent focusgroup", () => {
 
   test("arrow left from nested focusgroup navigates to previous sibling in parent", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="outer" focusgroup="toolbar nomemory">
         <button data-testid="btn3">btn3</button>
         <div data-testid="inner" focusgroup="toolbar nomemory" tabindex="0">
@@ -262,9 +285,12 @@ test.describe("nested focusgroup is item of parent focusgroup", () => {
     await expect(page.getByTestId("btn3")).toBeFocused();
   });
 
-  test("inner focusgroup navigation works independently", async ({ page }) => {
+  test("inner focusgroup navigation works independently", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="outer" focusgroup="toolbar nomemory">
         <button data-testid="btn1">btn1</button>
         <div data-testid="inner" focusgroup="toolbar nomemory" tabindex="0">
@@ -290,9 +316,10 @@ test.describe("Arrow keys follow the focused element's writing direction", () =>
     let item4;
     let item5;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="toolbar">
           <div dir="rtl">
@@ -376,9 +403,10 @@ test.describe("Arrow keys follow the focused element's writing direction", () =>
     let item2;
     let item3;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="toolbar" dir="rtl">
           <span data-testid="item1" tabindex=0>One</span>
@@ -438,9 +466,10 @@ test.describe("in RTL, ArrowLeft moves focus forward inline", () => {
   let item1;
   let item2;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div dir="rtl" focusgroup="toolbar">
           <span data-testid="item1" tabindex=0>item1</span>
@@ -496,9 +525,10 @@ test.describe("RTL wrapping respects reversed inline direction", () => {
   let item1;
   let item3;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div dir="rtl" focusgroup="toolbar wrap">
           <span data-testid="item1" tabindex=0>One</span>
@@ -542,9 +572,10 @@ test.describe("Vertical writing-mode swaps inline and block axes", () => {
   });
 
   test.describe("inline axis only", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `<div focusgroup="toolbar inline" style="writing-mode: vertical-rl;">
           <span data-testid="item1" tabindex="0">item1</span>
           <span data-testid="item2" tabindex="0">item2</span>
@@ -585,9 +616,10 @@ test.describe("Vertical writing-mode swaps inline and block axes", () => {
   });
 
   test.describe("both axes", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `<div focusgroup="toolbar inline block" style="writing-mode: vertical-rl;">
           <span data-testid="item1" tabindex="0">item1</span>
           <span data-testid="item2" tabindex="0">item2</span>
@@ -616,9 +648,10 @@ test.describe("Vertical writing-mode swaps inline and block axes", () => {
   });
 });
 
-test("skip hidden candidates", async ({ page }) => {
+test("skip hidden candidates", async ({ page }, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div focusgroup="tablist">
       <button data-testid="item1">item1</button>
@@ -639,9 +672,10 @@ test("skip hidden candidates", async ({ page }) => {
 // forward-navigation/horizontal/does-not-move-when-axis-not-supported.html
 test("horizontal: does not move when axis (ArrowRight) is not supported (block only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -656,9 +690,10 @@ test("horizontal: does not move when axis (ArrowRight) is not supported (block o
 // forward-navigation/horizontal/moves-when-only-current-axis-supported.html
 test("horizontal: moves when only the horizontal axis (ArrowRight) is supported (inline only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -675,9 +710,10 @@ test.describe("horizontal: RTL with inline-only axis respects reversed arrow key
   let item1;
   let item2;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div dir="rtl" focusgroup="toolbar inline">
         <span data-testid=item1 tabindex=0>item1</span>
@@ -725,9 +761,10 @@ test.describe("horizontal: RTL with inline-only axis respects reversed arrow key
 // forward-navigation/vertical/does-not-move-when-axis-not-supported.html
 test("vertical: does not move when axis (ArrowDown) is not supported (inline only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -742,9 +779,10 @@ test("vertical: does not move when axis (ArrowDown) is not supported (inline onl
 // forward-navigation/vertical/moves-when-only-current-axis-supported.html
 test("vertical: moves when only the vertical axis (ArrowDown) is supported (block only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>

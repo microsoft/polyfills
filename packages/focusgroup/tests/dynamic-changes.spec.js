@@ -16,9 +16,10 @@ test.describe("`focusgroup` attribute", () => {
   });
 
   test.describe("behavior token", () => {
-    test("should change role inference", async ({ page }) => {
+    test("should change role inference", async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <span tabindex="0" data-testid="item1">item 1</span>
@@ -38,9 +39,10 @@ test.describe("`focusgroup` attribute", () => {
 
     test("should disable directional navigation if changed to `none`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -61,9 +63,10 @@ test.describe("`focusgroup` attribute", () => {
 
     test("should enable directional navigation if changed from `none`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="none" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -84,9 +87,10 @@ test.describe("`focusgroup` attribute", () => {
 
     test("should disable directional navigation if changed to an invalid behavior token", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -109,9 +113,10 @@ test.describe("`focusgroup` attribute", () => {
   test.describe("logical axis restriction token", () => {
     test("should disable up and down arrows if `inline` is added", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -137,9 +142,10 @@ test.describe("`focusgroup` attribute", () => {
 
     test("should disable left and right arrows if `block` is added", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -163,9 +169,12 @@ test.describe("`focusgroup` attribute", () => {
       await expect(item2).toBeFocused();
     });
 
-    test("should change restriction when swapped", async ({ page }) => {
+    test("should change restriction when swapped", async ({ page }, {
+      project,
+    }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox inline" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -191,9 +200,10 @@ test.describe("`focusgroup` attribute", () => {
   });
 
   test.describe("`wrap` token", () => {
-    test("should enable wrap if added", async ({ page }) => {
+    test("should enable wrap if added", async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -212,9 +222,10 @@ test.describe("`focusgroup` attribute", () => {
       await expect(item1).toBeFocused();
     });
 
-    test("should disable wrap if removed", async ({ page }) => {
+    test("should disable wrap if removed", async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox wrap" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -235,9 +246,10 @@ test.describe("`focusgroup` attribute", () => {
   });
 
   test.describe("`nomemory` token", () => {
-    test("should disable memory if added", async ({ page }) => {
+    test("should disable memory if added", async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -259,9 +271,10 @@ test.describe("`focusgroup` attribute", () => {
       await expect(item1).toBeFocused();
     });
 
-    test("should enable memory if removed", async ({ page }) => {
+    test("should enable memory if removed", async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox nomemory" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -299,9 +312,10 @@ test.describe("writing direction CSS changes", () => {
   test.describe("`direction`", () => {
     test("should navigate forward with ArrowLeft if changed to `rtl`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group">
           <button data-testid="item1">item 1</button>
@@ -322,9 +336,10 @@ test.describe("writing direction CSS changes", () => {
 
     test("should navigate backward with ArrowLeft if changed to `ltr`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group" dir="rtl">
           <button data-testid="item1">item 1</button>
@@ -345,9 +360,10 @@ test.describe("writing direction CSS changes", () => {
 
     test("should navigate backward with ArrowDown if changed to `rtl` in a vertical writing mode", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group" style="writing-mode: vertical-rl;">
           <button data-testid="item1">item 1</button>
@@ -368,9 +384,10 @@ test.describe("writing direction CSS changes", () => {
 
     test("should navigate forward with ArrowDown if changed to `ltr` in a vertical writing mode", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group" dir="rtl" style="writing-mode: vertical-rl;">
           <button data-testid="item1">item 1</button>
@@ -393,9 +410,10 @@ test.describe("writing direction CSS changes", () => {
   test.describe("writing-mode", () => {
     test("should navigate forward with ArrowLeft if changed to `vertical-rl`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox" data-testid="group" style="writing-mode: vertical-lr;">
           <button data-testid="item1">item 1</button>
@@ -431,9 +449,10 @@ test.describe("opt-out", () => {
 
   test("should remove the opt-out item from directional navigation", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -459,9 +478,10 @@ test.describe("opt-out", () => {
 
   test("should remove directional navigation from the opt-out group", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div data-testid="group" focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -498,9 +518,10 @@ test.describe("opt-in", () => {
 
   test("should add the opt-in item from directional navigation", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -521,9 +542,10 @@ test.describe("opt-in", () => {
 
   test("should add directional navigation to the opt-in group", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div data-testid="group" focusgroup="none">
           <button data-testid="item1">item 1</button>
@@ -559,9 +581,10 @@ test.describe("`focusgroupstart` item", () => {
   });
 
   test.describe("added", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -600,9 +623,10 @@ test.describe("`focusgroupstart` item", () => {
   });
 
   test.describe("removed", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -644,9 +668,10 @@ test.describe("`focusgroupstart` item", () => {
   test.describe("added with an existing `focusgroupstart` element", () => {
     test("should move the tab stop to the element if added before the existing one", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -668,9 +693,10 @@ test.describe("`focusgroupstart` item", () => {
 
     test("should keep the tab stop unchanged if added after the existing one", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -695,9 +721,10 @@ test.describe("`focusgroupstart` item", () => {
   test.describe("removed with anothor focusgroupstart element", () => {
     test("should move the tab stop to the other one if removed before it", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -721,9 +748,10 @@ test.describe("`focusgroupstart` item", () => {
 
   test("should keep `focusgroupstart` position after moving when no memory", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <button data-testid="before">before</button>
       <div focusgroup="tablist nomemory" data-testid="tablist">
@@ -769,9 +797,10 @@ test.describe("item keyboard focusability", () => {
   test.describe("`tabindex`", () => {
     test("should remove an item from directional navigation if changed to `-1`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -793,9 +822,10 @@ test.describe("item keyboard focusability", () => {
 
     test("should add an item to directional navigation if changed to `0`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -818,9 +848,10 @@ test.describe("item keyboard focusability", () => {
   test.describe("`disabled`", () => {
     test("should remove an item from directional navigation if changed to `true`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -842,9 +873,10 @@ test.describe("item keyboard focusability", () => {
 
     test("should add an item to directional navigation if changed to `false`", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -877,9 +909,12 @@ test.describe("current tab stop element", () => {
   });
 
   test.describe("added", () => {
-    test("should move tab stop to the first item", async ({ page }) => {
+    test("should move tab stop to the first item", async ({ page }, {
+      project,
+    }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -901,9 +936,12 @@ test.describe("current tab stop element", () => {
   });
 
   test.describe("removed", () => {
-    test("should move tab stop to the first item", async ({ page }) => {
+    test("should move tab stop to the first item", async ({ page }, {
+      project,
+    }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -922,11 +960,12 @@ test.describe("current tab stop element", () => {
       await expect(item2).toBeFocused();
     });
 
-    test("should move memorized tab stop to the first item", async ({
-      page,
+    test("should move memorized tab stop to the first item", async ({ page }, {
+      project,
     }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -948,9 +987,10 @@ test.describe("current tab stop element", () => {
 
     test("should move memorized tab stop to the first item if parent removed", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="listbox">
@@ -972,9 +1012,12 @@ test.describe("current tab stop element", () => {
       await expect(item1).toBeFocused();
     });
 
-    test("should keep the active focus when no menory", async ({ page }) => {
+    test("should keep the active focus when no menory", async ({ page }, {
+      project,
+    }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="toolbar nomemory">
           <span tabindex="0" data-testid="item1">item1</span>
@@ -1004,9 +1047,12 @@ test.describe("current tab stop element", () => {
   });
 
   test.describe("hidden", () => {
-    test("should move tab stop to the nearest item", async ({ page }) => {
+    test("should move tab stop to the nearest item", async ({ page }, {
+      project,
+    }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="toolbar">
@@ -1032,9 +1078,12 @@ test.describe("current tab stop element", () => {
   });
 
   test.describe("opt-out", () => {
-    test("should move tab stop to the nearest item", async ({ page }) => {
+    test("should move tab stop to the nearest item", async ({ page }, {
+      project,
+    }) => {
       await setupPage(
         page,
+        project,
         `
         <button data-testid="before">before</button>
         <div focusgroup="toolbar">
@@ -1076,9 +1125,10 @@ test.describe("segmentor", () => {
   test.describe("added", () => {
     test("should add tab stop to all segments if added an opt-out element", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -1108,9 +1158,10 @@ test.describe("segmentor", () => {
 
     test("should add tab stop to all segments if added a nested group", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -1142,9 +1193,10 @@ test.describe("segmentor", () => {
 
     test("should not add tab stop if added a nest group with no focusable items", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -1172,9 +1224,10 @@ test.describe("segmentor", () => {
   test.describe("removed", () => {
     test("should keep one tab stop element within the merged segments", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -1197,9 +1250,10 @@ test.describe("segmentor", () => {
 
     test("should keep the current memorized element as tab stop", async ({
       page,
-    }) => {
+    }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item 1</button>
@@ -1227,9 +1281,10 @@ test.describe("segmentor", () => {
 test.describe("visibility", () => {
   test("hiding an item removes it from directional navigation", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="tablist">
         <button data-testid="item1">item1</button>
@@ -1251,11 +1306,12 @@ test.describe("visibility", () => {
     await expect(page.getByTestId("item3")).toBeFocused();
   });
 
-  test("showing an item adds it to directional navigation", async ({
-    page,
+  test("showing an item adds it to directional navigation", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `
       <div focusgroup="tablist">
         <button data-testid="item1">item1</button>

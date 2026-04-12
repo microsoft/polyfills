@@ -35,6 +35,27 @@ export default defineConfig({
     },
 
     {
+      name: "chromium Shadowless",
+      use: { ...devices["Desktop Chrome"] },
+      grepInvert: /@shadow/,
+      testMatch: "tests/*.spec.js",
+    },
+
+    {
+      name: "firefox Shadowless",
+      use: { ...devices["Desktop Firefox"] },
+      grepInvert: /@shadow/,
+      testMatch: "tests/*.spec.js",
+    },
+
+    {
+      name: "webkit Shadowless",
+      use: { ...devices["Desktop Safari"] },
+      grepInvert: /@shadow/,
+      testMatch: "tests/*.spec.js",
+    },
+
+    {
       name: "Google Chrome Canary",
       testMatch: "tests/*.spec.js",
       use: {
@@ -49,7 +70,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npm run dev",
+    command: "npm run build && npm run dev",
     port: 5173,
     reuseExistingServer: !process.env.CI,
   },

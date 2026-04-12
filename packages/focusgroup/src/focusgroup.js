@@ -11,6 +11,7 @@ import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
+  IS_SHADOWLESS,
   nodeContains,
 } from "./shadow-utils/index.js";
 import {
@@ -539,7 +540,7 @@ export class FocusGroup {
       node.hasAttribute(DatasetName.ITEM) ||
       // if the element is yet to be decorated
       (isKeyboardFocusable(node, this.#owner) &&
-        (node.assignedSlot
+        (!IS_SHADOWLESS && node.assignedSlot
           ? getClosestElement(node.assignedSlot, "[focusgroup]") === this.#owner
           : getClosestElement(node.parentNode, "[focusgroup]") === this.#owner))
     );
@@ -564,26 +565,11 @@ export class FocusGroup {
   #enableKeyboardFocusabilityForProxyHost(tabStop) {
     let node = tabStop;
     while (node && node !== this.#owner) {
-      const slot = node.assignedSlot;
-      if (slot) {
-        const slotRoot = slot.getRootNode();
-        if (slotRoot instanceof ShadowRoot) {
-          const host = slotRoot.host;
-          if (
-            host !== this.#owner &&
-            host.getAttribute(DatasetName.ITEM) === this.#id &&
-            host !== tabStop
-          ) {
-            host.tabIndex = 0;
-            this.#proxyHosts.add(host);
-          }
-          node = host;
-          continue;
-        }
-      }
-      const rootNode = node.getRootNode();
-      if (rootNode instanceof ShadowRoot) {
-        const host = rootNode.host;
+      // Resolve the shadow host: prefer the slot's root (for slotted nodes),
+      // otherwise fall back to the node's own root.
+      const root = (node.assignedSlot ?? node).getRootNode();
+      if (root instanceof ShadowRoot) {
+        const host = root.host;
         if (
           host !== this.#owner &&
           host.getAttribute(DatasetName.ITEM) === this.#id &&
