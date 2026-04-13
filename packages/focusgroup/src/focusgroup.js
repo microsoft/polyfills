@@ -164,7 +164,7 @@ export class FocusGroup {
     }
 
     this.#observer = createMutationObserver(this.#processMutations.bind(this));
-    this.#observer.observe(owner, {
+    this.#observer.observe(this.#owner, {
       attributes: true,
       attributeFilter: [
         "focusgroup",
@@ -640,7 +640,9 @@ export class FocusGroup {
    */
   // TODO: Handle mutations more granularly than redecorating all items.
   #processMutations(entries) {
-    const hasDefinitionChanged = entries.find(
+    console.log(this.#owner, entries);
+
+    const hasDefinitionChanged = entries.some(
       (e) => e.target === this.#owner && e.attributeName === "focusgroup",
     );
     if (hasDefinitionChanged) {
