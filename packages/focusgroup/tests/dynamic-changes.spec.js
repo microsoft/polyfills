@@ -503,6 +503,40 @@ test.describe("opt-out", () => {
 
     await expect(item2).toBeFocused();
   });
+
+  test("should remove directional navigation from the nested opt-out group", async ({
+    page,
+    channel,
+  }, { project }) => {
+    if (channel !== "chrome-canary") {
+      test.fixme();
+    }
+
+    await setupPage(
+      page,
+      project,
+      `
+      <div focusgroup="menu">
+        <div tabindex="0">
+          menu item
+          <div focusgroup="menu" data-testid="submenu">
+            <div tabindex="0" data-testid="subitem1">menu item</div>
+            <div tabindex="0" data-testid="subitem2">menu item</div>
+          </div>
+        </div>
+      </div>
+    `,
+    );
+
+    await page.getByTestId("submenu").evaluate((node) => {
+      node.setAttribute("focusgroup", "none");
+    });
+
+    await page.getByTestId("subitem1").focus();
+    await page.keyboard.press("Tab");
+
+    await expect(page.getByTestId("subitem2")).toBeFocused();
+  });
 });
 
 test.describe("opt-in", () => {
@@ -562,6 +596,40 @@ test.describe("opt-in", () => {
     await page.keyboard.press("ArrowRight");
 
     await expect(item2).toBeFocused();
+  });
+
+  test("should add directional navigation to the nested opt-in group", async ({
+    page,
+    channel,
+  }, { project }) => {
+    if (channel !== "chrome-canary") {
+      test.fixme();
+    }
+
+    await setupPage(
+      page,
+      project,
+      `
+      <div focusgroup="menu">
+        <div tabindex="0">
+          menu item
+          <div focusgroup="none" data-testid="submenu">
+            <div tabindex="0" data-testid="subitem1">menu item</div>
+            <div tabindex="0" data-testid="subitem2">menu item</div>
+          </div>
+        </div>
+      </div>
+    `,
+    );
+
+    await page.getByTestId("submenu").evaluate((node) => {
+      node.setAttribute("focusgroup", "menu");
+    });
+
+    await page.getByTestId("subitem1").focus();
+    await page.keyboard.press("ArrowDown");
+
+    await expect(page.getByTestId("subitem2")).toBeFocused();
   });
 });
 
