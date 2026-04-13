@@ -217,12 +217,14 @@ export class FocusGroup {
       this.#wrap = false;
     }
 
+    const hasInline = tokens.includes("inline");
+    const hasBlock = tokens.includes("block");
     this.#axis =
-      tokens.includes("inline") && !tokens.includes("block")
+      hasInline && !hasBlock
         ? "inline"
-        : tokens.includes("block") && !tokens.includes("inline")
+        : hasBlock && !hasInline
           ? "block"
-          : tokens.includes("inline") && tokens.includes("block")
+          : hasInline && hasBlock
             ? undefined
             : BehaviorMap.get(this.#behavior)?.axis;
 
@@ -543,9 +545,12 @@ export class FocusGroup {
       node.hasAttribute(DatasetName.ITEM) ||
       // if the element is yet to be decorated
       (isKeyboardFocusable(node, this.#owner) &&
-        (!IS_SHADOWLESS && node.assignedSlot
-          ? getClosestElement(node.assignedSlot, "[focusgroup]") === this.#owner
-          : getClosestElement(node.parentNode, "[focusgroup]") === this.#owner))
+        getClosestElement(
+          !IS_SHADOWLESS && node.assignedSlot
+            ? node.assignedSlot
+            : node.parentNode,
+          "[focusgroup]",
+        ) === this.#owner)
     );
   }
 
