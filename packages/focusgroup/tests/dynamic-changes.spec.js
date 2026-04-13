@@ -506,12 +506,7 @@ test.describe("opt-out", () => {
 
   test("should remove directional navigation from the nested opt-out group", async ({
     page,
-    channel,
   }, { project }) => {
-    if (channel !== "chrome-canary") {
-      test.fixme();
-    }
-
     await setupPage(
       page,
       project,
@@ -600,12 +595,7 @@ test.describe("opt-in", () => {
 
   test("should add directional navigation to the nested opt-in group", async ({
     page,
-    channel,
   }, { project }) => {
-    if (channel !== "chrome-canary") {
-      test.fixme();
-    }
-
     await setupPage(
       page,
       project,

@@ -24,12 +24,11 @@ import {
 } from "./utils.js";
 
 // Registry of all active focusgroup mutation observers. When any focusgroup
-// writes polyfill-managed attributes (tabindex, data-fg-*, role), we flush
-// *every* observer in this set so that no stale mutation records from our own
-// writes survive into the next microtask — preventing infinite cross-group
-// loops between nested focusgroups whose subtrees overlap.
-// Add it to the `window` object in case the polyfill script being loaded
-// multiple times.
+// writes polyfill-managed attributes (tabindex) during focus event handling,
+// we flush *every* observer in this set so that no stale mutation records from
+// cross-group writes survive into the next microtask — preventing unintended
+// re-decoration from ancestor/descendant focusgroups whose subtrees overlap.
+// Stored on `globalThis` in case the polyfill script is loaded multiple times.
 globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS ??= new Set();
 /** @type {Set<MutationObserver>} */
 const observers = globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS;
@@ -341,7 +340,7 @@ export class FocusGroup {
       this.#itemWalker.currentNode = startItem;
     }
 
-    flushAllObservers();
+    this.#flushObserver();
   }
 
   #undecorateItems() {
@@ -373,7 +372,7 @@ export class FocusGroup {
       item.removeAttribute(DatasetName.ITEM);
     } while (this.#itemWalker.nextNode());
 
-    flushAllObservers();
+    this.#flushObserver();
   }
 
   /** @returns {HTMLElement} The first item element. */
@@ -590,6 +589,18 @@ export class FocusGroup {
   }
 
   /**
+   * Flushes this group's own MutationObserver by calling `takeRecords()`,
+   * discarding any pending mutation records that were caused by polyfill-managed
+   * attribute writes (primarily `tabindex`). This prevents this group from
+   * re-processing its own decoration writes as if they were author-initiated
+   * changes. Unlike the previous global flush approach, this only discards
+   * records for *this* observer, leaving other groups' legitimate records intact.
+   */
+  #flushObserver() {
+    this.#observer?.takeRecords();
+  }
+
+  /**
    * Resets all proxy shadow hosts back to `tabindex=-1` (or `0` if they are
    * segment starts) so they no longer appear as extra Tab stops. Clears the
    * `#proxyHosts` tracking set.
@@ -606,7 +617,7 @@ export class FocusGroup {
    * Sets the target's `tabindex` to `0` and optionally calls `focus()` on it.
    * The previous item's `tabindex` is set to `-1` unless it belongs to a
    * different segment (in which case it remains `0` as a segment tab stop).
-   * Also clears proxy hosts and flushes observers.
+   * Also clears proxy hosts.
    * @param {HTMLElement} current - The currently focused item.
    * @param {HTMLElement} target - The item to receive focus.
    * @param {boolean} [shouldCallFocus=false] - Whether to programmatically call
@@ -624,8 +635,7 @@ export class FocusGroup {
         : 0;
 
     // Focus is moving within the group, so proxy hosts should stay cleared
-    // (they were cleared in #handleFocusin). Just clear+flush in case any
-    // lingered.
+    // (they were cleared in #handleFocusin). Just clear in case any lingered.
     this.#disableKeyboardFocusabilityForProxyHosts();
 
     flushAllObservers();
@@ -640,7 +650,27 @@ export class FocusGroup {
    */
   // TODO: Handle mutations more granularly than redecorating all items.
   #processMutations(entries) {
-    console.log(this.#owner, entries);
+    // When the polyfill writes `tabindex` during decoration or focus management,
+    // observers on ancestor/descendant focusgroups will also receive those
+    // mutation records (because of `subtree: true`). Filter those out to avoid
+    // infinite re-decoration loops. A `tabindex` mutation on an element that
+    // belongs to another focusgroup (i.e. has `AUTHOR_TABINDEX` set but
+    // `DatasetName.ITEM` !== this group's ID) is polyfill-managed by that other
+    // group. If *every* entry in the batch is such a cross-group tabindex write,
+    // there's nothing for us to do — skip entirely.
+    const relevantEntries = entries.filter(
+      (e) =>
+        !(
+          e.type === "attributes" &&
+          e.attributeName === "tabindex" &&
+          e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
+          e.target.getAttribute(DatasetName.ITEM) !== this.#id
+        ),
+    );
+
+    if (relevantEntries.length === 0) {
+      return;
+    }
 
     const hasDefinitionChanged = entries.some(
       (e) => e.target === this.#owner && e.attributeName === "focusgroup",
