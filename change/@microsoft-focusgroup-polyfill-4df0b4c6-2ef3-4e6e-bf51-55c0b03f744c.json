@@ -1,6 +1,6 @@
 {
   "type": "patch",
-  "comment": "fix bug that prevents slotted items from being polyfilled in shadowless bundle",
+  "comment": "fixed slotted items not being polyfilled in shadowless bundle",
   "packageName": "@microsoft/focusgroup-polyfill",
   "email": "machi@microsoft.com",
   "dependentChangeType": "none"

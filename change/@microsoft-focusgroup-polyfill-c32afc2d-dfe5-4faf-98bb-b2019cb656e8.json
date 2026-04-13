@@ -1,6 +1,6 @@
 {
   "type": "patch",
-  "comment": "restore nested focusability when focus leaves a group that has nomemory",
+  "comment": "fixed nested focusability not being restored when focus leaves a group that has nomemory",
   "packageName": "@microsoft/focusgroup-polyfill",
   "email": "machi@microsoft.com",
   "dependentChangeType": "none"
