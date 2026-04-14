@@ -25,12 +25,10 @@ function hasDcmSpecifier(element) {
   );
 }
 
-export function install(root = document.documentElement) {
-  if (supportsShadowRootAdoptedStyleSheets()) {
-    return;
-  }
+function _install(doc, root) {
+  root ??= doc.documentElement;
 
-  const walker = document.createTreeWalker(
+  const walker = doc.createTreeWalker(
     root,
     NodeFilter.SHOW_ELEMENT,
     (element) =>
@@ -64,7 +62,15 @@ export function install(root = document.documentElement) {
 
       element.shadowRoot.adoptedStyleSheets.push(...sheets);
 
-      install(element.shadowRoot);
+      _install(doc, element.shadowRoot);
     }
   }
+}
+
+export function install() {
+  if (supportsShadowRootAdoptedStyleSheets()) {
+    return;
+  }
+
+  _install(document);
 }
