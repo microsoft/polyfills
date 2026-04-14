@@ -22,13 +22,17 @@
   }
 </style>
 
-<style type="module" specifier="my-style-2-light" media="(prefers-color-scheme: light)">
+<style type="module" specifier="my-style-2-light"
+  media="(prefers-color-scheme: light)"
+>
   span {
     color: blue;
   }
 </style>
 
-<style type="module" specifier="my-style-2-dark" media="(prefers-color-scheme: dark)">
+<style type="module" specifier="my-style-2-dark"
+  media="(prefers-color-scheme: dark)"
+>
   span {
     color: yellow;
   }
@@ -49,7 +53,14 @@
     my-style-2-dark
   "
 >
-  <template shadowrootmode="open" shadowrootadoptedstylesheets="my-style-1 my-style-2-light my-style-2-dark">
+  <template
+    shadowrootmode="open"
+    shadowrootadoptedstylesheets="
+      my-style-1
+      my-style-2-light
+      my-style-2-dark
+    "
+  >
     <p>hello, <span>world</span>!</p>
 
     <style type="module" specifier="my-span">
@@ -58,12 +69,30 @@
       }
     </style>
 
-    <my-button data-shadowrootadoptedstylesheets="my-button">
-      <template shadowrootmode="open" shadowrootadoptedstylesheets="my-button">
+    <my-button
+      data-shadowrootadoptedstylesheets="my-button"
+    >
+      <template
+        shadowrootmode="open"
+        shadowrootadoptedstylesheets="my-button"
+      >
         <button>
           <slot></slot>
-          <my-span data-shadowrootadoptedstylesheets="my-span my-style-2-light my-style-2-dark">
-            <template shadowrootmode="open" shadowrootadoptedstylesheets="my-span my-style-2-light my-style-2-dark">
+          <my-span
+            data-shadowrootadoptedstylesheets="
+              my-span
+              my-style-2-light
+              my-style-2-dark
+            "
+          >
+            <template
+              shadowrootmode="open"
+              shadowrootadoptedstylesheets="
+                my-span
+                my-style-2-light
+                my-style-2-dark
+              "
+            >
               me <span>now</span>
             </template>
           </my-span>
