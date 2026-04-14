@@ -15,6 +15,13 @@
   }
 </style>
 
+<style type="module" specifier="my-style-1">
+  /* THESE STYLES SHOULD NOT APPLY */
+  p::after {
+    content: "this text should never show up";
+  }
+</style>
+
 <style type="module" specifier="my-style-2-light" media="(prefers-color-scheme: light)">
   span {
     color: blue;
