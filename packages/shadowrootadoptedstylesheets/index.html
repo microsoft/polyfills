@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
+<title>shadowrootadoptedstylesheets ponyfill</title>
+
+<style>
+  html {
+    color-scheme: light dark;
+  }
+</style>
+
+<style type="module" specifier="my-style-1">
+  p {
+    color: red;
+  }
+</style>
+
+<style type="module" specifier="my-style-2-light" media="(prefers-color-scheme: light)">
+  span {
+    color: blue;
+  }
+</style>
+
+<style type="module" specifier="my-style-2-dark" media="(prefers-color-scheme: dark)">
+  span {
+    color: yellow;
+  }
+</style>
+
+<style type="module" specifier="my-button">
+  button {
+    background-color: green;
+  }
+</style>
+
+<p>outside the world</p>
+
+<my-element
+  data-shadowrootadoptedstylesheets="
+    my-style-1
+    my-style-2-light
+    my-style-2-dark
+  "
+>
+  <template shadowrootmode="open" shadowrootadoptedstylesheets="my-style-1 my-style-2-light my-style-2-dark">
+    <p>hello, <span>world</span>!</p>
+
+    <style type="module" specifier="my-span">
+      :host {
+        color: white;
+      }
+    </style>
+
+    <my-button data-shadowrootadoptedstylesheets="my-button">
+      <template shadowrootmode="open" shadowrootadoptedstylesheets="my-button">
+        <button>
+          <slot></slot>
+          <my-span data-shadowrootadoptedstylesheets="my-span my-style-2-light my-style-2-dark">
+            <template shadowrootmode="open" shadowrootadoptedstylesheets="my-span my-style-2-light my-style-2-dark">
+              me <span>now</span>
+            </template>
+          </my-span>
+        </button>
+      </template>
+      click
+    </my-button>
+  </template>
+</my-element>
+
+<script type="module">
+  import { install } from "./src/index.js";
+
+  install();
+</script>
+
+</html>
