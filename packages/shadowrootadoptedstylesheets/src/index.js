@@ -57,7 +57,12 @@ function installTo(doc, root) {
       const specifiers = attrValue.trim().split(" ");
       const sheets = specifiers
         .filter(Boolean)
-        .map((s) => styleSheetMap.get(s.trim()))
+        .map((s) => {
+          // TODO: if a specifier is not found in the map, the ponyfill should
+          // make a tempt to fetch the resource, see:
+          // https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ShadowDOMAdoptedStyleSheets/explainer.md#fetch-behavior-for-external-specifiers
+          return styleSheetMap.get(s.trim());
+        })
         .filter(Boolean);
 
       element.shadowRoot.adoptedStyleSheets.push(...sheets);
