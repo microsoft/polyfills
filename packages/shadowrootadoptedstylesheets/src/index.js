@@ -25,7 +25,7 @@ function hasDcmSpecifier(element) {
   );
 }
 
-function _install(doc, root) {
+function installTo(doc, root) {
   root ??= doc.documentElement;
 
   const walker = doc.createTreeWalker(
@@ -62,7 +62,7 @@ function _install(doc, root) {
 
       element.shadowRoot.adoptedStyleSheets.push(...sheets);
 
-      _install(doc, element.shadowRoot);
+      installTo(doc, element.shadowRoot);
     }
   }
 }
@@ -72,5 +72,5 @@ export function install() {
     return;
   }
 
-  _install(document);
+  installTo(document);
 }
