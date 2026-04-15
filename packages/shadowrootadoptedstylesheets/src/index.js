@@ -2,6 +2,11 @@ window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP ??= new Map();
 /** @type {Map<string, CSSStyleSheet>} */
 const styleSheetMap = window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP;
 
+/**
+ * Whether the current user agent supports the `shadowrootadoptedstylesheets`
+ * attribute for Declarative Shadow DOM.
+ * @returns {boolean}
+ */
 export function supportsShadowRootAdoptedStyleSheets() {
   return (
     "document" in globalThis &&
@@ -9,6 +14,11 @@ export function supportsShadowRootAdoptedStyleSheets() {
   );
 }
 
+/**
+ * Whether the given element is a `<style type="module" specifier>` element.
+ * @param {Element} element
+ * @returns {boolean}
+ */
 function isCSSModule(element) {
   return !!(
     element.nodeName === "STYLE" &&
@@ -17,7 +27,13 @@ function isCSSModule(element) {
   );
 }
 
-function hasDcmSpecifier(element) {
+/**
+ * Whether the given element is a custom element that has the
+ * `data-shadowrootadoptedstylesheets` attribute and contains a shadow root.
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function hasSpecifier(element) {
   return !!(
     element.nodeName.includes("-") &&
     element.dataset?.shadowrootadoptedstylesheets &&
@@ -25,6 +41,11 @@ function hasDcmSpecifier(element) {
   );
 }
 
+/**
+ * Installs declarative adopted stylesheets to a given element’s shadow root.
+ * @param {Document!} doc
+ * @param {HTMLElement} root
+ */
 function installTo(doc, root) {
   root ??= doc.documentElement;
 
@@ -32,7 +53,7 @@ function installTo(doc, root) {
     root,
     NodeFilter.SHOW_ELEMENT,
     (element) =>
-      isCSSModule(element) || hasDcmSpecifier(element)
+      isCSSModule(element) || hasSpecifier(element)
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_SKIP,
   );
@@ -54,22 +75,21 @@ function installTo(doc, root) {
       continue;
     }
 
-    if (hasDcmSpecifier(element)) {
+    if (hasSpecifier(element)) {
       const attrValue = element.dataset.shadowrootadoptedstylesheets;
       const specifiers = attrValue.trim().split(" ");
       const sheets = specifiers
         .filter(Boolean)
         .map((s) => {
           const specifier = s.trim();
-          let sheet = styleSheetMap.get(specifier);
+          const sheet = styleSheetMap.get(specifier) ?? new CSSStyleSheet();
 
-          if (!sheet) {
-            sheet = new CSSStyleSheet();
+          if (!styleSheetMap.has(specifier)) {
+            styleSheetMap.set(specifier, sheet);
             fetch(specifier, { headers: { accept: "text/css" } })
               .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
               .then((text) => {
                 sheet.replaceSync(text);
-                styleSheetMap.set(specifier, sheet);
               });
           }
 
@@ -84,6 +104,7 @@ function installTo(doc, root) {
   }
 }
 
+/** @returns {Promise<void>} */
 function domReady() {
   return new Promise((resolve) => {
     if (document.readyState === "loading") {
@@ -94,6 +115,10 @@ function domReady() {
   });
 }
 
+/**
+ * Installs declarative adopted stylesheets for all the eligible elements in
+ * the current document.
+ */
 export function install() {
   if (supportsShadowRootAdoptedStyleSheets()) {
     return;
