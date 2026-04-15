@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-const PROPERTY_NAME = "shadowRootAdoptedStyleSheets";
-const ATTR_NAME_DATA_BASE = `data-${PROPERTY_NAME.toLocaleLowerCase()}`;
+const PROP_NAME = "shadowRootAdoptedStyleSheets";
+const ATTR_NAME_DATA_BASE = `data-${PROP_NAME.toLocaleLowerCase()}`;
 const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
 const ATTR_NAME_SPECIFIER = "specifier";
 
@@ -12,7 +12,7 @@ const ATTR_NAME_SPECIFIER = "specifier";
  * @returns {boolean}
  */
 export function supportsShadowRootAdoptedStyleSheets() {
-  return "document" in globalThis && PROPERTY_NAME in HTMLTemplateElement;
+  return "document" in globalThis && PROP_NAME in HTMLTemplateElement;
 }
 
 /**
