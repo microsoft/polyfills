@@ -2,6 +2,12 @@ window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP ??= new Map();
 /** @type {Map<string, CSSStyleSheet>} */
 const styleSheetMap = window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP;
 
+const BASE = "shadowrootadoptedstylesheets";
+const DataName = {
+  BASE,
+  READY: `${BASE}Ready`,
+};
+
 /**
  * Whether the current user agent supports the `shadowrootadoptedstylesheets`
  * attribute for Declarative Shadow DOM.
@@ -36,7 +42,7 @@ function isCSSModule(element) {
 function hasSpecifier(element) {
   return !!(
     element.nodeName.includes("-") &&
-    element.dataset?.shadowrootadoptedstylesheets &&
+    element.dataset?.[DataName.BASE] &&
     element.shadowRoot
   );
 }
@@ -76,8 +82,9 @@ function installTo(doc, root) {
     }
 
     if (hasSpecifier(element)) {
-      const attrValue = element.dataset.shadowrootadoptedstylesheets;
+      const attrValue = element.dataset[DataName.BASE];
       const specifiers = attrValue.trim().split(" ");
+      const pending = [];
       const sheets = specifiers
         .filter(Boolean)
         .map((s) => {
@@ -86,11 +93,13 @@ function installTo(doc, root) {
 
           if (!styleSheetMap.has(specifier)) {
             styleSheetMap.set(specifier, sheet);
-            fetch(specifier, { headers: { accept: "text/css" } })
-              .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
-              .then((text) => {
-                sheet.replaceSync(text);
-              });
+            pending.push(
+              fetch(specifier, { headers: { accept: "text/css" } })
+                .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
+                .then((text) => {
+                  sheet.replaceSync(text);
+                }),
+            );
           }
 
           return sheet;
@@ -98,6 +107,14 @@ function installTo(doc, root) {
         .filter(Boolean);
 
       element.shadowRoot.adoptedStyleSheets.push(...sheets);
+
+      if (pending.length > 0) {
+        Promise.all(pending).then(() => {
+          element.dataset[DataName.READY] = "";
+        });
+      } else {
+        element.dataset[DataName.READY] = "";
+      }
 
       installTo(doc, element.shadowRoot);
     }
