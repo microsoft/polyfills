@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/shadowrootadoptedstylesheets-ponyfill",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "A pony fill for `shadowrootadoptedstylesheets` attribute on Declarative Shadow DOM.",
   "scripts": {
     "dev": "vite",
@@ -13,11 +13,15 @@
   },
   "keywords": [
     "html",
-    "shadow dom",
     "adopted style sheets",
     "web components",
     "custom elements",
-    "declarative shadow dom"
+    "shadow dom",
+    "declarative shadow dom",
+    "css module",
+    "declarative css module",
+    "ponyfill",
+    "polyfill"
   ],
   "author": "Microsoft",
   "license": "MIT",
