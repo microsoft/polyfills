@@ -50,6 +50,8 @@ function installTo(doc, root) {
       const sheet = new CSSStyleSheet({ media: element.media });
       sheet.replaceSync(element.textContent);
       styleSheetMap.set(specifier, sheet);
+
+      continue;
     }
 
     if (hasDcmSpecifier(element)) {
