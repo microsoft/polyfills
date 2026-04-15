@@ -82,10 +82,22 @@ function installTo(doc, root) {
   }
 }
 
+function domReady() {
+  return new Promise((resolve) => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", resolve, { once: true });
+    } else {
+      resolve();
+    }
+  });
+}
+
 export function install() {
   if (supportsShadowRootAdoptedStyleSheets()) {
     return;
   }
 
-  installTo(document);
+  domReady().then(() => {
+    installTo(document);
+  });
 }
