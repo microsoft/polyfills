@@ -2,16 +2,10 @@ window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP ??= new Map();
 /** @type {Map<string, CSSStyleSheet>} */
 const styleSheetMap = window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP;
 
-const PROP = "shadowRootAdoptedStyleSheets";
-const BASE = PROP.toLocaleLowerCase();
-const DataName = {
-  BASE,
-  READY: `${BASE}Ready`,
-};
-
-const AttrName = {
-  SPECIFIER: "specifier",
-};
+const PROPERTY_NAME = "shadowRootAdoptedStyleSheets";
+const ATTR_NAME_DATA_BASE = `data-${PROPERTY_NAME.toLocaleLowerCase()}`;
+const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
+const ATTR_NAME_SPECIFIER = "specifier";
 
 /**
  * Whether the current user agent supports the `shadowrootadoptedstylesheets`
@@ -19,7 +13,7 @@ const AttrName = {
  * @returns {boolean}
  */
 export function supportsShadowRootAdoptedStyleSheets() {
-  return "document" in globalThis && PROP in HTMLTemplateElement;
+  return "document" in globalThis && PROPERTY_NAME in HTMLTemplateElement;
 }
 
 /**
@@ -31,7 +25,7 @@ function isCSSModule(element) {
   return !!(
     element.nodeName === "STYLE" &&
     element.getAttribute("type") === "module" &&
-    element.getAttribute(AttrName.SPECIFIER)
+    element.getAttribute(ATTR_NAME_SPECIFIER)
   );
 }
 
@@ -44,18 +38,18 @@ function isCSSModule(element) {
 function hasSpecifier(element) {
   return !!(
     element.nodeName.includes("-") &&
-    element.dataset?.[DataName.BASE] &&
+    element.hasAttribute(ATTR_NAME_DATA_BASE) &&
     element.shadowRoot
   );
 }
 
 /**
- * Installs declarative adopted stylesheets to a given element’s shadow root.
+ * Installs declarative adopted stylesheets to a given DOM root node.
  * @param {Document!} doc
- * @param {HTMLElement} root
+ * @param {(Document|ShadowRoot)?} root
  */
-function installTo(doc, root) {
-  root ??= doc.documentElement;
+function installToRoot(doc, root) {
+  root ??= doc;
 
   const walker = doc.createTreeWalker(
     root,
@@ -70,7 +64,7 @@ function installTo(doc, root) {
     const element = walker.currentNode;
 
     if (isCSSModule(element)) {
-      const specifier = element.getAttribute(AttrName.SPECIFIER);
+      const specifier = element.getAttribute(ATTR_NAME_SPECIFIER);
 
       if (!specifier || styleSheetMap.has(specifier)) {
         continue;
@@ -84,7 +78,7 @@ function installTo(doc, root) {
     }
 
     if (hasSpecifier(element)) {
-      const attrValue = element.dataset[DataName.BASE];
+      const attrValue = element.getAttribute(ATTR_NAME_DATA_BASE);
       const specifiers = attrValue.trim().split(" ");
       const pending = [];
       const sheets = specifiers
@@ -110,15 +104,11 @@ function installTo(doc, root) {
 
       element.shadowRoot.adoptedStyleSheets.push(...sheets);
 
-      if (pending.length > 0) {
-        Promise.all(pending).then(() => {
-          element.dataset[DataName.READY] = "";
-        });
-      } else {
-        element.dataset[DataName.READY] = "";
-      }
+      Promise.all(pending).then(() => {
+        element.toggleAttribute(ATTR_NAME_DATA_READY, true);
+      });
 
-      installTo(doc, element.shadowRoot);
+      installToRoot(doc, element.shadowRoot);
     }
   }
 }
@@ -144,6 +134,6 @@ export function install() {
   }
 
   domReady().then(() => {
-    installTo(document);
+    installToRoot(document);
   });
 }
