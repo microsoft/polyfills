@@ -24,8 +24,8 @@ export function supportsShadowRootAdoptedStyleSheets() {
 function isCSSModule(element) {
   return !!(
     element.nodeName === "STYLE" &&
-    element.getAttribute("type") === "module" &&
-    element.getAttribute(ATTR_NAME_SPECIFIER)
+    element.getAttribute("type")?.trim() === "module" &&
+    element.getAttribute(ATTR_NAME_SPECIFIER)?.trim()
   );
 }
 
@@ -64,7 +64,7 @@ function installToRoot(doc, root) {
     const element = walker.currentNode;
 
     if (isCSSModule(element)) {
-      const specifier = element.getAttribute(ATTR_NAME_SPECIFIER);
+      const specifier = element.getAttribute(ATTR_NAME_SPECIFIER).trim();
 
       if (!specifier || styleSheetMap.has(specifier)) {
         continue;
@@ -78,29 +78,26 @@ function installToRoot(doc, root) {
     }
 
     if (hasSpecifier(element)) {
-      const attrValue = element.getAttribute(ATTR_NAME_DATA_BASE);
-      const specifiers = attrValue.trim().split(" ");
+      const attrValue = element.getAttribute(ATTR_NAME_DATA_BASE).trim();
+      const specifiers = attrValue.split(" ");
       const pending = [];
-      const sheets = specifiers
-        .filter(Boolean)
-        .map((s) => {
-          const specifier = s.trim();
-          const sheet = styleSheetMap.get(specifier) ?? new CSSStyleSheet();
+      const sheets = specifiers.filter(Boolean).map((s) => {
+        const specifier = s.trim();
+        const sheet = styleSheetMap.get(specifier) ?? new CSSStyleSheet();
 
-          if (!styleSheetMap.has(specifier)) {
-            styleSheetMap.set(specifier, sheet);
-            pending.push(
-              fetch(specifier, { headers: { accept: "text/css" } })
-                .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
-                .then((text) => {
-                  sheet.replaceSync(text);
-                }),
-            );
-          }
+        if (!styleSheetMap.has(specifier)) {
+          styleSheetMap.set(specifier, sheet);
+          pending.push(
+            fetch(specifier, { headers: { accept: "text/css" } })
+              .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
+              .then((text) => {
+                sheet.replaceSync(text);
+              }),
+          );
+        }
 
-          return sheet;
-        })
-        .filter(Boolean);
+        return sheet;
+      });
 
       element.shadowRoot.adoptedStyleSheets.push(...sheets);
 
