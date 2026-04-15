@@ -7,15 +7,6 @@ const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
 const ATTR_NAME_SPECIFIER = "specifier";
 
 /**
- * Whether the current user agent supports the `shadowrootadoptedstylesheets`
- * attribute for Declarative Shadow DOM.
- * @returns {boolean}
- */
-export function supportsShadowRootAdoptedStyleSheets() {
-  return "document" in globalThis && PROP_NAME in HTMLTemplateElement;
-}
-
-/**
  * Whether the given element is a `<style type="module" specifier>` element.
  * @param {Element} element
  * @returns {boolean}
@@ -121,12 +112,33 @@ function domReady() {
   });
 }
 
+/** @returns {boolean} */
+function supportsAdoptedStyleSheets() {
+  return (
+    typeof document !== "undefined" &&
+    typeof ShadowRoot !== "undefined" &&
+    "adoptedStyleSheets" in ShadowRoot.prototype
+  );
+}
+
+/**
+ * Whether the current user agent supports the `shadowrootadoptedstylesheets`
+ * attribute for Declarative Shadow DOM.
+ * @returns {boolean}
+ */
+export function supportsShadowRootAdoptedStyleSheets() {
+  return (
+    typeof document !== "undefined" &&
+    PROP_NAME in HTMLTemplateElement.prototype
+  );
+}
+
 /**
  * Installs declarative adopted stylesheets for all the eligible elements in
  * the current document.
  */
 export function install() {
-  if (supportsShadowRootAdoptedStyleSheets()) {
+  if (!supportsAdoptedStyleSheets() || supportsShadowRootAdoptedStyleSheets()) {
     return;
   }
 
