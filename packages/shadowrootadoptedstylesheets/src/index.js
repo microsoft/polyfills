@@ -58,10 +58,20 @@ function installTo(doc, root) {
       const sheets = specifiers
         .filter(Boolean)
         .map((s) => {
-          // TODO: if a specifier is not found in the map, the ponyfill should
-          // make a tempt to fetch the resource, see:
-          // https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ShadowDOMAdoptedStyleSheets/explainer.md#fetch-behavior-for-external-specifiers
-          return styleSheetMap.get(s.trim());
+          const specifier = s.trim();
+          let sheet = styleSheetMap.get(specifier);
+
+          if (!sheet) {
+            sheet = new CSSStyleSheet();
+            fetch(specifier, { headers: { accept: "text/css" } })
+              .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
+              .then((text) => {
+                sheet.replaceSync(text);
+                styleSheetMap.set(specifier, sheet);
+              });
+          }
+
+          return sheet;
         })
         .filter(Boolean);
 

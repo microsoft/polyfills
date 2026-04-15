@@ -51,6 +51,8 @@
     my-style-1
     my-style-2-light
     my-style-2-dark
+    ./non-exist.css
+    ./my-external.css
   "
 >
   <template
@@ -59,9 +61,11 @@
       my-style-1
       my-style-2-light
       my-style-2-dark
+      ./non-exist.css
+      ./my-external.css
     "
   >
-    <p>hello, <span>world</span>!</p>
+    <p>hello, <span>world</span>! <span class="external">and moon</span></p>
 
     <style type="module" specifier="my-span">
       :host {
@@ -83,6 +87,7 @@
               my-span
               my-style-2-light
               my-style-2-dark
+              ./my-external.css
             "
           >
             <template
@@ -91,9 +96,10 @@
                 my-span
                 my-style-2-light
                 my-style-2-dark
+                ./my-external.css
               "
             >
-              me <span>now</span>
+              me <span>now</span> <span class="external">external</span>
             </template>
           </my-span>
         </button>
