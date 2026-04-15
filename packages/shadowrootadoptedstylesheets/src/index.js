@@ -2,10 +2,15 @@ window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP ??= new Map();
 /** @type {Map<string, CSSStyleSheet>} */
 const styleSheetMap = window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP;
 
-const BASE = "shadowrootadoptedstylesheets";
+const PROP = "shadowRootAdoptedStyleSheets";
+const BASE = PROP.toLocaleLowerCase();
 const DataName = {
   BASE,
   READY: `${BASE}Ready`,
+};
+
+const AttrName = {
+  SPECIFIER: "specifier",
 };
 
 /**
@@ -14,10 +19,7 @@ const DataName = {
  * @returns {boolean}
  */
 export function supportsShadowRootAdoptedStyleSheets() {
-  return (
-    "document" in globalThis &&
-    "shadowRootAdoptedStyleSheets" in HTMLTemplateElement
-  );
+  return "document" in globalThis && PROP in HTMLTemplateElement;
 }
 
 /**
@@ -29,7 +31,7 @@ function isCSSModule(element) {
   return !!(
     element.nodeName === "STYLE" &&
     element.getAttribute("type") === "module" &&
-    element.getAttribute("specifier")
+    element.getAttribute(AttrName.SPECIFIER)
   );
 }
 
@@ -68,7 +70,7 @@ function installTo(doc, root) {
     const element = walker.currentNode;
 
     if (isCSSModule(element)) {
-      const specifier = element.getAttribute("specifier");
+      const specifier = element.getAttribute(AttrName.SPECIFIER);
 
       if (!specifier || styleSheetMap.has(specifier)) {
         continue;
