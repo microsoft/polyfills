@@ -1,7 +1,3 @@
-window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP ??= new Map();
-/** @type {Map<string, CSSStyleSheet>} */
-const styleSheetMap = window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP;
-
 const PROPERTY_NAME = "shadowRootAdoptedStyleSheets";
 const ATTR_NAME_DATA_BASE = `data-${PROPERTY_NAME.toLocaleLowerCase()}`;
 const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
@@ -45,10 +41,11 @@ function hasSpecifier(element) {
 
 /**
  * Installs declarative adopted stylesheets to a given DOM root node.
+ * @param {Map<string, CSSStyleSheet>} map
  * @param {Document!} doc
  * @param {(Document|ShadowRoot)?} root
  */
-function installToRoot(doc, root) {
+function installToRoot(map, doc, root) {
   root ??= doc;
 
   const walker = doc.createTreeWalker(
@@ -66,13 +63,13 @@ function installToRoot(doc, root) {
     if (isCSSModule(element)) {
       const specifier = element.getAttribute(ATTR_NAME_SPECIFIER).trim();
 
-      if (!specifier || styleSheetMap.has(specifier)) {
+      if (!specifier || map.has(specifier)) {
         continue;
       }
 
       const sheet = new CSSStyleSheet({ media: element.media });
       sheet.replaceSync(element.textContent);
-      styleSheetMap.set(specifier, sheet);
+      map.set(specifier, sheet);
 
       continue;
     }
@@ -83,10 +80,10 @@ function installToRoot(doc, root) {
       const pending = [];
       const sheets = specifiers.filter(Boolean).map((s) => {
         const specifier = s.trim();
-        const sheet = styleSheetMap.get(specifier) ?? new CSSStyleSheet();
+        const sheet = map.get(specifier) ?? new CSSStyleSheet();
 
-        if (!styleSheetMap.has(specifier)) {
-          styleSheetMap.set(specifier, sheet);
+        if (!map.has(specifier)) {
+          map.set(specifier, sheet);
           pending.push(
             fetch(specifier, { headers: { accept: "text/css" } })
               .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
@@ -105,7 +102,7 @@ function installToRoot(doc, root) {
         element.toggleAttribute(ATTR_NAME_DATA_READY, true);
       });
 
-      installToRoot(doc, element.shadowRoot);
+      installToRoot(map, doc, element.shadowRoot);
     }
   }
 }
@@ -130,7 +127,9 @@ export function install() {
     return;
   }
 
+  window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP ??= new Map();
+
   domReady().then(() => {
-    installToRoot(document);
+    installToRoot(window.__SHADOW_ROOT_ADOPTED_STYLE_SHEETS_MAP, document);
   });
 }
