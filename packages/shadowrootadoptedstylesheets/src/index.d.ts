@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 /**
  * Whether the current user agent supports the `shadowrootadoptedstylesheets`
  * attribute for Declarative Shadow DOM.

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 const PROPERTY_NAME = "shadowRootAdoptedStyleSheets";
 const ATTR_NAME_DATA_BASE = `data-${PROPERTY_NAME.toLocaleLowerCase()}`;
 const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
