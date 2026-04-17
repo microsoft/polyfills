@@ -125,6 +125,12 @@ export class FocusGroup {
   #observer;
 
   /**
+   * The abort controller for when the `recycle()` is called.
+   * @type {AbortController}
+   */
+  #abort = new AbortController();
+
+  /**
    * @param {HTMLElement!} owner - The focus group owner element.
    */
   constructor(owner) {
@@ -181,9 +187,15 @@ export class FocusGroup {
     });
     addObserver(this.#observer);
 
-    this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this));
-    this.#owner.addEventListener("focusin", this.#handleFocusin.bind(this));
-    this.#owner.addEventListener("focusout", this.#handleFocusout.bind(this));
+    this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this), {
+      signal: this.#abort.signal,
+    });
+    this.#owner.addEventListener("focusin", this.#handleFocusin.bind(this), {
+      signal: this.#abort.signal,
+    });
+    this.#owner.addEventListener("focusout", this.#handleFocusout.bind(this), {
+      signal: this.#abort.signal,
+    });
   }
 
   /**
@@ -199,6 +211,7 @@ export class FocusGroup {
     this.#itemWalker = null;
     this.#memorized = null;
     this.#proxyHosts.clear();
+    this.#abort.abort();
   }
 
   #updateDefinition() {
