@@ -111,12 +111,18 @@ export class FocusGroup {
   #memorized = null;
 
   /**
-   * Shadow host ancestors that have been given `tabindex=0` purely to keep
-   * the real tab stop reachable via Tab. Cleared and rebuilt whenever the tab
-   * stop changes.
-   * @type {Set<HTMLElement>}
+   * Whether the owner currently has `tabindex=0` set as a Tab-entry proxy so
+   * sequential focus navigation can reach a tab stop inside a shadow root.
+   * @type {boolean}
    */
-  #proxyHosts = new Set();
+  #ownerIsProxy = false;
+
+  /**
+   * The owner's original `tabindex` attribute value (or `null` if it had no
+   * `tabindex`), saved before the polyfill sets `tabindex=0` for proxy duty.
+   * @type {string|null}
+   */
+  #ownerTabindexBeforeProxy = null;
 
   /**
    * The mutation observer.
@@ -206,11 +212,11 @@ export class FocusGroup {
   recycle() {
     observers.delete(this.#observer);
     this.#observer?.disconnect();
+    this.#disableOwnerProxy();
     this.#owner = null;
     this.#start = null;
     this.#itemWalker = null;
     this.#memorized = null;
-    this.#proxyHosts.clear();
     this.#abort.abort();
   }
 
@@ -350,8 +356,8 @@ export class FocusGroup {
     if (startItem) {
       startItem.tabIndex = 0;
       this.#start = startItem;
-      this.#disableKeyboardFocusabilityForProxyHosts();
-      this.#enableKeyboardFocusabilityForProxyHost(startItem);
+      this.#disableOwnerProxy();
+      this.#enableOwnerProxy(startItem);
       this.#itemWalker.currentNode = startItem;
     }
 
@@ -359,7 +365,7 @@ export class FocusGroup {
   }
 
   #undecorateItems() {
-    this.#disableKeyboardFocusabilityForProxyHosts();
+    this.#disableOwnerProxy();
 
     const first = this.#firstItem();
 
@@ -455,29 +461,30 @@ export class FocusGroup {
   #handleFocusin(evt) {
     const target = evt.target.shadowRoot ? evt.composedPath()[0] : evt.target;
 
+    const focusEnteringGroup =
+      !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
+
+    // When the owner is acting as a Tab-entry proxy, redirect focus to the
+    // actual tab stop and disable the proxy so it doesn't create an extra stop.
+    if (target === this.#owner && this.#ownerIsProxy && focusEnteringGroup) {
+      const tabStop = this.#memorized || this.#start;
+      this.#disableOwnerProxy();
+      flushAllObservers();
+      if (tabStop) {
+        tabStop.focus();
+      }
+      evt.stopPropagation();
+      return;
+    }
+
     if (!this.#itemWalker.filter(target)) {
       return;
     }
 
-    const isExternalEntry =
-      !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
-
-    // Redirect Tab-from-outside that landed on a proxy host to the actual tab
-    // stop. A proxy host has tabindex=0 only so the browser can reach into its
-    // shadow root; the real tab stop lives deeper inside.
-    if (this.#proxyHosts.has(target) && isExternalEntry) {
-      const tabStop = this.#memorized || this.#start;
-      if (tabStop && tabStop !== target) {
-        tabStop.focus();
-        return;
-      }
-    }
-
-    // Once focus is inside the group (whether via redirect landing here or
-    // direct click/arrow), drop all proxy hosts back to tabindex=-1 so they
-    // don't create extra Tab stops when the user Shift+Tabs out.
-    if (this.#proxyHosts.size > 0) {
-      this.#disableKeyboardFocusabilityForProxyHosts();
+    // Once focus is inside the group, disable the owner proxy so it doesn't
+    // create an extra Tab stop when the user Shift+Tabs out.
+    if (this.#ownerIsProxy) {
+      this.#disableOwnerProxy();
       flushAllObservers();
     }
 
@@ -498,14 +505,14 @@ export class FocusGroup {
     const focusLeavingGroup =
       !evt.relatedTarget || !this.#owner.contains(evt.relatedTarget);
 
-    // When focus leaves the group, re-enable proxy hosts so Tab can re-enter
-    // through shadow boundaries to reach the tab stop.
+    // When focus leaves the group, re-enable the owner as a Tab-entry proxy
+    // so Tab can re-enter the group to reach the tab stop.
     if (focusLeavingGroup) {
       const tabStop = this.#memory
         ? this.#memorized || this.#start
         : this.#start;
       if (tabStop) {
-        this.#enableKeyboardFocusabilityForProxyHost(tabStop);
+        this.#enableOwnerProxy(tabStop);
         flushAllObservers();
       }
     }
@@ -540,7 +547,7 @@ export class FocusGroup {
     this.#itemWalker.currentNode = this.#start;
 
     if (focusLeavingGroup) {
-      this.#enableKeyboardFocusabilityForProxyHost(this.#start);
+      this.#enableOwnerProxy(this.#start);
     }
 
     // Proxy hosts for the reset tab stop are already set above.
@@ -576,34 +583,42 @@ export class FocusGroup {
   }
 
   /**
-   * Walks from `tabStop` up through shadow boundaries and slot assignments to
-   * `this.#owner`. For each shadow host ancestor that is a decorated item of
-   * this group, sets `tabindex=0` so the browser's sequential focus navigation
-   * can Tab into the shadow root that contains the real tab stop. Adds each
-   * such host to the `#proxyHosts` tracking set.
+   * If the tab stop is inside a shadow DOM, sets `tabindex=0` on the
+   * focusgroup owner so the browser's Tab navigation can land on it, at
+   * which point `#handleFocusin` will redirect focus to the real tab stop.
    * @param {HTMLElement} tabStop - The actual focusable tab stop element.
    */
-  #enableKeyboardFocusabilityForProxyHost(tabStop) {
-    let node = tabStop;
-    while (node && node !== this.#owner) {
-      // Resolve the shadow host: prefer the slot's root (for slotted nodes),
-      // otherwise fall back to the node's own root.
-      const root = (node.assignedSlot ?? node).getRootNode();
-      if (root instanceof ShadowRoot) {
-        const host = root.host;
-        if (
-          host !== this.#owner &&
-          host.getAttribute(DatasetName.ITEM) === this.#id &&
-          host !== tabStop
-        ) {
-          host.tabIndex = 0;
-          this.#proxyHosts.add(host);
-        }
-        node = host;
-      } else {
-        node = node.parentNode;
-      }
+  #enableOwnerProxy(tabStop) {
+    if (
+      this.#ownerIsProxy ||
+      (!(tabStop.getRootNode() instanceof ShadowRoot) && !tabStop.assignedSlot)
+    ) {
+      return;
     }
+    this.#ownerTabindexBeforeProxy = this.#owner.hasAttribute("tabindex")
+      ? this.#owner.getAttribute("tabindex")
+      : null;
+    this.#owner.tabIndex = 0;
+    this.#ownerIsProxy = true;
+    flushAllObservers();
+  }
+
+  /**
+   * Restores the owner's original `tabindex` (or removes it if it had none),
+   * undoing `#enableOwnerProxy`.
+   */
+  #disableOwnerProxy() {
+    if (!this.#ownerIsProxy) {
+      return;
+    }
+    if (this.#ownerTabindexBeforeProxy !== null) {
+      this.#owner.setAttribute("tabindex", this.#ownerTabindexBeforeProxy);
+    } else {
+      this.#owner.removeAttribute("tabindex");
+    }
+    this.#ownerIsProxy = false;
+    this.#ownerTabindexBeforeProxy = null;
+    this.#flushObserver();
   }
 
   /**
@@ -619,23 +634,11 @@ export class FocusGroup {
   }
 
   /**
-   * Resets all proxy shadow hosts back to `tabindex=-1` (or `0` if they are
-   * segment starts) so they no longer appear as extra Tab stops. Clears the
-   * `#proxyHosts` tracking set.
-   */
-  #disableKeyboardFocusabilityForProxyHosts() {
-    for (const host of this.#proxyHosts) {
-      host.tabIndex = host.hasAttribute(DatasetName.SEGMENT_START) ? 0 : -1;
-    }
-    this.#proxyHosts.clear();
-  }
-
-  /**
    * Transfers the focusgroup's active tab stop from one item to another.
    * Sets the target's `tabindex` to `0` and optionally calls `focus()` on it.
    * The previous item's `tabindex` is set to `-1` unless it belongs to a
    * different segment (in which case it remains `0` as a segment tab stop).
-   * Also clears proxy hosts.
+   * Also disables the owner proxy.
    * @param {HTMLElement} current - The currently focused item.
    * @param {HTMLElement} target - The item to receive focus.
    * @param {boolean} [shouldCallFocus=false] - Whether to programmatically call
@@ -652,9 +655,9 @@ export class FocusGroup {
         ? -1
         : 0;
 
-    // Focus is moving within the group, so proxy hosts should stay cleared
-    // (they were cleared in #handleFocusin). Just clear in case any lingered.
-    this.#disableKeyboardFocusabilityForProxyHosts();
+    // Focus is moving within the group, so the owner proxy should stay
+    // disabled (it was disabled in #handleFocusin). Just clear in case any lingered.
+    this.#disableOwnerProxy();
 
     flushAllObservers();
   }
@@ -681,8 +684,11 @@ export class FocusGroup {
         !(
           e.type === "attributes" &&
           e.attributeName === "tabindex" &&
-          e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
-          e.target.getAttribute(DatasetName.ITEM) !== this.#id
+          // Ignore cross-group tabindex writes (items of other focusgroups).
+          ((e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
+            e.target.getAttribute(DatasetName.ITEM) !== this.#id) ||
+            // Ignore owner tabindex writes caused by proxy enable/disable.
+            e.target === this.#owner)
         ),
     );
 
