@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
-import { FocusGroupItemsMutateEvent } from "./focusgroup-items.js";
+import { FocusGroupMutateEvent } from "./focusgroup-items.js";
 import { observers } from "./observer-registry.js";
 import {
   createMutationObserver,
@@ -13,19 +13,24 @@ import {
 } from "./shadow-utils/index.js";
 import { generateUniqueId, isKeyboardFocusable, isSegmentor } from "./utils.js";
 
-/** @import { FocusGroupItem } from "./focusgroup-items.js" */
+/**
+ * @import {
+ *   FocusGroupItemCollection,
+ *   FocusGroupItem,
+ * } from "./focusgroup-items.js"
+ */
 
 /**
- * The default `FocusGroupItemsCollection` implementation used by the polyfill.
+ * The default `FocusGroupItemCollection` implementation used by the polyfill.
  *
  * Discovers items via a shadow-aware `TreeWalker` and observes the owner
  * subtree with a `MutationObserver`. Translates raw mutation batches into
- * `FocusGroupItemsMutateEvent`s, filtering out cross-group polyfill-managed
+ * `FocusGroupMutateEvent`s, filtering out cross-group polyfill-managed
  * tabindex writes and owner-proxy noise.
  *
- * Implements the `FocusGroupItemsCollection` interface.
+ * @implements {FocusGroupItemCollection}
  */
-export class TreeWalkerItemsCollection extends EventTarget {
+export class TreeWalkerItemCollection extends EventTarget {
   /**
    * Unique id used by `FocusGroup` to tag decorated items via the
    * `data-fg-item` attribute. Used here to disambiguate items of this group
@@ -249,7 +254,7 @@ export class TreeWalkerItemsCollection extends EventTarget {
   }
 
   /**
-   * Translates a `MutationRecord` batch into a `FocusGroupItemsMutateEvent`,
+   * Translates a `MutationRecord` batch into a `FocusGroupMutateEvent`,
    * or `null` if the batch contains nothing relevant. Filters out:
    *
    * - `tabindex` writes on items decorated by *other* focusgroups
@@ -259,7 +264,7 @@ export class TreeWalkerItemsCollection extends EventTarget {
    *   `FocusGroup` toggling its owner-proxy tabindex).
    *
    * @param {MutationRecord[]} records
-   * @returns {FocusGroupItemsMutateEvent | null}
+   * @returns {FocusGroupMutateEvent | null}
    */
   #classify(records) {
     const relevant = records.filter(
@@ -302,7 +307,7 @@ export class TreeWalkerItemsCollection extends EventTarget {
       }
     }
 
-    return new FocusGroupItemsMutateEvent({
+    return new FocusGroupMutateEvent({
       definitionChanged,
       removedNodes,
       authorTabindexChanges,

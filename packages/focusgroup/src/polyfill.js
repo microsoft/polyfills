@@ -3,7 +3,7 @@
 
 import { FocusGroup } from "./focusgroup.js";
 import { createTreeWalker } from "./shadow-utils/index.js";
-import { TreeWalkerItemsCollection } from "./tree-walker-items-collection.js";
+import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import { hasDocument, supportsFocusGroup } from "./utils.js";
 
 let elementPolyfillMap;
@@ -84,7 +84,7 @@ export function polyfill(root) {
     requestAnimationFrame(() => {
       elementPolyfillMap.set(
         element,
-        new FocusGroup(element, new TreeWalkerItemsCollection(element)),
+        new FocusGroup(element, new TreeWalkerItemCollection(element)),
       );
     });
   } while (walker.nextNode());

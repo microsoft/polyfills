@@ -13,7 +13,7 @@
  * Contract for the object passed to `new FocusGroup(owner, items)`.
  *
  * Implementations extend `EventTarget` and dispatch a
- * `FocusGroupItemsMutateEvent` (type `"mutate"`) whenever item membership, the
+ * `FocusGroupMutateEvent` (type `"mutate"`) whenever item membership, the
  * focusgroup definition, or author-set `tabindex` on a decorated item changes.
  *
  * @typedef {EventTarget & {
@@ -26,7 +26,7 @@
  *   contains(element: Element): boolean,
  *   disconnect?: () => void,
  *   flush?: () => void,
- * }} FocusGroupItemsCollection
+ * }} FocusGroupItemCollection
  *
  * `id` is optional. When provided, `FocusGroup` writes it to the
  * `data-fg-item` attribute of each decorated item. Implementations whose
@@ -44,14 +44,14 @@
  */
 
 /**
- * Dispatched on a `FocusGroupItemsCollection` instance whenever changes occur
+ * Dispatched on a `FocusGroupItemCollection` instance whenever changes occur
  * that require `FocusGroup` to reconcile decoration state.
  *
  * Implementations populate the fields they can detect; app-supplied items
  * that don't track these signals can dispatch with no init at all to mean
  * "items changed, please refresh."
  */
-export class FocusGroupItemsMutateEvent extends Event {
+export class FocusGroupMutateEvent extends Event {
   /**
    * @param {{
    *   definitionChanged?: boolean,

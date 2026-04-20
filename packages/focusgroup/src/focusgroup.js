@@ -23,8 +23,8 @@ import {
 
 /**
  * @import {
- *   FocusGroupItemsCollection,
- *   FocusGroupItemsMutateEvent,
+ *   FocusGroupItemCollection,
+ *   FocusGroupMutateEvent,
  * } from "./focusgroup-items.js"
  */
 
@@ -39,7 +39,7 @@ export class FocusGroup {
    * The items collection — discovers items, observes DOM changes, and
    * dispatches `"mutate"` events. Owns the only `MutationObserver` for the
    * owner subtree.
-   * @type {FocusGroupItemsCollection}
+   * @type {FocusGroupItemCollection}
    */
   #items;
 
@@ -126,7 +126,7 @@ export class FocusGroup {
 
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
-   * @param {FocusGroupItemsCollection} items - The items collection providing
+   * @param {FocusGroupItemCollection} items - The items collection providing
    *     item discovery and change notifications.
    */
   constructor(owner, items) {
@@ -515,10 +515,12 @@ export class FocusGroup {
    * @param {HTMLElement} tabStop - The actual focusable tab stop element.
    */
   #enableOwnerProxy(tabStop) {
-    if (
-      this.#ownerIsProxy ||
-      (!(tabStop.getRootNode() instanceof ShadowRoot) && !tabStop.assignedSlot)
-    ) {
+    const rootNode = (tabStop.assignedSlot ?? tabStop).getRootNode();
+    const hasFocusableHost =
+      rootNode instanceof ShadowRoot &&
+      rootNode.host.hasAttribute(DatasetName.AUTHOR_TABINDEX);
+
+    if (this.#ownerIsProxy || !hasFocusableHost) {
       return;
     }
     this.#ownerTabindexBeforeProxy = this.#owner.hasAttribute("tabindex")
@@ -582,7 +584,7 @@ export class FocusGroup {
    * decoration state in response to definition changes, removed memorized
    * elements, and author tabindex updates on decorated items.
    *
-   * @param {FocusGroupItemsMutateEvent} evt
+   * @param {FocusGroupMutateEvent} evt
    */
   #handleItemsMutate(evt) {
     if (evt.definitionChanged) {
