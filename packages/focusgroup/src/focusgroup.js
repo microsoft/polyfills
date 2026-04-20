@@ -18,41 +18,15 @@ import {
   generateUniqueId,
   getNavigationDirection,
   inferRole,
-  isKeyboardFocusable,
-  isSegmentor,
   supportsFocusGroup,
 } from "./utils.js";
 
-// Registry of all active focusgroup mutation observers. When any focusgroup
-// writes polyfill-managed attributes (tabindex) during focus event handling,
-// we flush *every* observer in this set so that no stale mutation records from
-// cross-group writes survive into the next microtask — preventing unintended
-// re-decoration from ancestor/descendant focusgroups whose subtrees overlap.
-// Stored on `globalThis` in case the polyfill script is loaded multiple times.
-globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS ??= new Set();
-/** @type {Set<MutationObserver>} */
-const observers = globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS;
-
 /**
- * Registers a MutationObserver in the global observer registry so it can be
- * flushed when any focusgroup writes polyfill-managed attributes.
- * @param {MutationObserver} observer - The observer to register.
+ * @import {
+ *   FocusGroupItemsCollection,
+ *   FocusGroupItemsMutateEvent,
+ * } from "./focusgroup-items.js"
  */
-function addObserver(observer) {
-  observers.add(observer);
-}
-
-/**
- * Flushes all globally registered focusgroup MutationObservers by calling
- * `takeRecords()` on each, discarding any pending mutation records that were
- * caused by polyfill-managed attribute writes. This prevents infinite
- * cross-group loops between nested focusgroups whose subtrees overlap.
- */
-function flushAllObservers() {
-  for (const observer of observers ?? []) {
-    observer.takeRecords();
-  }
-}
 
 export class FocusGroup {
   /**
@@ -62,10 +36,20 @@ export class FocusGroup {
   #owner;
 
   /**
-   * The unique ID for the group.
+   * The items collection — discovers items, observes DOM changes, and
+   * dispatches `"mutate"` events. Owns the only `MutationObserver` for the
+   * owner subtree.
+   * @type {FocusGroupItemsCollection}
+   */
+  #items;
+
+  /**
+   * The id used to tag decorated items via the `data-fg-item` attribute.
+   * Reads `items.id` when the items collection provides one (so the items'
+   * own filtering matches what we write); otherwise generates a fresh id.
    * @type {string}
    */
-  #id = generateUniqueId();
+  #id;
 
   /**
    * The focus group behavior.
@@ -86,23 +70,25 @@ export class FocusGroup {
   #wrap = false;
 
   /**
-   * Whether the focus group remembers the previously focused element. Defaults
-   * to `true`.
+   * Whether the focus group remembers the previously focused element.
+   * Defaults to `true`.
    * @type {boolean}
    */
   #memory = true;
 
   /**
-   * The focus group start element.
+   * The focus group start element (initial tab stop after decoration).
    * @type {HTMLElement}
    */
   #start;
 
   /**
-   * The TreeWalker to traverse all focus group items.
-   * @type {ShadowTreeWalker!}
+   * The currently active item — replaces the previous TreeWalker pointer.
+   * Updated by focusin / keyboard navigation handlers and after
+   * (un)decoration.
+   * @type {HTMLElement}
    */
-  #itemWalker;
+  #activeItem;
 
   /**
    * The memorized tab stop.
@@ -125,73 +111,40 @@ export class FocusGroup {
   #ownerTabindexBeforeProxy = null;
 
   /**
-   * The mutation observer.
-   * @type {MutationObserver}
+   * Set of elements currently decorated as items by this group, used to
+   * undecorate them later even if they no longer qualify as item candidates
+   * (e.g. became `focusgroup="none"` or were hidden).
+   * @type {Set<HTMLElement>}
    */
-  #observer;
+  #decorated = new Set();
 
   /**
-   * The abort controller for when the `recycle()` is called.
+   * The abort controller for when `disconnect()` is called.
    * @type {AbortController}
    */
   #abort = new AbortController();
 
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
+   * @param {FocusGroupItemsCollection} items - The items collection providing
+   *     item discovery and change notifications.
    */
-  constructor(owner) {
+  constructor(owner, items) {
     if (supportsFocusGroup() || !owner || !owner.hasAttribute("focusgroup")) {
       return;
     }
 
     this.#owner = owner;
-    this.#itemWalker = createTreeWalker(
-      document,
-      this.#owner,
-      NodeFilter.SHOW_ELEMENT,
-      (node) => {
-        if (
-          node.hasAttribute("focusgroup") &&
-          node.getAttribute(DatasetName.ITEM) !== this.#id
-        ) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        return node.getAttribute(DatasetName.ITEM) === this.#id
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_SKIP;
-      },
-    );
+    this.#items = items;
+    this.#id = items.id ?? generateUniqueId();
 
     this.#updateDefinition();
     this.#decorateOwner();
     this.#decorateItems();
 
-    // Move the walker pointer to the first tab stop element.
-    while (this.#itemWalker.currentNode.tabIndex < 0) {
-      // If no items in the group, move on.
-      if (!this.#itemWalker.nextNode()) {
-        break;
-      }
-    }
-
-    this.#observer = createMutationObserver(this.#processMutations.bind(this));
-    this.#observer.observe(this.#owner, {
-      attributes: true,
-      attributeFilter: [
-        "focusgroup",
-        "focusgroupstart",
-        "controls",
-        "contenteditable",
-        "disabled",
-        "href",
-        "hidden",
-        "tabindex",
-        "type",
-      ],
-      childList: true,
-      subtree: true,
+    this.#items.addEventListener("mutate", this.#handleItemsMutate.bind(this), {
+      signal: this.#abort.signal,
     });
-    addObserver(this.#observer);
 
     this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this), {
       signal: this.#abort.signal,
@@ -205,19 +158,25 @@ export class FocusGroup {
   }
 
   /**
-   * Recycles the focusgroup and release observers for garbage collection.
-   * NOTE: This method does not undecorate the elements, it should be called
-   * after the focusgroup owner being removed from DOM.
+   * Tears down the focus group: disables the owner proxy, removes all event
+   * listeners (via the abort signal — including the items `"mutate"`
+   * listener), then disconnects the items collection if it supports it.
+   *
+   * Ordering matters: owner-proxy teardown can trigger `flushAllObservers()`,
+   * which expects the items' observer to still be in the global registry.
+   * The items' own `disconnect()` is therefore called last.
+   *
+   * NOTE: This method does not undecorate the elements. Call it only after
+   * the focusgroup owner has been removed from the DOM.
    */
-  recycle() {
-    observers.delete(this.#observer);
-    this.#observer?.disconnect();
+  disconnect() {
     this.#disableOwnerProxy();
+    this.#abort.abort();
+    this.#items?.disconnect?.();
     this.#owner = null;
     this.#start = null;
-    this.#itemWalker = null;
+    this.#activeItem = null;
     this.#memorized = null;
-    this.#abort.abort();
   }
 
   #updateDefinition() {
@@ -262,71 +221,42 @@ export class FocusGroup {
       return;
     }
 
-    const walker = createTreeWalker(
-      document,
-      this.#owner,
-      NodeFilter.SHOW_ELEMENT,
-      (node) => {
-        if (this.#isItemCandidate(node) || this.#isNestedGroupOwner(node)) {
-          return NodeFilter.FILTER_ACCEPT;
-        }
-        return NodeFilter.FILTER_SKIP;
-      },
-    );
-
     let firstItem = null;
     let startItem = null;
     let segment = 0;
-    let shouldStartNewSegment = false;
 
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
+    for (const entry of this.#items.items()) {
+      const node = entry.element;
 
-      // --- Handle segment boundaries (nested focusgroup elements) ---
-      if (this.#isNestedGroupOwner(node)) {
-        if (isSegmentor(node, this.#owner)) {
-          segment++;
-          shouldStartNewSegment = true;
-        }
-        // A focusable, non-opted-out nested focusgroup owner participates as
-        // an item in this group — fall through to decoration.
-        // Otherwise skip — it’s only a boundary marker.
-        const isOptedOut = node.getAttribute("focusgroup").includes("none");
-        if (!isKeyboardFocusable(node, this.#owner) || isOptedOut) {
-          continue;
-        }
+      if (entry.segmentBoundary) {
+        segment++;
       }
 
-      // --- Decorate item ---
       if (!firstItem) {
         firstItem = node;
       }
       node.setAttribute(DatasetName.ITEM, this.#id);
+      this.#decorated.add(node);
 
       if (segment > 0) {
         node.setAttribute(DatasetName.SEGMENT, segment.toString());
       }
 
-      const isSegmentStart = shouldStartNewSegment;
-      if (isSegmentStart) {
+      if (entry.segmentBoundary) {
         node.setAttribute(DatasetName.SEGMENT_START, "");
-        shouldStartNewSegment = false;
       }
 
-      // Role inference
       inferRole(node, this.#behavior, "child");
 
-      // Preserve original tabindex
       node.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
         node.hasAttribute("tabindex") ? node.getAttribute("tabindex") : "none",
       );
 
-      // Determine tab stop
       if (!startItem && node.hasAttribute("focusgroupstart")) {
         startItem = node;
       } else {
-        node.tabIndex = isSegmentStart ? 0 : -1;
+        node.tabIndex = entry.segmentBoundary ? 0 : -1;
       }
     }
 
@@ -346,8 +276,8 @@ export class FocusGroup {
         startItem = this.#memorized;
       } else {
         // The memorized element is no longer a valid item. Pick the closest
-        // item in document order as the tab stop, but don't update #memorized
-        // — memory should only be set by actual focus events.
+        // item in document order as the tab stop, but don't update
+        // `#memorized` — memory should only be set by actual focus events.
         startItem = firstItem || startItem;
         this.#memorized = null;
       }
@@ -356,56 +286,50 @@ export class FocusGroup {
     if (startItem) {
       startItem.tabIndex = 0;
       this.#start = startItem;
+      this.#activeItem = startItem;
       this.#disableOwnerProxy();
       this.#enableOwnerProxy(startItem);
-      this.#itemWalker.currentNode = startItem;
     }
 
-    this.#flushObserver();
+    this.#items.flush?.();
   }
 
   #undecorateItems() {
     this.#disableOwnerProxy();
 
-    const first = this.#firstItem();
-
-    if (!first) {
-      return;
-    }
-
-    do {
-      const item = this.#itemWalker.currentNode;
+    let any = false;
+    for (const element of this.#decorated) {
+      // Skip if another focusgroup has claimed this element since we
+      // decorated it (its `data-fg-item` no longer matches our id). The
+      // claiming group will undecorate it when appropriate.
+      if (element.getAttribute(DatasetName.ITEM) !== this.#id) {
+        continue;
+      }
+      any = true;
 
       // Restore role
-      inferRole(item, null, null);
+      inferRole(element, null, null);
 
       // Restore tabindex
-      const authorTabIndex = item.getAttribute(DatasetName.AUTHOR_TABINDEX);
+      const authorTabIndex = element.getAttribute(DatasetName.AUTHOR_TABINDEX);
       if (authorTabIndex) {
         if (authorTabIndex === "none") {
-          item.removeAttribute("tabindex");
+          element.removeAttribute("tabindex");
         } else {
-          item.setAttribute("tabindex", authorTabIndex);
+          element.setAttribute("tabindex", authorTabIndex);
         }
-        item.removeAttribute(DatasetName.AUTHOR_TABINDEX);
+        element.removeAttribute(DatasetName.AUTHOR_TABINDEX);
       }
 
-      item.removeAttribute(DatasetName.ITEM);
-    } while (this.#itemWalker.nextNode());
+      element.removeAttribute(DatasetName.ITEM);
+      element.removeAttribute(DatasetName.SEGMENT);
+      element.removeAttribute(DatasetName.SEGMENT_START);
+    }
+    this.#decorated.clear();
 
-    this.#flushObserver();
-  }
-
-  /** @returns {HTMLElement} The first item element. */
-  #firstItem() {
-    while (this.#itemWalker.previousNode()) {}
-    return this.#itemWalker.currentNode;
-  }
-
-  /** @returns {HTMLElement} The last item element. */
-  #lastItem() {
-    while (this.#itemWalker.nextNode()) {}
-    return this.#itemWalker.currentNode;
+    if (any) {
+      this.#items.flush?.();
+    }
   }
 
   /** @param {KeyboardEvent} evt */
@@ -427,32 +351,36 @@ export class FocusGroup {
       return;
     }
 
-    const current = this.#itemWalker.currentNode;
+    const current = this.#activeItem;
+    if (!current) {
+      return;
+    }
     let target;
 
     switch (getNavigationDirection(evt, evtTarget, this.#axis)) {
       case "start":
-        target = this.#firstItem();
+        target = this.#items.first();
         break;
       case "end":
-        target = this.#lastItem();
+        target = this.#items.last();
         break;
       case "forward":
-        target = this.#itemWalker.nextNode();
+        target = this.#items.next(current);
         if (!target && this.#wrap) {
-          target = this.#firstItem();
+          target = this.#items.first();
         }
         break;
       case "backward":
-        target = this.#itemWalker.previousNode();
+        target = this.#items.previous(current);
         if (!target && this.#wrap) {
-          target = this.#lastItem();
+          target = this.#items.last();
         }
         break;
     }
 
     if (target && target !== current) {
       this.#setItemFocused(current, target, true);
+      this.#activeItem = target;
       evt.preventDefault();
     }
   }
@@ -490,14 +418,14 @@ export class FocusGroup {
 
     this.#memorized = target;
 
-    if (this.#itemWalker.currentNode === target) {
+    if (this.#activeItem === target) {
       return;
     }
 
-    if (target.tabIndex < 0) {
-      this.#setItemFocused(this.#itemWalker.currentNode, target);
+    if (target.tabIndex < 0 && this.#activeItem) {
+      this.#setItemFocused(this.#activeItem, target);
     }
-    this.#itemWalker.currentNode = target;
+    this.#activeItem = target;
   }
 
   /** @param {FocusEvent} evt */
@@ -525,32 +453,34 @@ export class FocusGroup {
       return;
     }
 
-    // Clear the memory and reset tab stops, but make sure the `focusgroupstart`
-    // element, if any, is considered as the new starting element (it’s possible
-    // that the author moved the `focusgroupstart` element and the polyfill
-    // should respect that.
+    // Clear the memory and reset tab stops, but make sure the
+    // `focusgroupstart` element, if any, is considered as the new starting
+    // element (it's possible that the author moved the `focusgroupstart`
+    // element and the polyfill should respect that).
     this.#memorized = null;
-    const first = this.#firstItem();
+    let firstItem = null;
     let startItem = null;
-    do {
-      const current = this.#itemWalker.currentNode;
-      if (!startItem && current.hasAttribute("focusgroupstart")) {
-        startItem = current;
+    for (const { element } of this.#items.items()) {
+      if (!firstItem) {
+        firstItem = element;
       }
-      current.tabIndex = current.hasAttribute(DatasetName.SEGMENT_START)
+      if (!startItem && element.hasAttribute("focusgroupstart")) {
+        startItem = element;
+      }
+      element.tabIndex = element.hasAttribute(DatasetName.SEGMENT_START)
         ? 0
         : -1;
-    } while (this.#itemWalker.nextNode());
-
-    this.#start = startItem || first;
-    this.#start.tabIndex = 0;
-    this.#itemWalker.currentNode = this.#start;
-
-    if (focusLeavingGroup) {
-      this.#enableOwnerProxy(this.#start);
     }
 
-    // Proxy hosts for the reset tab stop are already set above.
+    this.#start = startItem || firstItem;
+    if (this.#start) {
+      this.#start.tabIndex = 0;
+    }
+    this.#activeItem = this.#start;
+
+    if (focusLeavingGroup && this.#start) {
+      this.#enableOwnerProxy(this.#start);
+    }
 
     flushAllObservers();
   }
@@ -614,19 +544,7 @@ export class FocusGroup {
     }
     this.#ownerIsProxy = false;
     this.#ownerTabindexBeforeProxy = null;
-    this.#flushObserver();
-  }
-
-  /**
-   * Flushes this group's own MutationObserver by calling `takeRecords()`,
-   * discarding any pending mutation records that were caused by polyfill-managed
-   * attribute writes (primarily `tabindex`). This prevents this group from
-   * re-processing its own decoration writes as if they were author-initiated
-   * changes. Unlike the previous global flush approach, this only discards
-   * records for *this* observer, leaving other groups' legitimate records intact.
-   */
-  #flushObserver() {
-    this.#observer?.takeRecords();
+    this.#items.flush?.();
   }
 
   /**
@@ -637,8 +555,8 @@ export class FocusGroup {
    * Also disables the owner proxy.
    * @param {HTMLElement} current - The currently focused item.
    * @param {HTMLElement} target - The item to receive focus.
-   * @param {boolean} [shouldCallFocus=false] - Whether to programmatically call
-   *     `focus()` on the target element.
+   * @param {boolean} [shouldCallFocus=false] - Whether to programmatically
+   *     call `focus()` on the target element.
    */
   #setItemFocused(current, target, shouldCallFocus = false) {
     target.tabIndex = 0;
@@ -652,85 +570,40 @@ export class FocusGroup {
         : 0;
 
     // Focus is moving within the group, so the owner proxy should stay
-    // disabled (it was disabled in #handleFocusin). Just clear in case any lingered.
+    // disabled (it was disabled in #handleFocusin). Just clear in case any
+    // lingered.
     this.#disableOwnerProxy();
 
     flushAllObservers();
   }
 
   /**
-   * Processes DOM mutation records observed on the owner's subtree. Handles
-   * changes to the `focusgroup` attribute definition, removal of the memorized
-   * tab stop, and author `tabindex` updates on decorated items. After
-   * processing, fully undecorates and redecorates all items to reconcile state.
-   * @param {MutationRecord[]} entries - The list of mutation records to process.
+   * Reaction to a `"mutate"` event from the items collection. Reconciles
+   * decoration state in response to definition changes, removed memorized
+   * elements, and author tabindex updates on decorated items.
+   *
+   * @param {FocusGroupItemsMutateEvent} evt
    */
-  // TODO: Handle mutations more granularly than redecorating all items.
-  #processMutations(entries) {
-    // When the polyfill writes `tabindex` during decoration or focus management,
-    // observers on ancestor/descendant focusgroups will also receive those
-    // mutation records (because of `subtree: true`). Filter those out to avoid
-    // infinite re-decoration loops. A `tabindex` mutation on an element that
-    // belongs to another focusgroup (i.e. has `AUTHOR_TABINDEX` set but
-    // `DatasetName.ITEM` !== this group's ID) is polyfill-managed by that other
-    // group. If *every* entry in the batch is such a cross-group tabindex write,
-    // there's nothing for us to do — skip entirely.
-    const relevantEntries = entries.filter(
-      (e) =>
-        !(
-          e.type === "attributes" &&
-          e.attributeName === "tabindex" &&
-          // Ignore cross-group tabindex writes (items of other focusgroups).
-          ((e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
-            e.target.getAttribute(DatasetName.ITEM) !== this.#id) ||
-            // Ignore owner tabindex writes caused by proxy enable/disable.
-            e.target === this.#owner)
-        ),
-    );
-
-    if (relevantEntries.length === 0) {
-      return;
-    }
-
-    const hasDefinitionChanged = entries.some(
-      (e) => e.target === this.#owner && e.attributeName === "focusgroup",
-    );
-    if (hasDefinitionChanged) {
+  #handleItemsMutate(evt) {
+    if (evt.definitionChanged) {
       this.#updateDefinition();
       this.#decorateOwner();
     }
 
-    // If the memorized tab stop element has been removed, clear the memory.
-    if (this.#memorized) {
-      const memorizedRemoved = entries.some(
-        (e) =>
-          e.type === "childList" &&
-          Array.from(e.removedNodes).some(
-            (n) => n === this.#memorized || nodeContains(n, this.#memorized),
-          ),
-      );
-      if (memorizedRemoved) {
-        this.#memorized = null;
-      }
+    if (
+      this.#memorized &&
+      evt.removedNodes.some(
+        (n) => n === this.#memorized || nodeContains(n, this.#memorized),
+      )
+    ) {
+      this.#memorized = null;
     }
 
-    // When the author changes `tabindex` on an already-decorated item that
-    // belongs to *this* focusgroup, update the stored author intent
-    // (`data-fg-ati`) so the upcoming undecorate → redecorate cycle uses the
-    // new value.  Ignore tabindex mutations on items owned by nested groups —
-    // those are caused by the nested group's own decoration.
-    for (const entry of entries) {
-      if (
-        entry.type === "attributes" &&
-        entry.attributeName === "tabindex" &&
-        entry.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
-        entry.target.getAttribute(DatasetName.ITEM) === this.#id
-      ) {
-        entry.target.setAttribute(
-          DatasetName.AUTHOR_TABINDEX,
-          entry.target.getAttribute("tabindex") ?? "none",
-        );
-      }
+    for (const el of evt.authorTabindexChanges) {
+      el.setAttribute(
+        DatasetName.AUTHOR_TABINDEX,
+        el.getAttribute("tabindex") ?? "none",
+      );
     }
 
     this.#undecorateItems();

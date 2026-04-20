@@ -1,20 +1,9 @@
-import { copyFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const src = (path) => resolve(import.meta.dirname, path);
 
 const entry = src("src/index.js");
 const shadowlessUtils = src("src/shadow-utils/index-shadowless.js");
-
-/** @returns {import("vite").Plugin} */
-function copyTypes() {
-  return {
-    name: "copy-types",
-    closeBundle() {
-      copyFileSync(src("src/index.d.ts"), src("build/index.d.ts"));
-    },
-  };
-}
 
 /** @returns {import("vite").Plugin} */
 function stripPureAnnotations() {
@@ -38,15 +27,12 @@ export default ({ mode }) => {
   const min = isMinified ? ".min" : "";
 
   return {
-    plugins: [
-      copyTypes(),
-      ...(mode === "minified" ? [stripPureAnnotations()] : []),
-    ],
+    plugins: [...(mode === "minified" ? [stripPureAnnotations()] : [])],
     build: {
       lib: {
         entry,
         formats: ["es"],
-        fileName: () => `focusgroup-polyfill${variant}${min}.mjs`,
+        fileName: () => `index${variant}${min}.mjs`,
       },
       target: "es2022",
       minify: isMinified ? "terser" : false,
@@ -96,6 +82,15 @@ export default ({ mode }) => {
         treeshake: {
           propertyReadSideEffects: false,
         },
+        ...(isMinified
+          ? {}
+          : {
+              output: {
+                preserveModules: true,
+                preserveModulesRoot: "src",
+                entryFileNames: `[name]${variant}.mjs`,
+              },
+            }),
       },
       outDir: "build",
       emptyOutDir: !isShadowless && !isMinified,

@@ -13,8 +13,8 @@ export async function setupPage(page, project, html) {
   await page.goto("/test.html");
   await page.setContent(html);
   const specifier = project.name.endsWith("Shadowless")
-    ? "/build/focusgroup-polyfill-shadowless.mjs"
-    : "/build/focusgroup-polyfill.mjs";
+    ? "/build/index-shadowless.mjs"
+    : "/build/index.mjs";
   await page.evaluate(async (specifier) => {
     const { polyfill } = await import(specifier);
     polyfill();
