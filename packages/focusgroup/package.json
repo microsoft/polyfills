@@ -57,9 +57,16 @@
       "types": "./build/types/index.d.ts",
       "default": "./build/index-shadowless.mjs"
     },
-    "./*.js": {
-      "types": "./build/types/*.d.ts",
-      "default": "./build/*.mjs"
+    "./focusgroup.js": {
+      "types": "./build/types/focusgroup.d.ts",
+      "default": "./build/focusgroup.mjs"
+    },
+    "./focusgroup-shadowless.js": {
+      "types": "./build/types/focusgroup.d.ts",
+      "default": "./build/focusgroup-shadowless.mjs"
+    },
+    "./focusgroup-items.js": {
+      "default": "./build/types/focusgroup-items.d.ts"
     }
   },
   "files": [
