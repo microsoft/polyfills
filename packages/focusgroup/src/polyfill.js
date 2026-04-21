@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { FocusGroup } from "./focusgroup.js";
+import { state } from "./global-state.js";
 import { createTreeWalker } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import { hasDocument, supportsFocusGroup } from "./utils.js";
@@ -13,13 +14,10 @@ if (
   typeof MutationObserver !== "undefined" &&
   !supportsFocusGroup()
 ) {
-  globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY = false;
-
-  globalThis.__FOCUSGROUP_POLYFILL_ELEMENT_POLYFILL_MAP ??= new Map();
   /** @type {Map<HTMLElement, FocusGroup>} */
-  elementPolyfillMap = globalThis.__FOCUSGROUP_POLYFILL_ELEMENT_POLYFILL_MAP;
+  elementPolyfillMap = state.m ??= new Map();
 
-  if (!globalThis.__FOCUSGROUP_POLYFILL_GLOBAL_OBSERVER) {
+  if (!state.g) {
     // Only observe light DOM for perfoamance.
     const observer = new MutationObserver((entries) => {
       for (const entry of entries) {
@@ -34,7 +32,7 @@ if (
           }
         }
 
-        if (!globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY) {
+        if (!state.b) {
           continue;
         }
 
@@ -46,7 +44,7 @@ if (
       }
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    globalThis.__FOCUSGROUP_POLYFILL_GLOBAL_OBSERVER = observer;
+    state.g = observer;
   }
 }
 
@@ -99,6 +97,6 @@ export function polyfillBodyAndObserve() {
     return;
   }
 
-  globalThis.__FOCUSGROUP_POLYFILL_OBSERVE_BODY = true;
+  state.b = true;
   polyfill();
 }

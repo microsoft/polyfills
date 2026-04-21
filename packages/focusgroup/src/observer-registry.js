@@ -1,17 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-// Registry of all active focusgroup mutation observers. When any focusgroup
-// writes polyfill-managed attributes (tabindex) during focus event handling,
-// we flush *every* observer in this set so that no stale mutation records from
-// cross-group writes survive into the next microtask — preventing unintended
-// re-decoration from ancestor/descendant focusgroups whose subtrees overlap.
-// Stored on `globalThis` in case the polyfill script is loaded multiple times.
-globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS ??= new Set();
+import { state } from "./global-state.js";
 
 /** @type {Set<MutationObserver>} */
-export const observers =
-  globalThis.__FOCUSGROUP_POLYFILL_SHADOW_MUTATION_OBSERVERS;
+export const observers = state.o;
 
 /**
  * Flushes all globally registered focusgroup MutationObservers by calling
