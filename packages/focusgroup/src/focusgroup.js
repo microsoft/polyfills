@@ -24,7 +24,7 @@ import {
 /**
  * @import {
  *   FocusGroupItemCollection,
- *   FocusGroupMutateEvent,
+ *   FocusGroupUpdateInfo,
  * } from "./focusgroup-items.js"
  */
 
@@ -36,9 +36,9 @@ export class FocusGroup {
   #owner;
 
   /**
-   * The items collection — discovers items, observes DOM changes, and
-   * dispatches `"mutate"` events. Owns the only `MutationObserver` for the
-   * owner subtree.
+   * The items collection — exposes the focus group's items and answers
+   * queries about them. Reconciliation is triggered externally via
+   * `FocusGroup#update()`.
    * @type {FocusGroupItemCollection}
    */
   #items;
@@ -127,7 +127,7 @@ export class FocusGroup {
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
    * @param {FocusGroupItemCollection} items - The items collection providing
-   *     item discovery and change notifications.
+   *     item discovery and queries.
    */
   constructor(owner, items) {
     if (supportsFocusGroup() || !owner || !owner.hasAttribute("focusgroup")) {
@@ -142,10 +142,6 @@ export class FocusGroup {
     this.#decorateOwner();
     this.#decorateItems();
 
-    this.#items.addEventListener("mutate", this.#handleItemsMutate.bind(this), {
-      signal: this.#abort.signal,
-    });
-
     this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this), {
       signal: this.#abort.signal,
     });
@@ -159,8 +155,8 @@ export class FocusGroup {
 
   /**
    * Tears down the focus group: disables the owner proxy, removes all event
-   * listeners (via the abort signal — including the items `"mutate"`
-   * listener), then disconnects the items collection if it supports it.
+   * listeners (via the abort signal), then disconnects the items collection
+   * if it supports it.
    *
    * Ordering matters: owner-proxy teardown can trigger `flushAllObservers()`,
    * which expects the items' observer to still be in the global registry.
@@ -580,32 +576,43 @@ export class FocusGroup {
   }
 
   /**
-   * Reaction to a `"mutate"` event from the items collection. Reconciles
-   * decoration state in response to definition changes, removed memorized
-   * elements, and author tabindex updates on decorated items.
+   * Reconciles decoration state in response to relevant changes. Call this
+   * whenever the focus group should refresh — e.g. items were added or
+   * removed, the owner's `focusgroup` attribute changed, or an author set
+   * `tabindex` on a decorated item.
    *
-   * @param {FocusGroupMutateEvent} evt
+   * The polyfill's default `TreeWalkerItemCollection` calls this from a
+   * `MutationObserver`. App-supplied collections (or app code that knows
+   * when its model changed) can call it directly.
+   *
+   * @param {FocusGroupUpdateInfo} [info]
    */
-  #handleItemsMutate(evt) {
-    if (evt.definitionChanged) {
+  update(info = {}) {
+    if (!this.#owner) {
+      return;
+    }
+
+    if (info.definitionChanged) {
       this.#updateDefinition();
       this.#decorateOwner();
     }
 
     if (
       this.#memorized &&
-      evt.removedNodes.some(
+      info.removedNodes?.some(
         (n) => n === this.#memorized || nodeContains(n, this.#memorized),
       )
     ) {
       this.#memorized = null;
     }
 
-    for (const el of evt.authorTabindexChanges) {
-      el.setAttribute(
-        DatasetName.AUTHOR_TABINDEX,
-        el.getAttribute("tabindex") ?? "none",
-      );
+    if (info.authorTabindexChanges) {
+      for (const el of info.authorTabindexChanges) {
+        el.setAttribute(
+          DatasetName.AUTHOR_TABINDEX,
+          el.getAttribute("tabindex") ?? "none",
+        );
+      }
     }
 
     this.#undecorateItems();

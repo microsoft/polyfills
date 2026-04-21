@@ -10,13 +10,29 @@
  */
 
 /**
+ * Payload describing a batch of changes that require `FocusGroup` to
+ * reconcile decoration state, passed to `FocusGroup#update()`.
+ *
+ * Callers populate the fields they can detect; if none are known, pass an
+ * empty object (or omit it entirely) to mean "items changed, please refresh."
+ *
+ * @typedef {Object} FocusGroupUpdateInfo
+ * @property {boolean} [definitionChanged] - `true` when the owner's
+ *   `focusgroup` attribute changed.
+ * @property {Node[]} [removedNodes] - Nodes removed from the owner subtree.
+ * @property {HTMLElement[]} [authorTabindexChanges] - Decorated items whose
+ *   author-set `tabindex` changed.
+ */
+
+/**
  * Contract for the object passed to `new FocusGroup(owner, items)`.
  *
- * Implementations extend `EventTarget` and dispatch a
- * `FocusGroupMutateEvent` (type `"mutate"`) whenever item membership, the
- * focusgroup definition, or author-set `tabindex` on a decorated item changes.
+ * The collection's job is purely to expose the focus group's items and
+ * answer queries about them. To trigger reconciliation when items change,
+ * call `focusGroup.update(info)` from wherever the change is detected (the
+ * app, a `MutationObserver` inside the collection, etc.).
  *
- * @typedef {EventTarget & {
+ * @typedef {{
  *   id?: string,
  *   items(): Iterable<FocusGroupItem>,
  *   first(): (HTMLElement | null),
@@ -43,29 +59,4 @@
  * `MutationObserver`-backed implementations this is `observer.takeRecords()`.
  */
 
-/**
- * Dispatched on a `FocusGroupItemCollection` instance whenever changes occur
- * that require `FocusGroup` to reconcile decoration state.
- *
- * Implementations populate the fields they can detect; app-supplied items
- * that don't track these signals can dispatch with no init at all to mean
- * "items changed, please refresh."
- */
-export class FocusGroupMutateEvent extends Event {
-  /**
-   * @param {{
-   *   definitionChanged?: boolean,
-   *   removedNodes?: Node[],
-   *   authorTabindexChanges?: HTMLElement[],
-   * }} [init]
-   */
-  constructor(init = {}) {
-    super("mutate");
-    /** @type {boolean} */
-    this.definitionChanged = !!init.definitionChanged;
-    /** @type {Node[]} */
-    this.removedNodes = init.removedNodes ?? [];
-    /** @type {HTMLElement[]} */
-    this.authorTabindexChanges = init.authorTabindexChanges ?? [];
-  }
-}
+export {};

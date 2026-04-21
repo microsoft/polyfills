@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
-import { FocusGroupMutateEvent } from "./focusgroup-items.js";
 import { observers } from "./observer-registry.js";
 import {
   createMutationObserver,
@@ -15,22 +14,22 @@ import { generateUniqueId, isKeyboardFocusable, isSegmentor } from "./utils.js";
 
 /**
  * @import {
- *   FocusGroupItemCollection,
  *   FocusGroupItem,
+ *   FocusGroupUpdateInfo,
  * } from "./focusgroup-items.js"
+ * @import { FocusGroup } from "./focusgroup.js"
  */
 
 /**
  * The default `FocusGroupItemCollection` implementation used by the polyfill.
  *
- * Discovers items via a shadow-aware `TreeWalker` and observes the owner
- * subtree with a `MutationObserver`. Translates raw mutation batches into
- * `FocusGroupMutateEvent`s, filtering out cross-group polyfill-managed
+ * Discovers items via a shadow-aware `TreeWalker`. After construction, call
+ * `observe(focusGroup)` to start a `MutationObserver` on the owner subtree;
+ * mutation batches are translated into `FocusGroupUpdateInfo` payloads
+ * passed to `focusGroup.update()`, filtering out cross-group polyfill-managed
  * tabindex writes and owner-proxy noise.
- *
- * @implements {FocusGroupItemCollection}
  */
-export class TreeWalkerItemCollection extends EventTarget {
+export class TreeWalkerItemCollection {
   /**
    * Unique id used by `FocusGroup` to tag decorated items via the
    * `data-fg-item` attribute. Used here to disambiguate items of this group
@@ -45,14 +44,13 @@ export class TreeWalkerItemCollection extends EventTarget {
   /** @type {ShadowTreeWalker} */
   #walker;
 
-  /** @type {MutationObserver} */
-  #observer;
+  /** @type {MutationObserver | null} */
+  #observer = null;
 
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
    */
   constructor(owner) {
-    super();
     this.#owner = owner;
 
     this.#walker = createTreeWalker(
@@ -61,11 +59,20 @@ export class TreeWalkerItemCollection extends EventTarget {
       NodeFilter.SHOW_ELEMENT,
       (node) => this.#filter(node),
     );
+  }
 
+  /**
+   * Starts observing the owner subtree for mutations. Each relevant batch
+   * is delivered to `focusGroup.update(info)`. Call this once, after the
+   * paired `FocusGroup` has been constructed.
+   *
+   * @param {FocusGroup} focusGroup
+   */
+  observe(focusGroup) {
     this.#observer = createMutationObserver((records) => {
-      const evt = this.#classify(records);
-      if (evt) {
-        this.dispatchEvent(evt);
+      const info = this.#classify(records);
+      if (info) {
+        focusGroup.update(info);
       }
     });
     this.#observer.observe(this.#owner, {
@@ -254,7 +261,7 @@ export class TreeWalkerItemCollection extends EventTarget {
   }
 
   /**
-   * Translates a `MutationRecord` batch into a `FocusGroupMutateEvent`,
+   * Translates a `MutationRecord` batch into a `FocusGroupUpdateInfo`,
    * or `null` if the batch contains nothing relevant. Filters out:
    *
    * - `tabindex` writes on items decorated by *other* focusgroups
@@ -264,7 +271,7 @@ export class TreeWalkerItemCollection extends EventTarget {
    *   `FocusGroup` toggling its owner-proxy tabindex).
    *
    * @param {MutationRecord[]} records
-   * @returns {FocusGroupMutateEvent | null}
+   * @returns {FocusGroupUpdateInfo | null}
    */
   #classify(records) {
     const relevant = records.filter(
@@ -307,10 +314,10 @@ export class TreeWalkerItemCollection extends EventTarget {
       }
     }
 
-    return new FocusGroupMutateEvent({
+    return {
       definitionChanged,
       removedNodes,
       authorTabindexChanges,
-    });
+    };
   }
 }

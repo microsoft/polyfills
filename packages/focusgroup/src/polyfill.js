@@ -82,10 +82,10 @@ export function polyfill(root) {
 
     // Make sure the element is ready during initial polyfilling.
     requestAnimationFrame(() => {
-      elementPolyfillMap.set(
-        element,
-        new FocusGroup(element, new TreeWalkerItemCollection(element)),
-      );
+      const items = new TreeWalkerItemCollection(element);
+      const fg = new FocusGroup(element, items);
+      items.observe(fg);
+      elementPolyfillMap.set(element, fg);
     });
   } while (walker.nextNode());
 }

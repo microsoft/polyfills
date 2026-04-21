@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 export { FocusGroup } from "./focusgroup.js";
-export { FocusGroupMutateEvent } from "./focusgroup-items.js";
 export { polyfill, polyfillBodyAndObserve } from "./polyfill.js";
 export { supportsFocusGroup } from "./utils.js";
 
@@ -11,4 +10,7 @@ export { supportsFocusGroup } from "./utils.js";
  */
 /**
  * @typedef {import("./focusgroup-items.js").FocusGroupItem} FocusGroupItem
+ */
+/**
+ * @typedef {import("./focusgroup-items.js").FocusGroupUpdateInfo} FocusGroupUpdateInfo
  */
