@@ -10,7 +10,12 @@ import {
   IS_SHADOWLESS,
   nodeContains,
 } from "./shadow-utils/index.js";
-import { generateUniqueId, isKeyboardFocusable, isSegmentor } from "./utils.js";
+import {
+  generateUniqueId,
+  isKeyboardFocusable,
+  isSegmentor,
+  parseDefinition,
+} from "./utils.js";
 
 /**
  * @import {
@@ -37,6 +42,24 @@ export class TreeWalkerItemCollection {
    * @type {string}
    */
   id = generateUniqueId();
+
+  /**
+   * First descendant with the `focusgroupstart` attribute (shadow-aware),
+   * or `null` if none exists. `FocusGroup` reads this to choose the initial
+   * tab stop after decoration.
+   * @returns {HTMLElement | null}
+   */
+  get start() {
+    if (!this.#owner) {
+      return null;
+    }
+    for (const { element } of this.items()) {
+      if (element.hasAttribute("focusgroupstart")) {
+        return element;
+      }
+    }
+    return null;
+  }
 
   /** @type {HTMLElement} */
   #owner;
@@ -315,7 +338,7 @@ export class TreeWalkerItemCollection {
     }
 
     return {
-      definitionChanged,
+      definition: definitionChanged ? parseDefinition(this.#owner) : undefined,
       removedNodes,
       authorTabindexChanges,
     };

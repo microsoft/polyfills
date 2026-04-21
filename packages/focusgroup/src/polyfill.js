@@ -5,7 +5,12 @@ import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
 import { createTreeWalker } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
-import { hasDocument, supportsFocusGroup } from "./utils.js";
+import {
+  hasDocument,
+  inferRole,
+  parseDefinition,
+  supportsFocusGroup,
+} from "./utils.js";
 
 let elementPolyfillMap;
 
@@ -81,7 +86,10 @@ export function polyfill(root) {
     // Make sure the element is ready during initial polyfilling.
     requestAnimationFrame(() => {
       const items = new TreeWalkerItemCollection(element);
-      const fg = new FocusGroup(element, items);
+      const fg = new FocusGroup(element, items, {
+        definition: parseDefinition(element),
+        inferRole,
+      });
       items.observe(fg);
       elementPolyfillMap.set(element, fg);
     });

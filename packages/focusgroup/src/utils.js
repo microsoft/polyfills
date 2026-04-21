@@ -1,7 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { BehaviorMap, DatasetName } from "./constants.js";
+import {
+  BEHAVIOR_TOKENS,
+  BehaviorMap,
+  BehaviorToken,
+  DatasetName,
+} from "./constants.js";
 import { createTreeWalker, getParentElement } from "./shadow-utils/index.js";
 
 /**
@@ -20,6 +25,52 @@ export function hasDocument() {
  */
 export function supportsFocusGroup() {
   return "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {});
+}
+
+/**
+ * @typedef {Object} FocusGroupDefinition
+ * @property {BehaviorToken} [behavior]
+ * @property {boolean} [wrap]
+ * @property {("inline"|"block"|undefined)} [axis]
+ * @property {boolean} [memory]
+ */
+
+/**
+ * Parse a `FocusGroupDefinition` from the owner element's `focusgroup`
+ * attribute according to the HTML focusgroup spec. Used by `polyfill()` to
+ * configure the `FocusGroup` constructor's `options.definition`.
+ *
+ * @param {HTMLElement} owner
+ * @returns {FocusGroupDefinition}
+ */
+export function parseDefinition(owner) {
+  const tokens = (owner.getAttribute("focusgroup") ?? "").split(" ");
+  const behavior = BEHAVIOR_TOKENS.includes(tokens[0])
+    ? tokens[0]
+    : BehaviorToken.NONE;
+  const base = BehaviorMap[behavior];
+  let wrap = base?.wrap ?? false;
+  if (tokens.includes("wrap")) {
+    wrap = true;
+  } else if (tokens.includes("nowrap")) {
+    wrap = false;
+  }
+  const hasInline = tokens.includes("inline");
+  const hasBlock = tokens.includes("block");
+  const axis =
+    hasInline === hasBlock
+      ? hasInline
+        ? undefined
+        : base?.axis
+      : hasInline
+        ? "inline"
+        : "block";
+  return {
+    behavior,
+    wrap,
+    axis,
+    memory: !tokens.includes("nomemory"),
+  };
 }
 
 /**

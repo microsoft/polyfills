@@ -2,11 +2,34 @@
 // Licensed under the MIT License.
 
 /**
+ * @import {BehaviorToken} from "./constants.js"
+ * @import {FocusGroupDefinition} from "./utils.js"
+ */
+
+/**
  * @typedef {Object} FocusGroupItem
  * @property {HTMLElement} element - The item element.
  * @property {boolean} [segmentBoundary] - When `true`, this entry starts a
  *   new focus-group segment (e.g. it crosses a nested focusgroup that should
  *   act as a segmentor).
+ */
+
+/**
+ * Options accepted by `new FocusGroup(owner, items, options)`.
+ *
+ * @typedef {Object} FocusGroupOptions
+ * @property {FocusGroupDefinition} [definition] - Behavior config. Plain
+ *   data; FocusGroup just consumes it. Apps either build it themselves or call
+ *   `parseDefinition(owner)` to derive it from the HTML `focusgroup` attribute.
+ * @property {(
+ *     element: HTMLElement,
+ *     behavior: BehaviorToken,
+ *     kind: ("owner"|"child"|null),
+ *   ) => void} [inferRole] - Optional role-inference hook. When provided,
+ *   FocusGroup calls it during owner/item (un)decoration. Apps that declare
+ *   their own ARIA roles in templates omit this option, allowing the
+ *   role-inference module to be tree-shaken from the bundle. The polyfill entry
+ *   passes `inferRole` from `utils.js`.
  */
 
 /**
@@ -17,8 +40,9 @@
  * empty object (or omit it entirely) to mean "items changed, please refresh."
  *
  * @typedef {Object} FocusGroupUpdateInfo
- * @property {boolean} [definitionChanged] - `true` when the owner's
- *   `focusgroup` attribute changed.
+ * @property {FocusGroupDefinition} [definition] - When
+ *   provided, replaces the current definition. The polyfill computes this
+ *   from the owner's `focusgroup` attribute when the attribute mutates.
  * @property {Node[]} [removedNodes] - Nodes removed from the owner subtree.
  * @property {HTMLElement[]} [authorTabindexChanges] - Decorated items whose
  *   author-set `tabindex` changed.
@@ -34,6 +58,7 @@
  *
  * @typedef {{
  *   id?: string,
+ *   start?: (HTMLElement | null),
  *   items(): Iterable<FocusGroupItem>,
  *   first(): (HTMLElement | null),
  *   last(): (HTMLElement | null),
@@ -49,6 +74,11 @@
  * subtrees can overlap with other focusgroups (possible via shadow-DOM
  * slotting) should expose a unique `id` and use it inside their `contains()`
  * / navigation logic. Array-backed implementations don't need an `id`.
+ *
+ * `start` is optional. When provided and non-null, `FocusGroup` uses it as
+ * the initial tab stop after decoration instead of falling back to the
+ * first item. The polyfill's default `TreeWalkerItemCollection` returns
+ * the first `[focusgroupstart]` descendant.
  *
  * `disconnect()` is optional — `FocusGroup#disconnect()` calls it defensively
  * (`items.disconnect?.()`).

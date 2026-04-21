@@ -17,15 +17,16 @@ import {
 import {
   generateUniqueId,
   getNavigationDirection,
-  inferRole,
   supportsFocusGroup,
 } from "./utils.js";
 
 /**
  * @import {
  *   FocusGroupItemCollection,
+ *   FocusGroupOptions,
  *   FocusGroupUpdateInfo,
  * } from "./focusgroup-items.js"
+ * @import {FocusGroupDefinition} from "./utils.js"
  */
 
 export class FocusGroup {
@@ -125,21 +126,31 @@ export class FocusGroup {
   #abort = new AbortController();
 
   /**
+   * Optional role-inference hook injected via `options.inferRole`.
+   * When absent (e.g. apps that declare their own roles), no role inference
+   * happens and the role-inference module is tree-shaken from the bundle.
+   * @type {((element: HTMLElement, behavior: BehaviorToken, kind: ("owner"|"child"|null)) => void) | undefined}
+   */
+  #inferRole;
+
+  /**
    * @param {HTMLElement!} owner - The focus group owner element.
    * @param {FocusGroupItemCollection} items - The items collection providing
    *     item discovery and queries.
+   * @param {FocusGroupOptions} [options]
    */
-  constructor(owner, items) {
-    if (supportsFocusGroup() || !owner || !owner.hasAttribute("focusgroup")) {
+  constructor(owner, items, options = {}) {
+    if (supportsFocusGroup() || !owner) {
       return;
     }
 
     this.#owner = owner;
     this.#items = items;
     this.#id = items.id ?? generateUniqueId();
+    this.#inferRole = options.inferRole;
 
-    this.#updateDefinition();
-    inferRole(this.#owner, this.#behavior, "owner");
+    this.#applyDefinition(options.definition);
+    this.#inferRole?.(this.#owner, this.#behavior, "owner");
     this.#decorateItems();
 
     this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this), {
@@ -172,33 +183,12 @@ export class FocusGroup {
     this.#owner = null;
   }
 
-  #updateDefinition() {
-    const tokens = (this.#owner?.getAttribute("focusgroup") ?? "").split(" ");
-
-    this.#behavior = BEHAVIOR_TOKENS.includes(tokens[0])
-      ? tokens[0]
-      : BehaviorToken.NONE;
-
-    this.#memory = !tokens.includes("nomemory");
-
-    this.#wrap = BehaviorMap[this.#behavior]?.wrap ?? false;
-    if (tokens.includes("wrap") && !this.#wrap) {
-      this.#wrap = true;
-    } else if (tokens.includes("nowrap") && this.#wrap) {
-      this.#wrap = false;
-    }
-
-    const hasInline = tokens.includes("inline");
-    const hasBlock = tokens.includes("block");
-    this.#axis =
-      hasInline === hasBlock
-        ? hasInline
-          ? undefined
-          : BehaviorMap[this.#behavior]?.axis
-        : hasInline
-          ? "inline"
-          : "block";
-
+  /** @param {FocusGroupDefinition} [def] */
+  #applyDefinition(def) {
+    this.#behavior = def?.behavior ?? BehaviorToken.NONE;
+    this.#wrap = def?.wrap ?? false;
+    this.#axis = def?.axis;
+    this.#memory = def?.memory ?? true;
     if (!this.#memory) {
       this.#memorized = null;
     }
@@ -211,7 +201,7 @@ export class FocusGroup {
     }
 
     let firstItem = null;
-    let startItem = null;
+    let startItem = this.#items.start ?? null;
     let segment = 0;
 
     for (const entry of this.#items.items()) {
@@ -235,23 +225,19 @@ export class FocusGroup {
         node.setAttribute(DatasetName.SEGMENT_START, "");
       }
 
-      inferRole(node, this.#behavior, "child");
+      this.#inferRole?.(node, this.#behavior, "child");
 
       node.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
         node.getAttribute("tabindex") ?? "none",
       );
 
-      if (!startItem && node.hasAttribute("focusgroupstart")) {
-        startItem = node;
-      } else {
+      if (node !== startItem) {
         node.tabIndex = entry.segmentBoundary ? 0 : -1;
       }
     }
 
-    if (!startItem && firstItem) {
-      startItem = firstItem;
-    }
+    startItem ??= firstItem;
 
     if (!this.#memorized?.isConnected) {
       this.#memorized = null;
@@ -297,7 +283,7 @@ export class FocusGroup {
       any = true;
 
       // Restore role
-      inferRole(element, null, null);
+      this.#inferRole?.(element, null, null);
 
       // Restore tabindex
       const authorTabIndex = element.getAttribute(DatasetName.AUTHOR_TABINDEX);
@@ -443,25 +429,23 @@ export class FocusGroup {
     }
 
     // Clear the memory and reset tab stops, but make sure the
-    // `focusgroupstart` element, if any, is considered as the new starting
-    // element (it's possible that the author moved the `focusgroupstart`
-    // element and the polyfill should respect that).
+    // Clear the memory and reset tab stops, but make sure the start
+    // element provided by the items collection (if any) is considered as
+    // the new starting element — the collection may have recomputed it to
+    // reflect an author moving the `focusgroupstart` element.
     this.#memorized = null;
     let firstItem = null;
-    let startItem = null;
+    const startItem = this.#items.start ?? null;
     for (const { element } of this.#items.items()) {
       if (!firstItem) {
         firstItem = element;
-      }
-      if (!startItem && element.hasAttribute("focusgroupstart")) {
-        startItem = element;
       }
       element.tabIndex = element.hasAttribute(DatasetName.SEGMENT_START)
         ? 0
         : -1;
     }
 
-    this.#start = startItem || firstItem;
+    this.#start = startItem ?? firstItem;
     if (this.#start) {
       this.#start.tabIndex = 0;
     }
@@ -583,9 +567,9 @@ export class FocusGroup {
       return;
     }
 
-    if (info.definitionChanged) {
-      this.#updateDefinition();
-      inferRole(this.#owner, this.#behavior, "owner");
+    if (info.definition !== undefined) {
+      this.#applyDefinition(info.definition);
+      this.#inferRole?.(this.#owner, this.#behavior, "owner");
     }
 
     if (
