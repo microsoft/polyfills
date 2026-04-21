@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Polyfill Benchmarks</title>
+</head>
+<body>
+<div id="container"></div>
+<pre id="output">Running benchmarks...</pre>
+
+<script type="module">
+  import { Bench } from "/node_modules/tinybench/dist/index.js";
+  import { observe } from "/src/polyfill.js";
+  import {
+    setupSinglePatch,
+    setupManyTargets,
+    setupBatchPatches,
+    setupLargeContent,
+    setupInterleaved,
+    setupDeepDOM,
+  } from "/bench/scenarios.js";
+
+  const container = document.getElementById("container");
+  const output = document.getElementById("output");
+
+  const scenarios = [
+    { name: "single-patch", setup: () => setupSinglePatch(container) },
+    { name: "many-targets-1000", setup: () => setupManyTargets(container, 1000) },
+    { name: "batch-100", setup: () => setupBatchPatches(container, 100) },
+    { name: "large-content-1000", setup: () => setupLargeContent(container, 1000) },
+    { name: "interleaved-100", setup: () => setupInterleaved(container, 100) },
+    { name: "deep-dom-50", setup: () => setupDeepDOM(container, 50) },
+  ];
+
+  const results = {};
+
+  for (const scenario of scenarios) {
+    const bench = new Bench({ iterations: 50, warmupIterations: 5 });
+    let ctx;
+
+    bench.add(scenario.name, () => {
+      ctx.run(observe);
+    }, {
+      beforeEach() {
+        if (ctx) ctx.teardown();
+        ctx = scenario.setup();
+      },
+      afterAll() {
+        if (ctx) ctx.teardown();
+        container.innerHTML = "";
+      },
+    });
+
+    await bench.run();
+
+    const task = bench.tasks[0];
+    const r = task.result;
+    results[scenario.name] = {
+      opsPerSec: Math.round(r.throughput.mean),
+      avgMs: +(r.latency.mean * 1000).toFixed(4),
+      p99Ms: +(r.latency.p99 * 1000).toFixed(4),
+      samples: r.latency.samplesCount,
+    };
+
+    output.textContent += `\n+ ${scenario.name}`;
+  }
+
+  output.textContent = JSON.stringify(results, null, 2);
+  window.__benchResults = results;
+</script>
+</body>
+</html>

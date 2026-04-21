@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Basic replacement</title></head>
+<body>
+
+<section marker="gallery">
+  <?start name="gallery">Loading...<?end>
+</section>
+
+<template for="gallery">
+  <p>Actual gallery content</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

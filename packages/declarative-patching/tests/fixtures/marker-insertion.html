@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Marker insertion</title></head>
+<body>
+
+<ul marker="list">
+  <li>first item</li>
+  <?marker name=list>
+  <li>last item</li>
+</ul>
+
+<template for="list">
+  <li>middle item</li>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

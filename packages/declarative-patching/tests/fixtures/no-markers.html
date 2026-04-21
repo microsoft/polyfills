@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>No markers fallback</title></head>
+<body>
+
+<div marker="appendable"></div>
+
+<template for="appendable">
+  <p>Appended content</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

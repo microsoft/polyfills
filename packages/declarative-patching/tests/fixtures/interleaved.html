@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Interleaved patching</title></head>
+<body>
+
+<div marker="search-results">
+  <?start name="search-results">Loading...
+</div>
+
+<template for="search-results">
+  <p>first result</p>
+  <?marker name="search-results">
+</template>
+
+<template for="search-results">
+  <p>second result</p>
+  <?marker name="search-results">
+</template>
+
+<template for="search-results">
+  <p>third result</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "single-patch": {
+    "opsPerSec": 157957,
+    "avgMs": 5.9822,
+    "p99Ms": 100,
+    "samples": 167163
+  },
+  "many-targets-1000": {
+    "opsPerSec": 391,
+    "avgMs": 4997.0149,
+    "p99Ms": 15700,
+    "samples": 201
+  },
+  "batch-100": {
+    "opsPerSec": 330,
+    "avgMs": 3190.7643,
+    "p99Ms": 5300,
+    "samples": 314
+  },
+  "large-content-1000": {
+    "opsPerSec": 297,
+    "avgMs": 5548.0663,
+    "p99Ms": 11000,
+    "samples": 181
+  },
+  "interleaved-100": {
+    "opsPerSec": 1758,
+    "avgMs": 614.8125,
+    "p99Ms": 2100,
+    "samples": 1627
+  },
+  "deep-dom-50": {
+    "opsPerSec": 1987,
+    "avgMs": 850.8921,
+    "p99Ms": 1800,
+    "samples": 1177
+  }
+}

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>Start-only range</title></head>
+<body>
+
+<div marker="results">
+  <?start name="results">Loading results...
+</div>
+
+<template for="results">
+  <p>Result 1</p>
+  <p>Result 2</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

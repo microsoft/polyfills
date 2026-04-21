@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>Nested markers</title></head>
+<body>
+
+<section marker="gallery">
+  <?start name="all"> Loading...<br>
+  <div><?start name="part">Loading inner...<?end></div>
+  <?end>
+</section>
+
+<template for="gallery#part">
+  <p>Inner content replaced</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

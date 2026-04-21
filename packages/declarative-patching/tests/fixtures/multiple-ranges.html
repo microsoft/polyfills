@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>Multiple named ranges</title></head>
+<body>
+
+<div marker="part-one part-two">
+  <?start name="part-one">
+  Placeholder content
+  <?end>
+  <hr>
+  <?start name="part-two">
+  Placeholder content
+  <?end>
+</div>
+
+<template for="part-one">
+  <p>Actual 1st part of the content</p>
+</template>
+
+<template for="part-two">
+  <p>Actual 2nd part of the content</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

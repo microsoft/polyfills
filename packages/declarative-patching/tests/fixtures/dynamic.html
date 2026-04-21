@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head><title>Dynamic patching via observe</title></head>
+<body>
+
+<section marker="dynamic">
+  <?start name="dynamic">Placeholder<?end>
+</section>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+
+  // Simulate streaming: add a template after a microtask
+  queueMicrotask(() => {
+    const tpl = document.createElement("template");
+    tpl.setAttribute("for", "dynamic");
+    tpl.innerHTML = "<p>Dynamically patched</p>";
+    document.body.appendChild(tpl);
+  });
+</script>
+
+</body>
+</html>

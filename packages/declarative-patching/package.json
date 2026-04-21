@@ -1,0 +1,71 @@
+{
+  "name": "@microsoft/declarative-patching-polyfill",
+  "version": "0.0.1",
+  "description": "Minimal polyfill for the Declarative Partial Updates (interleaved HTML streaming/patching) proposal.",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:lib && npm run build:lib:min",
+    "build:app": "vite build",
+    "build:lib": "vite build --config vite.config.lib.js",
+    "build:lib:min": "npm run build:lib -- --mode minified",
+    "test": "playwright test",
+    "test:ci": "npm test -- --project=chromium --project=firefox --project=webkit",
+    "size": "size-limit",
+    "bench": "playwright test bench/bench.spec.js --project=chromium",
+    "bench:baseline": "BENCH_BASELINE=1 npm run bench",
+    "bench:profile": "playwright test bench/profile.spec.js --project=chromium"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Microsoft/polyfills.git",
+    "directory": "packages/declarative-patching"
+  },
+  "keywords": [
+    "declarative-patching",
+    "polyfill",
+    "html",
+    "streaming"
+  ],
+  "author": "Microsoft",
+  "license": "MIT",
+  "type": "module",
+  "module": "./build/declarative-patching-polyfill.min.mjs",
+  "types": "./build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/declarative-patching-polyfill.min.mjs"
+    },
+    "./unminified": {
+      "types": "./build/index.d.ts",
+      "default": "./build/declarative-patching-polyfill.mjs"
+    }
+  },
+  "files": [
+    "build"
+  ],
+  "size-limit": [
+    {
+      "path": "build/declarative-patching-polyfill.min.mjs",
+      "limit": "10 kB",
+      "gzip": true
+    },
+    {
+      "path": "build/declarative-patching-polyfill.min.mjs",
+      "limit": "10 kB"
+    }
+  ],
+  "bugs": {
+    "url": "https://github.com/Microsoft/polyfills/issues"
+  },
+  "homepage": "https://github.com/microsoft/polyfills/tree/main/packages/declarative-patching#readme",
+  "devDependencies": {
+    "@playwright/test": "1.59.1",
+    "@size-limit/preset-small-lib": "12.0.1",
+    "@types/node": "^25.4.0",
+    "size-limit": "12.0.1",
+    "terser": "5.46.1",
+    "tinybench": "^6.0.0",
+    "vite": "8.0.3"
+  }
+}

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>Failed patch</title></head>
+<body>
+
+<div marker="other">No matching marker element here</div>
+
+<template for="nonexistent">
+  <p>This should not be applied</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

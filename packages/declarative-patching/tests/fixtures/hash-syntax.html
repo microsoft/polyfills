@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Hash syntax</title></head>
+<body>
+
+<section marker="gallery">
+  <?start name="part">Loading...<?end>
+</section>
+
+<template for="gallery#part">
+  <p>Actual gallery content</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

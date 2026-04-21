@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head><title>Bare marker insertion</title></head>
+<body>
+
+<section marker="gallery"><?marker></section>
+
+<template for="gallery">
+  <p>Actual gallery content</p>
+</template>
+
+<script type="module">
+  import { observe } from "/src/polyfill.js";
+  observe();
+</script>
+
+</body>
+</html>

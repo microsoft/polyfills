@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<!-- Copyright (c) Microsoft Corporation.
+ Licensed under the MIT License. -->
+<html lang="en">
+<meta charset="utf-8">
+<title>declarative-patching polyfill</title>
+<style>
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    font-family: sans-serif;
+    margin-inline: auto;
+    max-inline-size: 50rem;
+    padding: 2rem;
+  }
+</style>
+
+<h1><code>declarative-patching</code> polyfill</h1>
+
+<h2>Basic replacement</h2>
+<section marker="gallery">
+  <?start name="gallery">Loading...<?end>
+</section>
+
+<template for="gallery">
+  <p>Actual gallery content</p>
+</template>
+
+<h2>Interleaved patching</h2>
+<div marker="search-results">
+  <?start name="search-results">Loading...
+</div>
+
+<template for="search-results">
+  <p>first result</p>
+  <?marker name="search-results">
+</template>
+
+<template for="search-results">
+  <p>second result</p>
+  <?marker name="search-results">
+</template>
+
+<template for="search-results">
+  <p>third result</p>
+</template>
+
+<script type="module">
+  import { observe } from "./src/polyfill.js";
+
+  observe();
+</script>
+
+<a href="test.html">test</a>
+
+</html>
