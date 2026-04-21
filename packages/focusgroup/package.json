@@ -56,17 +56,6 @@
     "./shadowless-unminified": {
       "types": "./build/types/index.d.ts",
       "default": "./build/index-shadowless.mjs"
-    },
-    "./focusgroup.js": {
-      "types": "./build/types/focusgroup.d.ts",
-      "default": "./build/focusgroup.mjs"
-    },
-    "./focusgroup-shadowless.js": {
-      "types": "./build/types/focusgroup.d.ts",
-      "default": "./build/focusgroup-shadowless.mjs"
-    },
-    "./focusgroup-items.js": {
-      "default": "./build/types/focusgroup-items.d.ts"
     }
   },
   "files": [
@@ -75,12 +64,21 @@
   "size-limit": [
     {
       "path": "build/index.min.mjs",
-      "limit": "10 kB",
+      "limit": "6 kB",
       "gzip": true
     },
     {
       "path": "build/index.min.mjs",
-      "limit": "10 kB"
+      "limit": "5 kB"
+    },
+    {
+      "path": "build/index-shadowless.min.mjs",
+      "limit": "4 kB",
+      "gzip": true
+    },
+    {
+      "path": "build/index-shadowless.min.mjs",
+      "limit": "4 kB"
     }
   ],
   "bugs": {

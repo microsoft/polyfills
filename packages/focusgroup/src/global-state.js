@@ -13,7 +13,10 @@
 //   g: MutationObserver — singleton observer on `document.body` for
 //      auto-disconnect on removal and (when `b` is true) auto-polyfill on add.
 //   b: boolean — whether the global observer should also polyfill new nodes.
-/** @type {{ o: Set<MutationObserver>, m?: Map<HTMLElement, *>, g?: MutationObserver, b: boolean }} */
+/**
+ * @type {{ o: Set<MutationObserver>, m?: Map<HTMLElement, *>, g?: MutationObserver, b: boolean }}
+ * @global
+ */
 globalThis.__FOCUSGROUP_POLYFILL__ ??= {
   o: new Set(),
   b: false,

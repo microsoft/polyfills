@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+/** @enum {string} */
 export const DatasetName = {
   // Whether the polyfill added an inferred role to the element due to lack of
   // explicit author role.
@@ -19,6 +20,7 @@ export const DatasetName = {
   SEGMENT_START: "data-fg-segs",
 };
 
+/** @enum {string} */
 export const BehaviorToken = {
   TOOLBAR: "toolbar",
   TABLIST: "tablist",
