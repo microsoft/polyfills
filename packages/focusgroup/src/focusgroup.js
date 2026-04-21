@@ -149,7 +149,7 @@ export class FocusGroup {
     this.#id = items.id ?? generateUniqueId();
     this.#inferRole = options.inferRole;
 
-    this.#applyDefinition(options.definition);
+    this.#updateDefinition(options.definition);
     this.#inferRole?.(this.#owner, this.#behavior, "owner");
     this.#decorateItems();
 
@@ -184,7 +184,7 @@ export class FocusGroup {
   }
 
   /** @param {FocusGroupDefinition} [def] */
-  #applyDefinition(def) {
+  #updateDefinition(def) {
     this.#behavior = def?.behavior ?? BehaviorToken.NONE;
     this.#wrap = def?.wrap ?? false;
     this.#axis = def?.axis;
@@ -568,7 +568,7 @@ export class FocusGroup {
     }
 
     if (info.definition !== undefined) {
-      this.#applyDefinition(info.definition);
+      this.#updateDefinition(info.definition);
       this.#inferRole?.(this.#owner, this.#behavior, "owner");
     }
 
