@@ -249,8 +249,11 @@ export function inferRole(element, behavior, kind) {
   const allowRoleInferring =
     hasGenericRole(element) ||
     (kind === "child" && element.nodeName === "BUTTON");
+  const cfg = BehaviorMap[behavior];
   const role = allowRoleInferring
-    ? BehaviorMap.get(behavior)?.[`${kind}Role`]
+    ? kind === "owner"
+      ? cfg?.ownerRole
+      : cfg?.childRole
     : undefined;
 
   if (role) {

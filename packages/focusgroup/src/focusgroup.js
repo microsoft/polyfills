@@ -139,7 +139,7 @@ export class FocusGroup {
     this.#id = items.id ?? generateUniqueId();
 
     this.#updateDefinition();
-    this.#decorateOwner();
+    inferRole(this.#owner, this.#behavior, "owner");
     this.#decorateItems();
 
     this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this), {
@@ -170,9 +170,6 @@ export class FocusGroup {
     this.#abort.abort();
     this.#items?.disconnect?.();
     this.#owner = null;
-    this.#start = null;
-    this.#activeItem = null;
-    this.#memorized = null;
   }
 
   #updateDefinition() {
@@ -184,7 +181,7 @@ export class FocusGroup {
 
     this.#memory = !tokens.includes("nomemory");
 
-    this.#wrap = BehaviorMap.get(this.#behavior)?.wrap ?? false;
+    this.#wrap = BehaviorMap[this.#behavior]?.wrap ?? false;
     if (tokens.includes("wrap") && !this.#wrap) {
       this.#wrap = true;
     } else if (tokens.includes("nowrap") && this.#wrap) {
@@ -194,21 +191,17 @@ export class FocusGroup {
     const hasInline = tokens.includes("inline");
     const hasBlock = tokens.includes("block");
     this.#axis =
-      hasInline && !hasBlock
-        ? "inline"
-        : hasBlock && !hasInline
-          ? "block"
-          : hasInline && hasBlock
-            ? undefined
-            : BehaviorMap.get(this.#behavior)?.axis;
+      hasInline === hasBlock
+        ? hasInline
+          ? undefined
+          : BehaviorMap[this.#behavior]?.axis
+        : hasInline
+          ? "inline"
+          : "block";
 
     if (!this.#memory) {
       this.#memorized = null;
     }
-  }
-
-  #decorateOwner() {
-    inferRole(this.#owner, this.#behavior, "owner");
   }
 
   #decorateItems() {
@@ -246,7 +239,7 @@ export class FocusGroup {
 
       node.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
-        node.hasAttribute("tabindex") ? node.getAttribute("tabindex") : "none",
+        node.getAttribute("tabindex") ?? "none",
       );
 
       if (!startItem && node.hasAttribute("focusgroupstart")) {
@@ -383,7 +376,7 @@ export class FocusGroup {
 
   /** @param {FocusEvent} evt */
   #handleFocusin(evt) {
-    const target = evt.target.shadowRoot ? evt.composedPath()[0] : evt.target;
+    const target = evt.composedPath()[0];
 
     const focusEnteringGroup =
       !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
@@ -519,9 +512,7 @@ export class FocusGroup {
     if (this.#ownerIsProxy || !hasFocusableHost) {
       return;
     }
-    this.#ownerTabindexBeforeProxy = this.#owner.hasAttribute("tabindex")
-      ? this.#owner.getAttribute("tabindex")
-      : null;
+    this.#ownerTabindexBeforeProxy = this.#owner.getAttribute("tabindex");
     this.#owner.tabIndex = 0;
     this.#ownerIsProxy = true;
     flushAllObservers();
@@ -594,7 +585,7 @@ export class FocusGroup {
 
     if (info.definitionChanged) {
       this.#updateDefinition();
-      this.#decorateOwner();
+      inferRole(this.#owner, this.#behavior, "owner");
     }
 
     if (
