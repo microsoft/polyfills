@@ -202,28 +202,15 @@ export class FocusGroup {
 
     let firstItem = null;
     let startItem = this.#items.start ?? null;
-    let segment = 0;
 
     for (const entry of this.#items.items()) {
       const node = entry.element;
-
-      if (entry.segmentBoundary) {
-        segment++;
-      }
 
       if (!firstItem) {
         firstItem = node;
       }
       node.setAttribute(DatasetName.ITEM, this.#id);
       this.#decorated.add(node);
-
-      if (segment > 0) {
-        node.setAttribute(DatasetName.SEGMENT, segment.toString());
-      }
-
-      if (entry.segmentBoundary) {
-        node.setAttribute(DatasetName.SEGMENT_START, "");
-      }
 
       this.#inferRole?.(node, this.#behavior, "child");
 
@@ -297,8 +284,6 @@ export class FocusGroup {
       }
 
       element.removeAttribute(DatasetName.ITEM);
-      element.removeAttribute(DatasetName.SEGMENT);
-      element.removeAttribute(DatasetName.SEGMENT_START);
     }
     this.#decorated.clear();
 
@@ -440,9 +425,7 @@ export class FocusGroup {
       if (!firstItem) {
         firstItem = element;
       }
-      element.tabIndex = element.hasAttribute(DatasetName.SEGMENT_START)
-        ? 0
-        : -1;
+      element.tabIndex = this.#items.isSegmentStart?.(element) ? 0 : -1;
     }
 
     this.#start = startItem ?? firstItem;
@@ -537,10 +520,7 @@ export class FocusGroup {
       target.focus();
     }
     current.tabIndex =
-      current.getAttribute(DatasetName.SEGMENT) ===
-      target.getAttribute(DatasetName.SEGMENT)
-        ? -1
-        : 0;
+      (this.#items.sameSegment?.(current, target) ?? true) ? -1 : 0;
 
     // Focus is moving within the group, so the owner proxy should stay
     // disabled (it was disabled in #handleFocusin). Just clear in case any

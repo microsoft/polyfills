@@ -142,7 +142,10 @@ export class TreeWalkerItemCollection {
   /**
    * Yields all items in the focus group in navigation (document) order.
    * Each entry's `segmentBoundary` is `true` when the item is preceded by a
-   * nested focusgroup acting as a segmentor.
+   * nested focusgroup acting as a segmentor. Also writes
+   * `data-fg-seg`/`data-fg-segs` on yielded items so that
+   * `isSegmentStart()` / `sameSegment()` can answer purely from the DOM
+   * without keeping any in-memory state.
    *
    * @returns {Generator<FocusGroupItem>}
    */
@@ -160,6 +163,7 @@ export class TreeWalkerItemCollection {
     );
 
     let pendingSegmentBoundary = false;
+    let segment = 0;
     /** @type {Element | null} */
     let skipSubtreeOf = null;
 
@@ -186,12 +190,41 @@ export class TreeWalkerItemCollection {
       }
 
       if (pendingSegmentBoundary) {
+        segment++;
+        node.setAttribute(DatasetName.SEGMENT, String(segment));
+        node.setAttribute(DatasetName.SEGMENT_START, "");
         pendingSegmentBoundary = false;
         yield { element: node, segmentBoundary: true };
       } else {
+        if (segment > 0) {
+          node.setAttribute(DatasetName.SEGMENT, String(segment));
+        }
         yield { element: node };
       }
     }
+  }
+
+  /**
+   * Whether `el` is the first item of a non-initial segment (i.e. the item
+   * that immediately follows a segmentor in document order).
+   * @param {HTMLElement} el
+   * @returns {boolean}
+   */
+  isSegmentStart(el) {
+    return el.hasAttribute(DatasetName.SEGMENT_START);
+  }
+
+  /**
+   * Whether `a` and `b` belong to the same segment.
+   * @param {HTMLElement} a
+   * @param {HTMLElement} b
+   * @returns {boolean}
+   */
+  sameSegment(a, b) {
+    return (
+      a.getAttribute(DatasetName.SEGMENT) ===
+      b.getAttribute(DatasetName.SEGMENT)
+    );
   }
 
   /** @returns {HTMLElement | null} The first item, or null. */

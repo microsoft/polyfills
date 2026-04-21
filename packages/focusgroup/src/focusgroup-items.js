@@ -65,6 +65,8 @@
  *   next(current: HTMLElement): (HTMLElement | null),
  *   previous(current: HTMLElement): (HTMLElement | null),
  *   contains(element: Element): boolean,
+ *   isSegmentStart?: (element: HTMLElement) => boolean,
+ *   sameSegment?: (a: HTMLElement, b: HTMLElement) => boolean,
  *   disconnect?: () => void,
  *   flush?: () => void,
  * }} FocusGroupItemCollection
@@ -79,6 +81,19 @@
  * the initial tab stop after decoration instead of falling back to the
  * first item. The polyfill's default `TreeWalkerItemCollection` returns
  * the first `[focusgroupstart]` descendant.
+ *
+ * `isSegmentStart` and `sameSegment` are optional spec-glue hooks. The
+ * polyfill's `TreeWalkerItemCollection` uses them to preserve the per-segment
+ * roving tab stop produced by nested focusgroups acting as segmentors:
+ * - `isSegmentStart(el)` — is `el` the first item of a non-initial segment?
+ *   Used by `FocusGroup` when re-applying tabindexes after a no-memory reset
+ *   to keep each segment's roving stop at `0`.
+ * - `sameSegment(a, b)` — are `a` and `b` in the same segment? Used by
+ *   `FocusGroup` when the rover moves; if `false`, the previous item keeps
+ *   `tabindex=0` so the segment it belonged to remains tab-reachable.
+ * Collections that don't implement segment behavior (e.g. FUI components
+ * with flat item lists) omit both methods. `FocusGroup` then defaults to
+ * single-roving-stop behavior.
  *
  * `disconnect()` is optional — `FocusGroup#disconnect()` calls it defensively
  * (`items.disconnect?.()`).
