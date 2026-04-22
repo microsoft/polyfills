@@ -605,6 +605,8 @@ test.describe("guaranteed tab stop priority", () => {
     await expect(page.getByTestId("after")).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(page.getByTestId("item22")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 
   test("focusgroupstart element in nested shadow tree is the guaranteed tab stop entry point with nomemory", async ({
@@ -643,6 +645,8 @@ test.describe("guaranteed tab stop priority", () => {
     await expect(page.getByTestId("after")).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(page.getByTestId("item22")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 
   test("a single item in a group should not lose focusability", async ({

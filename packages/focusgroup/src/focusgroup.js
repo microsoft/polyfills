@@ -299,16 +299,17 @@ export class FocusGroup {
       return;
     }
 
-    const closestGroup = getClosestElement(evtTarget, "[focusgroup]");
-
-    if (closestGroup) {
-      evt.stopPropagation();
-    }
-
-    // Avoid focus group navigation if the focus is on an opted-out element.
-    if (closestGroup?.getAttribute("focusgroup").includes("none")) {
+    // Only handle events targeted at our own items. The collection's
+    // candidacy filter already excludes opted-out subtrees and items owned
+    // by nested focusgroups, so this guard subsumes both the legacy
+    // closest-`[focusgroup]` opt-out check and the propagation-stopping
+    // logic for nested groups. `contains()` is intentionally lax so that
+    // untraversable (`tabindex=-1`) items still count as ours when focused.
+    if (!this.#items.contains(evtTarget)) {
       return;
     }
+
+    evt.stopPropagation();
 
     const current = this.#activeItem;
     if (!current) {
@@ -412,17 +413,29 @@ export class FocusGroup {
       return;
     }
 
-    // Clear the memory and re-decorate from scratch so the items collection
-    // can recompute the start element (the author may have moved
-    // `focusgroupstart` since the last decoration).
+    // In nomemory mode, focus leaving the group should reset the tab stop
+    // back to the start (focusgroupstart or first item). Do this by
+    // resetting tabindex on currently-decorated items and re-establishing
+    // the start, without doing a full undecorate+decorate cycle — the
+    // latter churns the owner proxy tabindex synchronously inside
+    // focusout, which can race with the browser's tab-target resolution
+    // and pull focus back to the owner proxy.
     this.#memorized = null;
-    this.#undecorateItems();
-    this.#decorateItems();
+    const newStart = this.#items.start ?? this.#items.first?.() ?? null;
+    for (const { element, segmentBoundary } of this.#items.items()) {
+      element.tabIndex = segmentBoundary ? 0 : -1;
+    }
+    if (newStart) {
+      newStart.tabIndex = 0;
+      this.#start = newStart;
+      this.#activeItem = newStart;
+    }
 
     if (focusLeavingGroup && this.#start) {
       this.#enableOwnerProxy(this.#start);
     }
 
+    this.#items.flush?.();
     flushAllObservers();
   }
 
