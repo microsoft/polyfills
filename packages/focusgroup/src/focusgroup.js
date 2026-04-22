@@ -357,7 +357,6 @@ export class FocusGroup {
     if (target === this.#owner && this.#ownerIsProxy && focusEnteringGroup) {
       const tabStop = this.#memorized || this.#start;
       this.#disableOwnerProxy();
-      flushAllObservers();
       if (tabStop) {
         tabStop.focus();
       }
@@ -373,7 +372,6 @@ export class FocusGroup {
     // create an extra Tab stop when the user Shift+Tabs out.
     if (this.#ownerIsProxy) {
       this.#disableOwnerProxy();
-      flushAllObservers();
     }
 
     this.#memorized = target;
@@ -401,7 +399,6 @@ export class FocusGroup {
         : this.#start;
       if (tabStop) {
         this.#enableOwnerProxy(tabStop);
-        flushAllObservers();
       }
     }
 
@@ -422,21 +419,24 @@ export class FocusGroup {
     // and pull focus back to the owner proxy.
     this.#memorized = null;
     const newStart = this.#items.start ?? this.#items.first?.() ?? null;
-    for (const { element, segmentBoundary } of this.#items.items()) {
-      element.tabIndex = segmentBoundary ? 0 : -1;
-    }
-    if (newStart) {
-      newStart.tabIndex = 0;
-      this.#start = newStart;
-      this.#activeItem = newStart;
+
+    // Skip the reset loop if the user never moved off the start — no
+    // tabindexes need restoring.
+    if (this.#activeItem !== this.#start || newStart !== this.#start) {
+      for (const { element, segmentBoundary } of this.#items.items()) {
+        element.tabIndex = segmentBoundary ? 0 : -1;
+      }
+      if (newStart) {
+        newStart.tabIndex = 0;
+        this.#start = newStart;
+        this.#activeItem = newStart;
+      }
+      this.#items.flush?.();
     }
 
     if (focusLeavingGroup && this.#start) {
       this.#enableOwnerProxy(this.#start);
     }
-
-    this.#items.flush?.();
-    flushAllObservers();
   }
 
   /**
@@ -499,6 +499,7 @@ export class FocusGroup {
     this.#ownerIsProxy = false;
     this.#ownerTabindexBeforeProxy = null;
     this.#items.flush?.();
+    flushAllObservers();
   }
 
   /**
