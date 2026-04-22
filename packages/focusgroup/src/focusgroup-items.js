@@ -57,7 +57,6 @@
  * app, a `MutationObserver` inside the collection, etc.).
  *
  * @typedef {{
- *   id?: string,
  *   start?: (HTMLElement | null),
  *   items(): Iterable<FocusGroupItem>,
  *   first(): (HTMLElement | null),
@@ -65,17 +64,30 @@
  *   next(current: HTMLElement): (HTMLElement | null),
  *   previous(current: HTMLElement): (HTMLElement | null),
  *   contains(element: Element): boolean,
+ *   decorate?: () => void,
+ *   undecorate?: () => void,
+ *   isItem?: (element: Element) => boolean,
  *   isSegmentStart?: (element: HTMLElement) => boolean,
  *   sameSegment?: (a: HTMLElement, b: HTMLElement) => boolean,
  *   disconnect?: () => void,
  *   flush?: () => void,
  * }} FocusGroupItemCollection
  *
- * `id` is optional. When provided, `FocusGroup` writes it to the
- * `data-fg-item` attribute of each decorated item. Implementations whose
- * subtrees can overlap with other focusgroups (possible via shadow-DOM
- * slotting) should expose a unique `id` and use it inside their `contains()`
- * / navigation logic. Array-backed implementations don't need an `id`.
+ * Lifecycle: `FocusGroup` calls `decorate()` to ask the collection to set
+ * up structural state (e.g. mark items in the DOM, compute segments), then
+ * iterates `items()` to apply behavioral state (tabindex, role). On
+ * teardown, `FocusGroup` iterates `items()` first to roll back behavioral
+ * state, then calls `undecorate()` to release the structural state. Custom
+ * collections whose `items()` is self-managed (e.g. backed by a static
+ * array) can omit `decorate` / `undecorate` entirely.
+ *
+ * `isItem(el)` is an optional strict membership check answering "is `el`
+ * currently a decorated item of this collection?". Used by `FocusGroup`
+ * when validating the memorized element after a re-decoration cycle, and
+ * (in keydown) to guard against handling events from elements that aren't
+ * ours. Differs from `contains(el)` in that `contains` is intentionally
+ * lax — it includes untraversable (e.g. `tabindex=-1`) elements that
+ * `focusin` should still treat as belonging to the group.
  *
  * `start` is optional. When provided and non-null, `FocusGroup` uses it as
  * the initial tab stop after decoration instead of falling back to the

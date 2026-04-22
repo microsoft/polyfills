@@ -45,20 +45,22 @@ export class TreeWalkerItemCollection {
 
   /**
    * First descendant with the `focusgroupstart` attribute (shadow-aware),
-   * or `null` if none exists. `FocusGroup` reads this to choose the initial
-   * tab stop after decoration.
+   * or the first item as fallback, or `null` if none exist. `FocusGroup`
+   * reads this to choose the initial tab stop after decoration.
    * @returns {HTMLElement | null}
    */
   get start() {
     if (!this.#owner) {
       return null;
     }
+    let first = null;
     for (const { element } of this.items()) {
       if (element.hasAttribute("focusgroupstart")) {
         return element;
       }
+      first ??= element;
     }
-    return null;
+    return first;
   }
 
   /** @type {HTMLElement} */
@@ -140,16 +142,16 @@ export class TreeWalkerItemCollection {
   }
 
   /**
-   * Yields all items in the focus group in navigation (document) order.
-   * Each entry's `segmentBoundary` is `true` when the item is preceded by a
-   * nested focusgroup acting as a segmentor. Also writes
-   * `data-fg-seg`/`data-fg-segs` on yielded items so that
-   * `isSegmentStart()` / `sameSegment()` can answer purely from the DOM
-   * without keeping any in-memory state.
+   * Discovers items in the owner subtree and writes the marker attributes
+   * (`data-fg-item`, `data-fg-seg`, `data-fg-segs`). Heavy walk — uses the
+   * full candidacy filter (`isKeyboardFocusable` + ownership) and respects
+   * nested-focusgroup opt-out subtrees and segmentor boundaries.
    *
-   * @returns {Generator<FocusGroupItem>}
+   * After this call, `items()` will yield the marked items, and
+   * `isItem()` / the persistent walker (used by `first/last/next/previous`)
+   * will recognize them.
    */
-  *items() {
+  decorate() {
     const walker = createTreeWalker(
       document,
       this.#owner,
@@ -189,18 +191,53 @@ export class TreeWalkerItemCollection {
         }
       }
 
+      node.setAttribute(DatasetName.ITEM, this.id);
       if (pendingSegmentBoundary) {
         segment++;
         node.setAttribute(DatasetName.SEGMENT, String(segment));
         node.setAttribute(DatasetName.SEGMENT_START, "");
         pendingSegmentBoundary = false;
-        yield { element: node, segmentBoundary: true };
-      } else {
-        if (segment > 0) {
-          node.setAttribute(DatasetName.SEGMENT, String(segment));
-        }
-        yield { element: node };
+      } else if (segment > 0) {
+        node.setAttribute(DatasetName.SEGMENT, String(segment));
       }
+    }
+  }
+
+  /**
+   * Yields all items previously marked by `decorate()` in document order.
+   * Light walk — iterates only `data-fg-item="${id}"` nodes via the
+   * persistent walker (which rejects foreign-focusgroup subtrees). Reads
+   * `segmentBoundary` from the DOM marker.
+   *
+   * @returns {Generator<FocusGroupItem>}
+   */
+  *items() {
+    this.#walker.currentNode = this.#owner;
+    while (this.#walker.nextNode()) {
+      const node = /** @type {HTMLElement} */ (this.#walker.currentNode);
+      yield {
+        element: node,
+        segmentBoundary: node.hasAttribute(DatasetName.SEGMENT_START),
+      };
+    }
+  }
+
+  /**
+   * Clears all marker attributes (`data-fg-item`, `data-fg-seg`,
+   * `data-fg-segs`) written by `decorate()`. Light walk over marked nodes.
+   */
+  undecorate() {
+    // Snapshot first — clearing markers mid-walk would invalidate the
+    // walker's filter and skip subsequent nodes.
+    const marked = [];
+    this.#walker.currentNode = this.#owner;
+    while (this.#walker.nextNode()) {
+      marked.push(/** @type {HTMLElement} */ (this.#walker.currentNode));
+    }
+    for (const node of marked) {
+      node.removeAttribute(DatasetName.ITEM);
+      node.removeAttribute(DatasetName.SEGMENT);
+      node.removeAttribute(DatasetName.SEGMENT_START);
     }
   }
 
@@ -272,6 +309,16 @@ export class TreeWalkerItemCollection {
   }
 
   /**
+   * Strict membership: is `element` currently a decorated item of *this*
+   * collection?
+   * @param {Element} element
+   * @returns {boolean}
+   */
+  isItem(element) {
+    return element.getAttribute(DatasetName.ITEM) === this.id;
+  }
+
+  /**
    * The persistent walker's filter — accepts elements decorated as items of
    * this items collection (matching `id`) and rejects nested groups whose
    * decoration belongs to another collection.
@@ -297,14 +344,13 @@ export class TreeWalkerItemCollection {
    */
   #isItemCandidate(node) {
     return (
-      node.hasAttribute(DatasetName.ITEM) ||
-      (isKeyboardFocusable(node, this.#owner) &&
-        getClosestElement(
-          !IS_SHADOWLESS && node.assignedSlot
-            ? node.assignedSlot
-            : node.parentNode,
-          "[focusgroup]",
-        ) === this.#owner)
+      isKeyboardFocusable(node, this.#owner) &&
+      getClosestElement(
+        !IS_SHADOWLESS && node.assignedSlot
+          ? node.assignedSlot
+          : node.parentNode,
+        "[focusgroup]",
+      ) === this.#owner
     );
   }
 

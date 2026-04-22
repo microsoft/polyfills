@@ -45,14 +45,6 @@ export class FocusGroup {
   #items;
 
   /**
-   * The id used to tag decorated items via the `data-fg-item` attribute.
-   * Reads `items.id` when the items collection provides one (so the items'
-   * own filtering matches what we write); otherwise generates a fresh id.
-   * @type {string}
-   */
-  #id;
-
-  /**
    * The focus group behavior.
    * @type {BehaviorToken!}
    */
@@ -112,14 +104,6 @@ export class FocusGroup {
   #ownerTabindexBeforeProxy = null;
 
   /**
-   * Set of elements currently decorated as items by this group, used to
-   * undecorate them later even if they no longer qualify as item candidates
-   * (e.g. became `focusgroup="none"` or were hidden).
-   * @type {Set<HTMLElement>}
-   */
-  #decorated = new Set();
-
-  /**
    * The abort controller for when `disconnect()` is called.
    * @type {AbortController}
    */
@@ -146,7 +130,6 @@ export class FocusGroup {
 
     this.#owner = owner;
     this.#items = items;
-    this.#id = items.id ?? generateUniqueId();
     this.#inferRole = options.inferRole;
 
     this.#updateDefinition(options.definition);
@@ -183,6 +166,50 @@ export class FocusGroup {
     this.#owner = null;
   }
 
+  /**
+   * Reconciles decoration state in response to relevant changes. Call this
+   * whenever the focus group should refresh — e.g. items were added or
+   * removed, the owner's `focusgroup` attribute changed, or an author set
+   * `tabindex` on a decorated item.
+   *
+   * The polyfill's default `TreeWalkerItemCollection` calls this from a
+   * `MutationObserver`. App-supplied collections (or app code that knows
+   * when its model changed) can call it directly.
+   *
+   * @param {FocusGroupUpdateInfo} [info]
+   */
+  update(info = {}) {
+    if (!this.#owner) {
+      return;
+    }
+
+    if (info.definition !== undefined) {
+      this.#updateDefinition(info.definition);
+      this.#inferRole?.(this.#owner, this.#behavior, "owner");
+    }
+
+    if (
+      this.#memorized &&
+      info.removedNodes?.some(
+        (n) => n === this.#memorized || nodeContains(n, this.#memorized),
+      )
+    ) {
+      this.#memorized = null;
+    }
+
+    if (info.authorTabindexChanges) {
+      for (const el of info.authorTabindexChanges) {
+        el.setAttribute(
+          DatasetName.AUTHOR_TABINDEX,
+          el.getAttribute("tabindex") ?? "none",
+        );
+      }
+    }
+
+    this.#undecorateItems();
+    this.#decorateItems();
+  }
+
   /** @param {FocusGroupDefinition} [def] */
   #updateDefinition(def) {
     this.#behavior = def?.behavior ?? BehaviorToken.NONE;
@@ -200,50 +227,29 @@ export class FocusGroup {
       return;
     }
 
-    let firstItem = null;
-    let startItem = this.#items.start ?? null;
+    this.#items.decorate?.();
 
-    for (const entry of this.#items.items()) {
-      const node = entry.element;
-
-      if (!firstItem) {
-        firstItem = node;
-      }
-      node.setAttribute(DatasetName.ITEM, this.#id);
-      this.#decorated.add(node);
-
-      this.#inferRole?.(node, this.#behavior, "child");
-
-      node.setAttribute(
+    for (const { element, segmentBoundary } of this.#items.items()) {
+      this.#inferRole?.(element, this.#behavior, "child");
+      element.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
-        node.getAttribute("tabindex") ?? "none",
+        element.getAttribute("tabindex") ?? "none",
       );
-
-      if (node !== startItem) {
-        node.tabIndex = entry.segmentBoundary ? 0 : -1;
-      }
+      element.tabIndex = segmentBoundary ? 0 : -1;
     }
 
-    startItem ??= firstItem;
-
-    if (!this.#memorized?.isConnected) {
+    if (
+      !this.#memorized?.isConnected ||
+      !(
+        this.#items.isItem?.(this.#memorized) ??
+        this.#items.contains(this.#memorized)
+      )
+    ) {
       this.#memorized = null;
     }
 
-    if (this.#memorized) {
-      // Verify the memorized element is still a valid item in this group.
-      // It may have become ineligible (disabled, hidden, moved to a nested
-      // group, etc.) since it was last focused.
-      if (this.#memorized.getAttribute(DatasetName.ITEM) === this.#id) {
-        startItem = this.#memorized;
-      } else {
-        // The memorized element is no longer a valid item. Pick the closest
-        // item in document order as the tab stop, but don't update
-        // `#memorized` — memory should only be set by actual focus events.
-        startItem = firstItem || startItem;
-        this.#memorized = null;
-      }
-    }
+    const startItem =
+      this.#memorized ?? this.#items.start ?? this.#items.first?.() ?? null;
 
     if (startItem) {
       startItem.tabIndex = 0;
@@ -260,13 +266,7 @@ export class FocusGroup {
     this.#disableOwnerProxy();
 
     let any = false;
-    for (const element of this.#decorated) {
-      // Skip if another focusgroup has claimed this element since we
-      // decorated it (its `data-fg-item` no longer matches our id). The
-      // claiming group will undecorate it when appropriate.
-      if (element.getAttribute(DatasetName.ITEM) !== this.#id) {
-        continue;
-      }
+    for (const { element } of this.#items.items()) {
       any = true;
 
       // Restore role
@@ -282,10 +282,9 @@ export class FocusGroup {
         }
         element.removeAttribute(DatasetName.AUTHOR_TABINDEX);
       }
-
-      element.removeAttribute(DatasetName.ITEM);
     }
-    this.#decorated.clear();
+
+    this.#items.undecorate?.();
 
     if (any) {
       this.#items.flush?.();
@@ -413,26 +412,12 @@ export class FocusGroup {
       return;
     }
 
-    // Clear the memory and reset tab stops, but make sure the
-    // Clear the memory and reset tab stops, but make sure the start
-    // element provided by the items collection (if any) is considered as
-    // the new starting element — the collection may have recomputed it to
-    // reflect an author moving the `focusgroupstart` element.
+    // Clear the memory and re-decorate from scratch so the items collection
+    // can recompute the start element (the author may have moved
+    // `focusgroupstart` since the last decoration).
     this.#memorized = null;
-    let firstItem = null;
-    const startItem = this.#items.start ?? null;
-    for (const { element } of this.#items.items()) {
-      if (!firstItem) {
-        firstItem = element;
-      }
-      element.tabIndex = this.#items.isSegmentStart?.(element) ? 0 : -1;
-    }
-
-    this.#start = startItem ?? firstItem;
-    if (this.#start) {
-      this.#start.tabIndex = 0;
-    }
-    this.#activeItem = this.#start;
+    this.#undecorateItems();
+    this.#decorateItems();
 
     if (focusLeavingGroup && this.#start) {
       this.#enableOwnerProxy(this.#start);
@@ -528,49 +513,5 @@ export class FocusGroup {
     this.#disableOwnerProxy();
 
     flushAllObservers();
-  }
-
-  /**
-   * Reconciles decoration state in response to relevant changes. Call this
-   * whenever the focus group should refresh — e.g. items were added or
-   * removed, the owner's `focusgroup` attribute changed, or an author set
-   * `tabindex` on a decorated item.
-   *
-   * The polyfill's default `TreeWalkerItemCollection` calls this from a
-   * `MutationObserver`. App-supplied collections (or app code that knows
-   * when its model changed) can call it directly.
-   *
-   * @param {FocusGroupUpdateInfo} [info]
-   */
-  update(info = {}) {
-    if (!this.#owner) {
-      return;
-    }
-
-    if (info.definition !== undefined) {
-      this.#updateDefinition(info.definition);
-      this.#inferRole?.(this.#owner, this.#behavior, "owner");
-    }
-
-    if (
-      this.#memorized &&
-      info.removedNodes?.some(
-        (n) => n === this.#memorized || nodeContains(n, this.#memorized),
-      )
-    ) {
-      this.#memorized = null;
-    }
-
-    if (info.authorTabindexChanges) {
-      for (const el of info.authorTabindexChanges) {
-        el.setAttribute(
-          DatasetName.AUTHOR_TABINDEX,
-          el.getAttribute("tabindex") ?? "none",
-        );
-      }
-    }
-
-    this.#undecorateItems();
-    this.#decorateItems();
   }
 }

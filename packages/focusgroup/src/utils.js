@@ -132,12 +132,13 @@ export function isKeyboardFocusable(element, owner) {
  *     if there shouldn’t be navigation, e.g. when directional limit applies.
  */
 export function getNavigationDirection(event, owner, axis) {
+  const FORWARD = "forward";
+  const BACKWARD = "backward";
+  const BLOCK = "block";
+  const INLINE = "inline";
+
   if (isKeyConflictElement(event.composedPath()[0])) {
-    return event.key === "Tab"
-      ? event.shiftKey
-        ? "backward"
-        : "forward"
-      : null;
+    return event.key === "Tab" ? (event.shiftKey ? BACKWARD : FORWARD) : null;
   }
 
   if (event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -147,8 +148,8 @@ export function getNavigationDirection(event, owner, axis) {
   const { writingMode, direction } = window.getComputedStyle(owner);
   const isVertical = !writingMode.startsWith("horizontal-");
   const isRtl = direction === "rtl";
-  const horizontal = isVertical ? "block" : "inline";
-  const vertical = isVertical ? "inline" : "block";
+  const horizontal = isVertical ? BLOCK : INLINE;
+  const vertical = isVertical ? INLINE : BLOCK;
   const isHorizontalReversed = isVertical
     ? writingMode.endsWith("-rl") !== isRtl
     : isRtl;
@@ -157,19 +158,19 @@ export function getNavigationDirection(event, owner, axis) {
   const map = {
     ArrowUp: {
       axis: vertical,
-      dir: isVerticalReversed ? "forward" : "backward",
+      dir: isVerticalReversed ? FORWARD : BACKWARD,
     },
     ArrowDown: {
       axis: vertical,
-      dir: isVerticalReversed ? "backward" : "forward",
+      dir: isVerticalReversed ? BACKWARD : FORWARD,
     },
     ArrowLeft: {
       axis: horizontal,
-      dir: isHorizontalReversed ? "forward" : "backward",
+      dir: isHorizontalReversed ? FORWARD : BACKWARD,
     },
     ArrowRight: {
       axis: horizontal,
-      dir: isHorizontalReversed ? "backward" : "forward",
+      dir: isHorizontalReversed ? BACKWARD : FORWARD,
     },
     Home: { dir: "start" },
     End: { dir: "end" },
