@@ -469,10 +469,12 @@ export class FocusGroup {
    * @param {HTMLElement} tabStop - The actual focusable tab stop element.
    */
   #enableFocusabilityProxy(tabStop) {
-    const isInShadow =
-      (tabStop.assignedSlot ?? tabStop).getRootNode() instanceof ShadowRoot;
+    const rootNode = (tabStop.assignedSlot ?? tabStop).getRootNode();
+    const hasFocusableHost =
+      rootNode instanceof ShadowRoot &&
+      rootNode.host.hasAttribute(DatasetName.AUTHOR_TABINDEX);
 
-    if (this.#ownerIsProxy || !isInShadow) {
+    if (this.#ownerIsProxy || !hasFocusableHost) {
       return;
     }
     this.#ownerTabindexBeforeProxy = this.#owner.getAttribute("tabindex");
