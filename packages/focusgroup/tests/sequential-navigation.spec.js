@@ -227,7 +227,7 @@ test.describe("native arrow key handler elements block arrow exit", () => {
       page,
       project,
       `<div data-testid="toolbar-select" focusgroup="toolbar">
-        <button data-testid="btn-select-before">Before</button>
+        <button data-testid="btn-select-before" tabindex="0">Before</button>
         <select data-testid="select-input">
           <option>A</option>
           <option>B</option>

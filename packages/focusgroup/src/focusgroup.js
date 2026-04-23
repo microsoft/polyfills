@@ -76,18 +76,16 @@ export class FocusGroup {
   #start;
 
   /**
-   * The currently active item — replaces the previous TreeWalker pointer.
-   * Updated by focusin / keyboard navigation handlers and after
-   * (un)decoration.
-   * @type {HTMLElement}
-   */
-  #activeItem;
-
-  /**
-   * The memorized tab stop.
+   * The current item — the most recently focused item within the group.
+   * Serves as the keyboard-navigation cursor while focus is inside, and (in
+   * memory mode) as the tab stop to restore on re-entry. Updated by
+   * `#handleFocusin`, plus directly by `#handleKeydown` for shadow-internal
+   * navigation (where focus events don't cross the shadow boundary).
+   * Cleared in nomemory mode on focusout and when validation fails after
+   * re-decoration.
    * @type {HTMLElement|null}
    */
-  #memorized = null;
+  #current = null;
 
   /**
    * Whether the owner currently has `tabindex=0` set as a Tab-entry proxy so
@@ -188,15 +186,6 @@ export class FocusGroup {
       this.#inferRole?.(this.#owner, this.#behavior, "owner");
     }
 
-    if (
-      this.#memorized &&
-      info.removedNodes?.some(
-        (n) => n === this.#memorized || nodeContains(n, this.#memorized),
-      )
-    ) {
-      this.#memorized = null;
-    }
-
     if (info.authorTabindexChanges) {
       for (const el of info.authorTabindexChanges) {
         el.setAttribute(
@@ -217,7 +206,7 @@ export class FocusGroup {
     this.#axis = def?.axis;
     this.#memory = def?.memory ?? true;
     if (!this.#memory) {
-      this.#memorized = null;
+      this.#current = null;
     }
   }
 
@@ -230,7 +219,10 @@ export class FocusGroup {
     this.#items.decorate?.();
 
     for (const { element, segmentBoundary } of this.#items.items()) {
+      // Set role
       this.#inferRole?.(element, this.#behavior, "child");
+
+      // Set tabindex
       element.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
         element.getAttribute("tabindex") ?? "none",
@@ -239,22 +231,21 @@ export class FocusGroup {
     }
 
     if (
-      !this.#memorized?.isConnected ||
+      !this.#current?.isConnected ||
       !(
-        this.#items.isItem?.(this.#memorized) ??
-        this.#items.contains(this.#memorized)
+        this.#items.isItem?.(this.#current) ??
+        this.#items.contains(this.#current)
       )
     ) {
-      this.#memorized = null;
+      this.#current = null;
     }
 
     const startItem =
-      this.#memorized ?? this.#items.start ?? this.#items.first?.() ?? null;
+      this.#current ?? this.#items.start ?? this.#items.first?.() ?? null;
 
     if (startItem) {
       startItem.tabIndex = 0;
       this.#start = startItem;
-      this.#activeItem = startItem;
       this.#disableFocusabilityProxy();
       this.#enableFocusabilityProxy(startItem);
     }
@@ -265,9 +256,10 @@ export class FocusGroup {
   #undecorateItems() {
     this.#disableFocusabilityProxy();
 
-    let any = false;
+    let undecorated = false;
+
     for (const { element } of this.#items.items()) {
-      any = true;
+      undecorated = true;
 
       // Restore role
       this.#inferRole?.(element, null, null);
@@ -286,16 +278,16 @@ export class FocusGroup {
 
     this.#items.undecorate?.();
 
-    if (any) {
+    if (undecorated) {
       this.#items.flush?.();
     }
   }
 
   /** @param {KeyboardEvent} evt */
   #handleKeydown(evt) {
-    const evtTarget = evt.composedPath()[0];
+    const current = evt.composedPath()[0];
 
-    if (evt.defaultPrevented || evtTarget === this.#owner) {
+    if (evt.defaultPrevented || current === this.#owner) {
       return;
     }
 
@@ -305,19 +297,15 @@ export class FocusGroup {
     // closest-`[focusgroup]` opt-out check and the propagation-stopping
     // logic for nested groups. `contains()` is intentionally lax so that
     // untraversable (`tabindex=-1`) items still count as ours when focused.
-    if (!this.#items.contains(evtTarget)) {
+    if (!this.#items.contains(current)) {
       return;
     }
 
     evt.stopPropagation();
 
-    const current = this.#activeItem;
-    if (!current) {
-      return;
-    }
     let target;
 
-    switch (getNavigationDirection(evt, evtTarget, this.#axis)) {
+    switch (getNavigationDirection(evt, current, this.#axis)) {
       case "start":
         target = this.#items.first();
         break;
@@ -339,8 +327,10 @@ export class FocusGroup {
     }
 
     if (target && target !== current) {
-      this.#setItemFocused(current, target, true);
-      this.#activeItem = target;
+      this.#advanceFocus(current, target, true);
+      // Focus events don't cross shadow boundaries for moves within the
+      // same shadow tree, so update #current directly here.
+      this.#current = target;
       evt.preventDefault();
     }
   }
@@ -355,7 +345,7 @@ export class FocusGroup {
     // When the owner is acting as a Tab-entry proxy, redirect focus to the
     // actual tab stop and disable the proxy so it doesn't create an extra stop.
     if (target === this.#owner && this.#ownerIsProxy && focusEnteringGroup) {
-      const tabStop = this.#memorized || this.#start;
+      const tabStop = this.#current || this.#start;
       this.#disableFocusabilityProxy();
       if (tabStop) {
         tabStop.focus();
@@ -374,16 +364,19 @@ export class FocusGroup {
       this.#disableFocusabilityProxy();
     }
 
-    this.#memorized = target;
+    const prev = this.#current;
+    this.#current = target;
 
-    if (this.#activeItem === target) {
+    if (prev === target) {
       return;
     }
 
-    if (target.tabIndex < 0 && this.#activeItem) {
-      this.#setItemFocused(this.#activeItem, target);
+    if (target.tabIndex < 0) {
+      const transferFrom = prev ?? this.#start;
+      if (transferFrom) {
+        this.#advanceFocus(transferFrom, target);
+      }
     }
-    this.#activeItem = target;
   }
 
   /** @param {FocusEvent} evt */
@@ -410,32 +403,38 @@ export class FocusGroup {
       return;
     }
 
-    // In nomemory mode, focus leaving the group should reset the tab stop
-    // back to the start (focusgroupstart or first item). Do this by
-    // resetting tabindex on currently-decorated items and re-establishing
-    // the start, without doing a full undecorate+decorate cycle — the
-    // latter churns the owner proxy tabindex synchronously inside
-    // focusout, which can race with the browser's tab-target resolution
-    // and pull focus back to the owner proxy.
-    this.#memorized = null;
-    const newStart = this.#items.start ?? this.#items.first?.() ?? null;
+    // In nomemory mode, focus leaving the group resets the tab stop back to
+    // the start (focusgroupstart or first item). Reset tabindex on currently-
+    // decorated items and re-establish the start, without doing a full
+    // undecorate+decorate cycle — the latter churns the owner proxy tabindex
+    // synchronously inside focusout, which can race with the browser's
+    // tab-target resolution and pull focus back to the owner proxy.
+    if (!this.#memory && this.#start) {
+      const prev = this.#current;
 
-    // Skip the reset loop if the user never moved off the start — no
-    // tabindexes need restoring.
-    if (this.#activeItem !== this.#start || newStart !== this.#start) {
-      for (const { element, segmentBoundary } of this.#items.items()) {
-        element.tabIndex = segmentBoundary ? 0 : -1;
+      this.#current = null;
+
+      const nextStart = this.#items.start ?? this.#items.first?.() ?? null;
+
+      if (prev !== this.#start || nextStart !== this.#start) {
+        for (const { element, segmentBoundary } of this.#items.items()) {
+          element.tabIndex = segmentBoundary ? 0 : -1;
+        }
+
+        if (nextStart) {
+          nextStart.tabIndex = 0;
+          this.#start = nextStart;
+        }
+
+        this.#items.flush?.();
       }
-      if (newStart) {
-        newStart.tabIndex = 0;
-        this.#start = newStart;
-        this.#activeItem = newStart;
-      }
-      this.#items.flush?.();
     }
 
-    if (focusLeavingGroup && this.#start) {
-      this.#enableFocusabilityProxy(this.#start);
+    // Re-enable the owner as a Tab-entry proxy so Tab can re-enter the group.
+    const tabStop = this.#memory ? this.#current || this.#start : this.#start;
+
+    if (tabStop) {
+      this.#enableFocusabilityProxy(tabStop);
     }
   }
 
@@ -477,9 +476,11 @@ export class FocusGroup {
     if (this.#ownerIsProxy || !hasFocusableHost) {
       return;
     }
+
     this.#ownerTabindexBeforeProxy = this.#owner.getAttribute("tabindex");
     this.#owner.tabIndex = 0;
     this.#ownerIsProxy = true;
+
     flushAllObservers();
   }
 
@@ -488,35 +489,38 @@ export class FocusGroup {
     if (!this.#ownerIsProxy) {
       return;
     }
+
     if (this.#ownerTabindexBeforeProxy !== null) {
       this.#owner.setAttribute("tabindex", this.#ownerTabindexBeforeProxy);
     } else {
       this.#owner.removeAttribute("tabindex");
     }
+
     this.#ownerIsProxy = false;
     this.#ownerTabindexBeforeProxy = null;
     this.#items.flush?.();
+
     flushAllObservers();
   }
 
   /**
-   * Transfers the focusgroup's active tab stop from one item to another.
-   * Sets the target's `tabindex` to `0` and optionally calls `focus()` on it.
-   * The previous item's `tabindex` is set to `-1` unless it belongs to a
-   * different segment (in which case it remains `0` as a segment tab stop).
-   * Also disables the owner proxy.
-   * @param {HTMLElement} current - The currently focused item.
-   * @param {HTMLElement} target - The item to receive focus.
+   * Advances the focusgroup's active tab stop from one item to another. Sets
+   * the target's `tabindex` to `0` and optionally calls `focus()` on it. The
+   * previous item's `tabindex` is set to `-1` unless it belongs to a different
+   * segment (in which case it remains `0` as a segment tab stop). Also disables
+   * the owner proxy.
+   *
+   * @param {HTMLElement} prev - The currently focused item.
+   * @param {HTMLElement} next - The item to receive focus.
    * @param {boolean} [shouldCallFocus=false] - Whether to programmatically
    *     call `focus()` on the target element.
    */
-  #setItemFocused(current, target, shouldCallFocus = false) {
-    target.tabIndex = 0;
+  #advanceFocus(prev, next, shouldCallFocus = false) {
+    next.tabIndex = 0;
     if (shouldCallFocus) {
-      target.focus();
+      next.focus();
     }
-    current.tabIndex =
-      (this.#items.sameSegment?.(current, target) ?? true) ? -1 : 0;
+    prev.tabIndex = (this.#items.sameSegment?.(prev, next) ?? true) ? -1 : 0;
 
     // Focus is moving within the group, so the owner proxy should stay
     // disabled (it was disabled in #handleFocusin). Just clear in case any
