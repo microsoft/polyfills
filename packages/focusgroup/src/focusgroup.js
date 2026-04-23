@@ -477,7 +477,7 @@ export class FocusGroup {
       return;
     }
 
-    if (!this.#itemWalker.filter(target)) {
+    if (this.#itemWalker.filter(target) === NodeFilter.FILTER_REJECT) {
       return;
     }
 
@@ -503,7 +503,7 @@ export class FocusGroup {
   /** @param {FocusEvent} evt */
   #handleFocusout(evt) {
     const focusLeavingGroup =
-      !evt.relatedTarget || !this.#owner.contains(evt.relatedTarget);
+      !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
 
     // When focus leaves the group, re-enable the owner as a Tab-entry proxy
     // so Tab can re-enter the group to reach the tab stop.
