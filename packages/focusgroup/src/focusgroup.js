@@ -160,7 +160,7 @@ export class FocusGroup {
    * the focusgroup owner has been removed from the DOM.
    */
   disconnect() {
-    this.#disableOwnerProxy();
+    this.#disableFocusabilityProxy();
     this.#abort.abort();
     this.#items?.disconnect?.();
     this.#owner = null;
@@ -255,15 +255,15 @@ export class FocusGroup {
       startItem.tabIndex = 0;
       this.#start = startItem;
       this.#activeItem = startItem;
-      this.#disableOwnerProxy();
-      this.#enableOwnerProxy(startItem);
+      this.#disableFocusabilityProxy();
+      this.#enableFocusabilityProxy(startItem);
     }
 
     this.#items.flush?.();
   }
 
   #undecorateItems() {
-    this.#disableOwnerProxy();
+    this.#disableFocusabilityProxy();
 
     let any = false;
     for (const { element } of this.#items.items()) {
@@ -356,7 +356,7 @@ export class FocusGroup {
     // actual tab stop and disable the proxy so it doesn't create an extra stop.
     if (target === this.#owner && this.#ownerIsProxy && focusEnteringGroup) {
       const tabStop = this.#memorized || this.#start;
-      this.#disableOwnerProxy();
+      this.#disableFocusabilityProxy();
       if (tabStop) {
         tabStop.focus();
       }
@@ -371,7 +371,7 @@ export class FocusGroup {
     // Once focus is inside the group, disable the owner proxy so it doesn't
     // create an extra Tab stop when the user Shift+Tabs out.
     if (this.#ownerIsProxy) {
-      this.#disableOwnerProxy();
+      this.#disableFocusabilityProxy();
     }
 
     this.#memorized = target;
@@ -398,7 +398,7 @@ export class FocusGroup {
         ? this.#memorized || this.#start
         : this.#start;
       if (tabStop) {
-        this.#enableOwnerProxy(tabStop);
+        this.#enableFocusabilityProxy(tabStop);
       }
     }
 
@@ -435,7 +435,7 @@ export class FocusGroup {
     }
 
     if (focusLeavingGroup && this.#start) {
-      this.#enableOwnerProxy(this.#start);
+      this.#enableFocusabilityProxy(this.#start);
     }
   }
 
@@ -468,13 +468,11 @@ export class FocusGroup {
    * which point `#handleFocusin` will redirect focus to the real tab stop.
    * @param {HTMLElement} tabStop - The actual focusable tab stop element.
    */
-  #enableOwnerProxy(tabStop) {
-    const rootNode = (tabStop.assignedSlot ?? tabStop).getRootNode();
-    const hasFocusableHost =
-      rootNode instanceof ShadowRoot &&
-      rootNode.host.hasAttribute(DatasetName.AUTHOR_TABINDEX);
+  #enableFocusabilityProxy(tabStop) {
+    const isInShadow =
+      (tabStop.assignedSlot ?? tabStop).getRootNode() instanceof ShadowRoot;
 
-    if (this.#ownerIsProxy || !hasFocusableHost) {
+    if (this.#ownerIsProxy || !isInShadow) {
       return;
     }
     this.#ownerTabindexBeforeProxy = this.#owner.getAttribute("tabindex");
@@ -483,11 +481,8 @@ export class FocusGroup {
     flushAllObservers();
   }
 
-  /**
-   * Restores the owner's original `tabindex` (or removes it if it had none),
-   * undoing `#enableOwnerProxy`.
-   */
-  #disableOwnerProxy() {
+  /** Undoes `#enableFocusabilityProxy`. */
+  #disableFocusabilityProxy() {
     if (!this.#ownerIsProxy) {
       return;
     }
@@ -524,7 +519,7 @@ export class FocusGroup {
     // Focus is moving within the group, so the owner proxy should stay
     // disabled (it was disabled in #handleFocusin). Just clear in case any
     // lingered.
-    this.#disableOwnerProxy();
+    this.#disableFocusabilityProxy();
 
     flushAllObservers();
   }
