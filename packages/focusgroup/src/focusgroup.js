@@ -134,15 +134,22 @@ export class FocusGroup {
     this.#inferRole?.(this.#owner, this.#behavior, "owner");
     this.#decorateItems();
 
-    this.#owner.addEventListener("keydown", this.#handleKeydown.bind(this), {
-      signal: this.#abort.signal,
-    });
-    this.#owner.addEventListener("focusin", this.#handleFocusin.bind(this), {
-      signal: this.#abort.signal,
-    });
-    this.#owner.addEventListener("focusout", this.#handleFocusout.bind(this), {
-      signal: this.#abort.signal,
-    });
+    const opts = { signal: this.#abort.signal };
+    this.#owner.addEventListener(
+      "keydown",
+      this.#handleKeydown.bind(this),
+      opts,
+    );
+    this.#owner.addEventListener(
+      "focusin",
+      this.#handleFocusin.bind(this),
+      opts,
+    );
+    this.#owner.addEventListener(
+      "focusout",
+      this.#handleFocusout.bind(this),
+      opts,
+    );
   }
 
   /**
@@ -339,12 +346,13 @@ export class FocusGroup {
   #handleFocusin(evt) {
     const target = evt.composedPath()[0];
 
-    const focusEnteringGroup =
-      !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
-
     // When the owner is acting as a Tab-entry proxy, redirect focus to the
     // actual tab stop and disable the proxy so it doesn't create an extra stop.
-    if (target === this.#owner && this.#ownerIsProxy && focusEnteringGroup) {
+    if (
+      target === this.#owner &&
+      this.#ownerIsProxy &&
+      (!evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget))
+    ) {
       const tabStop = this.#current || this.#start;
       this.#disableFocusabilityProxy();
       if (tabStop) {
