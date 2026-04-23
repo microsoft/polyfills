@@ -21,15 +21,13 @@
  * @property {FocusGroupDefinition} [definition] - Behavior config. Plain
  *   data; FocusGroup just consumes it. Apps either build it themselves or call
  *   `parseDefinition(owner)` to derive it from the HTML `focusgroup` attribute.
- * @property {(
- *     element: HTMLElement,
- *     behavior: BehaviorToken,
- *     kind: ("owner"|"child"|null),
- *   ) => void} [inferRole] - Optional role-inference hook. When provided,
- *   FocusGroup calls it during owner/item (un)decoration. Apps that declare
- *   their own ARIA roles in templates omit this option, allowing the
- *   role-inference module to be tree-shaken from the bundle. The polyfill entry
- *   passes `inferRole` from `utils.js`.
+ * @property {(element: HTMLElement, behavior: BehaviorToken|null) => void} [decorateOwner] -
+ *   Optional hook called during owner (un)decoration. Receives the behavior
+ *   token, or `null` when undecorating. Apps that don't need owner decoration
+ *   omit this option, allowing the role-inference module to be tree-shaken.
+ * @property {(element: HTMLElement, behavior: BehaviorToken|null) => void} [decorateItem] -
+ *   Optional hook called during item (un)decoration. Receives the behavior
+ *   token, or `null` when undecorating.
  */
 
 /**

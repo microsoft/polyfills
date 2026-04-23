@@ -108,12 +108,20 @@ export class FocusGroup {
   #abort = new AbortController();
 
   /**
-   * Optional role-inference hook injected via `options.inferRole`.
-   * When absent (e.g. apps that declare their own roles), no role inference
-   * happens and the role-inference module is tree-shaken from the bundle.
-   * @type {((element: HTMLElement, behavior: BehaviorToken, kind: ("owner"|"child"|null)) => void) | undefined}
+   * Optional owner-decoration hook injected via `options.decorateOwner`.
+   * Called with `(owner, behavior)` on decoration and `(owner, null)` on
+   * undecoration. When absent, no owner decoration happens.
+   * @type {((element: HTMLElement, behavior: BehaviorToken|null) => void) | undefined}
    */
-  #inferRole;
+  #decorateOwner;
+
+  /**
+   * Optional item-decoration hook injected via `options.decorateItem`.
+   * Called with `(item, behavior)` on decoration and `(item, null)` on
+   * undecoration. When absent, no item decoration happens.
+   * @type {((element: HTMLElement, behavior: BehaviorToken|null) => void) | undefined}
+   */
+  #decorateItem;
 
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
@@ -128,10 +136,11 @@ export class FocusGroup {
 
     this.#owner = owner;
     this.#items = items;
-    this.#inferRole = options.inferRole;
+    this.#decorateOwner = options.decorateOwner;
+    this.#decorateItem = options.decorateItem;
 
     this.#updateDefinition(options.definition);
-    this.#inferRole?.(this.#owner, this.#behavior, "owner");
+    this.#decorateOwner?.(this.#owner, this.#behavior);
     this.#decorateItems();
 
     const opts = { signal: this.#abort.signal };
@@ -190,7 +199,7 @@ export class FocusGroup {
 
     if (info.definition !== undefined) {
       this.#updateDefinition(info.definition);
-      this.#inferRole?.(this.#owner, this.#behavior, "owner");
+      this.#decorateOwner?.(this.#owner, this.#behavior);
     }
 
     if (info.authorTabindexChanges) {
@@ -227,7 +236,7 @@ export class FocusGroup {
 
     for (const { element, segmentBoundary } of this.#items.items()) {
       // Set role
-      this.#inferRole?.(element, this.#behavior, "child");
+      this.#decorateItem?.(element, this.#behavior);
 
       // Set tabindex
       element.setAttribute(
@@ -269,7 +278,7 @@ export class FocusGroup {
       undecorated = true;
 
       // Restore role
-      this.#inferRole?.(element, null, null);
+      this.#decorateItem?.(element, null);
 
       // Restore tabindex
       const authorTabIndex = element.getAttribute(DatasetName.AUTHOR_TABINDEX);

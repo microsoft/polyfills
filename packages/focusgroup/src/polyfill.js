@@ -88,7 +88,8 @@ export function polyfill(root) {
       const items = new TreeWalkerItemCollection(element);
       const fg = new FocusGroup(element, items, {
         definition: parseDefinition(element),
-        inferRole,
+        decorateOwner: (el, behavior) => inferRole(el, behavior, "owner"),
+        decorateItem: (el, behavior) => inferRole(el, behavior, "child"),
       });
       items.observe(fg);
       elementPolyfillMap.set(element, fg);
