@@ -46,9 +46,9 @@ const myElement = document.querySelector(".my-element");
 polyfill(myElement);
 ```
 
-Note that even if your custom elements with Shadow DOM need focusgroup, if the focusgroup items are all slotted into their parents in the light DOM, you can still use the shadowless bundle.
+Even if you use custom elements with Shadow DOM, you can still use the shadowless bundle as long as all focusgroup items are in the light DOM and only slotted into their parent shadow trees.
 
-Alternatively, you can polyfill the entire `document.body` and observe any DOM changes, if new focusgroup elements are added to the light DOM, they will be automatically polyfilled:
+Alternatively, you can polyfill the entire `document.body` and observe DOM changes. If new focusgroup elements are added to the light DOM, they will be automatically polyfilled:
 
 ```js
 import { polyfillBodyAndObserve } from "@microsoft/focusgroup-polyfill";
