@@ -46,11 +46,11 @@ jobs:
       run: npm run check
 
     - name: Build workspaces
-      run: npx lage build ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }}
+      run: npx lage build ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }} --allow-no-target-runs
 
     - name: Install playwright dependencies and browsers
       run: |
         npx playwright install --with-deps
 
     - name: Testing
-      run: npx lage test:ci ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }}
+      run: npx lage test:ci ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }} --allow-no-target-runs
