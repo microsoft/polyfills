@@ -31,11 +31,10 @@ function hasSpecifier(element) {
 
 /**
  * Processes a given element.
- * @param {Element} element
  * @param {Map<string, CSSStyleSheet>} map
- * @param {Document!} doc
+ * @param {Element} element
  */
-function processElement(element, map, doc) {
+function processElement(map, element) {
   if (isCSSModule(element)) {
     const specifier = element.getAttribute(ATTR_NAME_SPECIFIER).trim();
 
@@ -77,9 +76,14 @@ function processElement(element, map, doc) {
     Promise.all(pending).then(() => {
       element.toggleAttribute(ATTR_NAME_DATA_READY, true);
     });
-
-    installToRoot(map, doc, element.shadowRoot);
   }
+}
+
+function shouldProcessElement(element) {
+  return (
+    element.nodeType === Node.ELEMENT_NODE &&
+    (isCSSModule(element) || hasSpecifier(element))
+  );
 }
 
 /**
@@ -91,35 +95,48 @@ function processElement(element, map, doc) {
 function installToRoot(map, doc, root) {
   root ??= doc;
 
+  function processElementList(list) {
+    for (const element of list ?? []) {
+      processElement(map, element);
+    }
+  }
+
   const walker = doc.createTreeWalker(
     root,
     NodeFilter.SHOW_ELEMENT,
     (element) =>
-      isCSSModule(element) || hasSpecifier(element)
+      shouldProcessElement(element)
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_SKIP,
   );
-
-  while (walker.nextNode()) {
-    processElement(walker.currentNode, map, doc);
+  function* walkerElements() {
+    while (walker.nextNode()) {
+      yield walker.currentNode;
+    }
   }
+  processElementList(walkerElements());
 
   new MutationObserver((entries) => {
-    const elements = entries
+    const addedElements = entries
       .filter((e) => e.addedNodes)
       .flatMap((e) => [...e.addedNodes])
-      .filter(
-        (n) =>
-          n.nodeType === Node.ELEMENT_NODE &&
-          (isCSSModule(n) || hasSpecifier(n)),
-      );
-    for (const element of elements) {
-      processElement(element, map, doc);
-    }
+      .filter(shouldProcessElement);
+    processElementList(addedElements);
   }).observe(root, {
     childList: true,
     subtree: true,
   });
+
+  // Install this to all shadow roots.
+  const shadowRootWalker = doc.createTreeWalker(
+    root,
+    NodeFilter.SHOW_ELEMENT,
+    (element) =>
+      element.shadowRoot ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+  );
+  while (shadowRootWalker.nextNode()) {
+    installToRoot(map, doc, shadowRootWalker.currentNode.shadowRoot);
+  }
 }
 
 /** @returns {Promise<void>} */

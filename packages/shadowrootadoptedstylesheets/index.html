@@ -169,6 +169,15 @@
   <button onclick="addMore(this)">add more content</button>
 </div>
 
+<div style="margin: 1rem; padding: 1rem; border: 1px solid;">
+  <template shadowrootmode="open">
+    <p>This shadow root doesn’t have declarative adopted stylesheet.</p>
+    <div id="more" style="margin-block-start: 1rem;">
+      <button onclick="addMore(this)">add more content</button>
+    </div>
+  </template>
+</div>
+
 <script type="module">
   import { install } from "./src/index.js";
 
