@@ -46,11 +46,11 @@ jobs:
       run: npm run check
 
     - name: Build workspaces
-      run: npm run build
+      run: npx lage build ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }}
 
     - name: Install playwright dependencies and browsers
       run: |
         npx playwright install --with-deps
 
     - name: Testing
-      run: npm run test
+      run: npx lage test:ci ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }}
