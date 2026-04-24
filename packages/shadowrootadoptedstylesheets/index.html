@@ -54,6 +54,47 @@
   }
 </style>
 
+<script>
+  function addMore(el) {
+    if (!("setHTML" in Element.prototype)) {
+      return;
+    }
+    el.getRootNode().getElementById("more").setHTMLUnsafe(`
+      <style type="module" specifier="more-styles">
+        .more {
+          font-size: 200%;
+        }
+      </style>
+      <div
+        data-shadowrootadoptedstylesheets="
+          my-style-1
+          my-style-2-light
+          my-style-2-dark
+          non-exist
+          ./non-exist.css
+          ./my-external.css
+          more-styles
+        "
+      >
+        <template
+          shadowrootmode="open"
+          shadowrootadoptedstylesheets="
+            my-style-1
+            my-style-2-light
+            my-style-2-dark
+            non-exist
+            ./non-exist.css
+            ./my-external.css
+          "
+        >
+          <p>hello, <span>world</span>! <span class="external">and moon</span></p>
+          <p class="more">more more more</p>
+        </template>
+      </div>
+    `);
+  }
+</script>
+
 <p>outside the world</p>
 
 <my-element
@@ -112,6 +153,9 @@
               "
             >
               me <span>now</span> <span class="external">external</span>
+              <div id="more" style="margin-block-start: 1rem;">
+                <button onclick="addMore(this)">add more content</button>
+              </div>
             </template>
           </my-span>
         </button>
@@ -120,6 +164,10 @@
     </my-button>
   </template>
 </my-element>
+
+<div id="more" style="margin-block-start: 2rem;">
+  <button onclick="addMore(this)">add more content</button>
+</div>
 
 <script type="module">
   import { install } from "./src/index.js";
