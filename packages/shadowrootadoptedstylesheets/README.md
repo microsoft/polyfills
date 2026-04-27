@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/%40microsoft%2Fshadowrootadoptedstylesheets-ponyfill.svg)](https://badge.fury.io/js/%40microsoft%2Fshadowrootadoptedstylesheets-ponyfill)
 
-For more information about focusgroup itself, see: <https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ShadowDOM/explainer.md> and <https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ShadowDOMAdoptedStyleSheets/explainer.md>
+For more information about declarative adopted style sheets itself, see: <https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ShadowDOM/explainer.md> and <https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ShadowDOMAdoptedStyleSheets/explainer.md>
 
 ## Usage
 
@@ -20,7 +20,7 @@ yarn add @microsoft/shadowrootadoptedstylesheets-ponyfill
   ...
 </style>
 
-<style type="module" specifier="my-elementp-styles">
+<style type="module" specifier="my-element-styles">
   :host {}
   ...
 </style>
@@ -43,10 +43,11 @@ yarn add @microsoft/shadowrootadoptedstylesheets-ponyfill
 
 ## Limitations
 
-The ponyfill works differently than the native implementation in a few ways, hence it being a “ponyfill” instead of a polyfill:
+The ponyfill works differently than the native implementation in a few ways — hence “ponyfill” rather than “polyfill”:
 
-* The ponyfill requires an extra data attribute on the shadow host: `data-shadowrootadoptedstylesheets`, because once a declarative shadow root `<template>` elemenis parsed, it becomes a shadow root right away, so there’s no way for JavaScript to locate the `<template>` and read the attribute
-* The ponyfill does not add `<style type="module" specifier>` elements to the importmap, because it requires browser supports for both [multiple importmaps](https://caniuse.com/mdn-html_elements_script_type_importmap_multiple_import_maps) and [CSS import attribute](https://caniuse.com/wf-css-modules)
+* The ponyfill requires an extra `data-shadowrootadoptedstylesheets` data attribute on the shadow host, because once a declarative shadow root `<template>` element is parsed, it becomes a shadow root right away, so there’s no way for JavaScript to locate the `<template>` and read the attribute
+    * It’s still recommended to add the `shadowrootadoptedstylesheets` attribute to the declarative shadow root `<template>` element for browsers that do natively support this feature
+* The ponyfill does not add `<style type="module" specifier>` elements to the importmap, because it requires browser support for both [multiple importmaps](https://caniuse.com/mdn-html_elements_script_type_importmap_multiple_import_maps) and [CSS module import attribute](https://caniuse.com/wf-css-modules)
 
 ## Testing
 
