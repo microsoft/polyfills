@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test:ci --workspaces --if-present",
+    "build": "lage build",
+    "test": "lage test:ci",
     "check": "biome check",
     "fix": "biome check --fix",
     "change": "beachball change --dependent-change-type none",
@@ -33,6 +33,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.10",
     "beachball": "2.64.0",
+    "lage": "2.15.9",
     "lefthook": "2.1.4"
   }
 }
