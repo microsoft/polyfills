@@ -7,6 +7,16 @@ const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
 const ATTR_NAME_SPECIFIER = "specifier";
 
 /**
+ * Whether the given specifier string is a fetchable external module.
+ * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import#module_specifier_resolution
+ * @param {string} specifier
+ * @returns {boolean}
+ */
+function isFetchableModule(specifier) {
+  return /\.{0,2}\//.test(specifier) || URL.canParse?.(specifier);
+}
+
+/**
  * Whether the given element is a `<style type="module" specifier>` element.
  * @param {Element} element
  * @returns {boolean}
@@ -59,13 +69,15 @@ function processElement(map, element) {
 
       if (!map.has(specifier)) {
         map.set(specifier, sheet);
-        pending.push(
-          fetch(specifier, { headers: { accept: "text/css" } })
-            .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
-            .then((text) => {
-              sheet.replaceSync(text);
-            }),
-        );
+        if (isFetchableModule(specifier)) {
+          pending.push(
+            fetch(specifier, { headers: { accept: "text/css" } })
+              .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
+              .then((text) => {
+                sheet.replaceSync(text);
+              }),
+          );
+        }
       }
 
       return sheet;

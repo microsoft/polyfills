@@ -9,7 +9,9 @@
     "build:app": "vite build",
     "build:lib": "vite build --config vite.config.lib.js",
     "build:lib:min": "npm run build:lib -- --mode minified",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "playwright test",
+    "test:ci": "npm test -- --project=chromium --project=firefox --project=webkit",
+    "size": "size-limit"
   },
   "module": "./build/index.mjs",
   "types": "./build/index.d.ts",
@@ -23,6 +25,17 @@
       "default": "./build/index.min.mjs"
     }
   },
+  "size-limit": [
+    {
+      "path": "build/index.min.mjs",
+      "limit": "2 kB",
+      "gzip": true
+    },
+    {
+      "path": "build/index.min.mjs",
+      "limit": "1 kB"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Microsoft/polyfills.git",

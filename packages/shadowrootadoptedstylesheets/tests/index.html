@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
+<title>shadowrootadoptedstylesheets ponyfill tests</title>
+
+<style type="module">
+  p { text-decoration: underline; }
+</style>
+<style type="module" specifier="s1">
+  p { text-decoration: underline; }
+</style>
+<style type="module" specifier="s2">
+  span { text-decoration: line-through; }
+</style>
+
+<p data-testid="outside">text</p>
+
+<div data-shadowrootadoptedstylesheets="s1">
+  <p data-testid="non-host">text</p>
+</div>
+
+<div data-shadowrootadoptedstylesheets="s1 s2">
+  <template shadowrootmode="open" shadowrootadoptedstylesheets="s1 s2">
+    <p data-testid="p1">text <span data-testid="span1">text</span></p>
+  </template>
+</div>
+
+<my-el data-shadowrootadoptedstylesheets="s1 s2">
+  <template shadowrootmode="open" shadowrootadoptedstylesheets="s1 s2">
+    <p data-testid="p2">text <span data-testid="span2">text</span></p>
+  </template>
+</my-el>
+
+<div data-shadowrootadoptedstylesheets="s1 s2 ./external.css">
+  <template
+    shadowrootmode="open"
+    shadowrootadoptedstylesheets="s1 s2 ./external.css"
+  >
+    <p data-testid="p3">
+      text
+      <span data-testid="span3">text</span>
+      <b data-testid="b3">text</b>
+    </p>
+  </template>
+</div>
+
+<div data-shadowrootadoptedstylesheets="s1 non-existing ./non-existing.css">
+  <template
+    shadowrootmode="open"
+    shadowrootadoptedstylesheets="s1 non-existing ./non-existing.css"
+  >
+    <p data-testid="p4">text</p>
+  </template>
+</div>
+
+<div data-shadowrootadoptedstylesheets="s1">
+  <template shadowrootmode="open" shadowrootadoptedstylesheets="s1">
+    <p data-testid="p5-1">text <span data-testid="span5-1">text</span></p>
+    <div data-shadowrootadoptedstylesheets="s2">
+      <template shadowrootmode="open" shadowrootadoptedstylesheets="s2">
+        <p data-testid="p5-2">text <span data-testid="span5-2">text</span></p>
+      </template>
+    </div>
+  </template>
+</div>
+
+<div data-shadowrootadoptedstylesheets="s1">
+  <template shadowrootmode="open" shadowrootadoptedstylesheets="s1">
+    <style type="module" specifier="s3">
+      span { text-decoration: double; }
+    </style>
+    <p>text</p>
+    <div data-shadowrootadoptedstylesheets="s2 s3">
+      <template shadowrootmode="open" shadowrootadoptedstylesheets="s2 s3">
+        <p>text <span data-testid="span6">text</span></p>
+      </template>
+    </div>
+  </template>
+</div>
+
+<div data-testid="container"></div>
+<div>
+  <template shadowrootmode="open">
+    <div data-testid="shadow-container"></div>
+  </template>
+</div>
+
+</html>
