@@ -82,6 +82,7 @@ test("should ignore non-existing style sheets", async ({ page, channel }) => {
     }
   });
   await setupPage(page, channel);
+  await page.waitForResponse(/non-existing\.css$/);
 
   await expect(page.getByTestId("p4")).toHaveCSS(
     "text-decoration",
