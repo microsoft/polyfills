@@ -1,8 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-export const IS_SHADOWLESS = false;
-
 export {
   getClosestElement,
   getParentElement,

@@ -11,7 +11,7 @@ import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
-  IS_SHADOWLESS,
+  getParentElement,
   nodeContains,
 } from "./shadow-utils/index.js";
 import {
@@ -565,12 +565,8 @@ export class FocusGroup {
       node.hasAttribute(DatasetName.ITEM) ||
       // if the element is yet to be decorated
       (isKeyboardFocusable(node, this.#owner) &&
-        getClosestElement(
-          !IS_SHADOWLESS && node.assignedSlot
-            ? node.assignedSlot
-            : node.parentNode,
-          "[focusgroup]",
-        ) === this.#owner)
+        getClosestElement(getParentElement(node), "[focusgroup]") ===
+          this.#owner)
     );
   }
 
