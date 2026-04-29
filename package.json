@@ -32,7 +32,7 @@
   "homepage": "https://github.com/microsoft/polyfills#readme",
   "devDependencies": {
     "@biomejs/biome": "2.4.13",
-    "beachball": "2.65.1",
+    "beachball": "2.65.3",
     "lage": "2.15.11",
     "lefthook": "2.1.6"
   }
