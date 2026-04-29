@@ -47,71 +47,118 @@
  */
 
 /**
- * Contract for the object passed to `new FocusGroup(owner, items)`.
+ * Interface for the object passed to `new FocusGroup(owner, items, options)`.
+ * `FocusGroup` only depends on this shape — implementations can be plain
+ * object literals, class instances, or anything else that satisfies the
+ * contract.
  *
- * The collection's job is purely to expose the focus group's items and
- * answer queries about them. To trigger reconciliation when items change,
- * call `focusGroup.update(info)` from wherever the change is detected (the
- * app, a `MutationObserver` inside the collection, etc.).
+ * The collection's job is purely to expose the focus group's items and answer
+ * queries about them. To trigger reconciliation when items change, call
+ * `focusGroup.update(info)` from wherever the change is detected (the app, a
+ * `MutationObserver` inside the collection, etc.).
  *
- * @typedef {{
- *   start?: (HTMLElement | null),
- *   items(): Iterable<FocusGroupItem>,
- *   first(): (HTMLElement | null),
- *   last(): (HTMLElement | null),
- *   next(current: HTMLElement): (HTMLElement | null),
- *   previous(current: HTMLElement): (HTMLElement | null),
- *   contains(element: Element): boolean,
- *   decorate?: () => void,
- *   undecorate?: () => void,
- *   isItem?: (element: Element) => boolean,
- *   isSegmentStart?: (element: HTMLElement) => boolean,
- *   sameSegment?: (a: HTMLElement, b: HTMLElement) => boolean,
- *   disconnect?: () => void,
- *   flush?: () => void,
- * }} FocusGroupItemCollection
+ * Lifecycle: `FocusGroup` calls `decorate()` to set up structural state
+ * (e.g. mark items in the DOM, compute segments), then iterates `items()` to
+ * apply behavioral state (tabindex, role). On teardown, `FocusGroup` iterates
+ * `items()` first to roll back behavioral state, then calls `undecorate()` to
+ * release the structural state. Collections whose `items()` is self-managed
+ * (e.g. backed by a static array) can omit `decorate` / `undecorate` entirely.
  *
- * Lifecycle: `FocusGroup` calls `decorate()` to ask the collection to set
- * up structural state (e.g. mark items in the DOM, compute segments), then
- * iterates `items()` to apply behavioral state (tabindex, role). On
- * teardown, `FocusGroup` iterates `items()` first to roll back behavioral
- * state, then calls `undecorate()` to release the structural state. Custom
- * collections whose `items()` is self-managed (e.g. backed by a static
- * array) can omit `decorate` / `undecorate` entirely.
+ * Minimal example backed by a plain array:
  *
- * `isItem(el)` is an optional strict membership check answering "is `el`
- * currently a decorated item of this collection?". Used by `FocusGroup`
- * when validating the memorized element after a re-decoration cycle, and
- * (in keydown) to guard against handling events from elements that aren't
- * ours. Differs from `contains(el)` in that `contains` is intentionally
- * lax — it includes untraversable (e.g. `tabindex=-1`) elements that
- * `focusin` should still treat as belonging to the group.
+ * ```js
+ * const myItems = [el1, el2, el3];
+ * const itemCollection = {
+ *   *items() {
+ *     for (const el of myItems) {
+ *       yield { element: el };
+ *     }
+ *   },
+ *   first: () => myItems[0] ?? null,
+ *   last: () => myItems.at(-1) ?? null,
+ *   next: (cur) => myItems[myItems.indexOf(cur) + 1] ?? null,
+ *   previous: (cur) => myItems[myItems.indexOf(cur) - 1] ?? null,
+ *   contains: (el) => myItems.includes(el),
+ * };
+ * ```
  *
- * `start` is optional. When provided and non-null, `FocusGroup` uses it as
- * the initial tab stop after decoration instead of falling back to the
- * first item. The polyfill's default `TreeWalkerItemCollection` returns
- * the first `[focusgroupstart]` descendant.
+ * For a class-based reference implementation, see `TreeWalkerItemCollection`.
  *
- * `isSegmentStart` and `sameSegment` are optional spec-glue hooks. The
- * polyfill's `TreeWalkerItemCollection` uses them to preserve the per-segment
- * roving tab stop produced by nested focusgroups acting as segmentors:
- * - `isSegmentStart(el)` — is `el` the first item of a non-initial segment?
- *   Used by `FocusGroup` when re-applying tabindexes after a no-memory reset
- *   to keep each segment's roving stop at `0`.
- * - `sameSegment(a, b)` — are `a` and `b` in the same segment? Used by
+ * @typedef {Object} FocusGroupItemCollection
+ *
+ * @property {() => Iterable<FocusGroupItem>} items Returns an iterable of the
+ *   collection's items, in DOM/tab order. `FocusGroup` iterates this during
+ *   decoration and undecoration to apply or roll back `tabindex` and role.
+ *   Each entry is a `FocusGroupItem` ({@link FocusGroupItem}); set
+ *   `segmentBoundary` on the first item of a non-initial segment to make it
+ *   tab-reachable.
+ *
+ * @property {() => (HTMLElement | null)} first The first item of the
+ *   collection, or `null` if empty. Used by `FocusGroup` for `Home` /
+ *   wrap-forward navigation, and as the fallback initial tab stop when `start`
+ *   is not provided.
+ *
+ * @property {() => (HTMLElement | null)} last The last item of the collection,
+ *   or `null` if empty. Used by `FocusGroup` for `End` / wrap-backward
+ *   navigation.
+ *
+ * @property {(current: HTMLElement) => (HTMLElement | null)} next The item
+ *   after `current` in tab order, or `null` if `current` is the last. Used by
+ *   `FocusGroup` for forward arrow navigation.
+ *
+ * @property {(current: HTMLElement) => (HTMLElement | null)} previous The item
+ *   before `current` in tab order, or `null` if `current` is the first. Used by
+ *   `FocusGroup` for backward arrow navigation.
+ *
+ * @property {(element: Element) => boolean} contains Lax membership check:
+ *   should `element` be treated as belonging to this group for `focusin` /
+ *   `keydown` purposes? Returns `true` for items, including untraversable
+ *   (`tabindex="-1"`) ones. Used by `FocusGroup` to ignore events from nested
+ *   focusgroups and from elements outside the group entirely. Contrast with
+ *   `isItem(el)`, which is strict.
+ *
+ * @property {(HTMLElement | null)} [start] Optional initial tab stop
+ *   after decoration. When provided and non-null, `FocusGroup` uses
+ *   it instead of falling back to `first()`. The polyfill's default
+ *   `TreeWalkerItemCollection` returns the first `[focusgroupstart]`
+ *   descendant.
+ *
+ * @property {() => void} [decorate] Optional. Called by `FocusGroup` at the
+ *   start of each decoration pass, before `items()` is iterated. Use this to
+ *   set up structural state — e.g. mark items in the DOM, compute segments,
+ *   refresh a cached item list. Omit if `items()` is self-managed.
+ *
+ * @property {() => void} [undecorate] Optional. Called by `FocusGroup` at the
+ *   end of each undecoration pass, after `items()` is iterated. Use this to
+ *   release the structural state set up in `decorate()`.
+ *
+ * @property {(element: Element) => boolean} [isItem] Optional strict membership
+ *   check: is `element` currently a decorated item of *this* collection? Used
+ *   by `FocusGroup` to validate the remembered tab stop after a re-decoration
+ *   cycle. Falls back to `contains()` when omitted.
+ *
+ * @property {(element: HTMLElement) => boolean} [isSegmentStart] Optional
+ *   spec-glue hook: is `element` the first item of a non-initial segment? Used
+ *   by `FocusGroup` when re-applying `tabindex` after a no-memory reset to
+ *   keep each segment's roving stop at `0`. Collections without segment support
+ *   omit this.
+ *
+ * @property {(a: HTMLElement, b: HTMLElement) => boolean} [sameSegment]
+ *   Optional spec-glue hook: are `a` and `b` in the same segment? Used by
  *   `FocusGroup` when the rover moves; if `false`, the previous item keeps
- *   `tabindex=0` so the segment it belonged to remains tab-reachable.
- * Collections that don't implement segment behavior (e.g. FUI components
- * with flat item lists) omit both methods. `FocusGroup` then defaults to
- * single-roving-stop behavior.
+ *   `tabindex=0` so its segment stays tab-reachable. Collections without
+ *   segment support omit this; `FocusGroup` then defaults to single-roving-stop
+ *   behavior.
  *
- * `disconnect()` is optional — `FocusGroup#disconnect()` calls it defensively
- * (`items.disconnect?.()`).
+ * @property {() => void} [disconnect] Optional. Called defensively from
+ *   `FocusGroup#disconnect()` (`items.disconnect?.()`). Use it to detach any
+ *   observers or other resources owned by the collection.
  *
- * `flush()` is optional — `FocusGroup` calls it after writing
- * polyfill-managed attributes (`tabindex`, `data-fg-*`) so the implementation
- * can drop pending mutation records it would otherwise re-deliver. For
- * `MutationObserver`-backed implementations this is `observer.takeRecords()`.
+ * @property {() => void} [flush] Optional. Called by `FocusGroup` after
+ *   writing polyfill-managed attributes (`tabindex`, `data-fg-*`) so the
+ *   implementation can drop pending mutation records it would otherwise
+ *   re-deliver. For `MutationObserver`-backed implementations this is typically
+ *   `observer.takeRecords()`.
  */
 
 export {};
