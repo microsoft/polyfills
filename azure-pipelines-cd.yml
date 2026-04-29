@@ -76,10 +76,10 @@ extends:
               npm run build
             displayName: "Build workspaces"
 
-          - script: |
-              npm run publish-ci
-            displayName: "Use Beachball publish to bump, pack, and commit without publishing"
-            env:
-              GH_TOKEN: $(GH_TOKEN)
+          # - script: |
+          #     npm run publish-ci
+          #   displayName: "Use Beachball publish to bump, pack, and commit without publishing"
+          #   env:
+          #     GH_TOKEN: $(GH_TOKEN)
 
-          - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines  # Template reference
+          # - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines  # Template reference
