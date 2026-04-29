@@ -1,24 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import {
-  BEHAVIOR_TOKENS,
-  BehaviorMap,
-  BehaviorToken,
-  DatasetName,
-} from "./constants.js";
-import {
-  createMutationObserver,
-  createTreeWalker,
-  getClosestElement,
-  getParentElement,
-  nodeContains,
-} from "./shadow-utils/index.js";
-import {
-  generateUniqueId,
-  getNavigationDirection,
-  supportsFocusGroup,
-} from "./utils.js";
+import { BehaviorToken, DatasetName } from "./constants.js";
+import { flushAllObservers } from "./observer-registry.js";
+import { nodeContains } from "./shadow-utils/index.js";
+import { getNavigationDirection, supportsFocusGroup } from "./utils.js";
 
 /**
  * @import {
@@ -371,7 +357,7 @@ export class FocusGroup {
       return;
     }
 
-    if (this.#itemWalker.filter(target) === NodeFilter.FILTER_REJECT) {
+    if (!this.#items.contains(target)) {
       return;
     }
 
@@ -404,9 +390,7 @@ export class FocusGroup {
     // When focus leaves the group, re-enable the owner as a Tab-entry proxy
     // so Tab can re-enter the group to reach the tab stop.
     if (focusLeavingGroup) {
-      const tabStop = this.#memory
-        ? this.#memorized || this.#start
-        : this.#start;
+      const tabStop = this.#memory ? this.#current || this.#start : this.#start;
       if (tabStop) {
         this.#enableFocusabilityProxy(tabStop);
       }
@@ -453,29 +437,6 @@ export class FocusGroup {
     if (tabStop) {
       this.#enableFocusabilityProxy(tabStop);
     }
-  }
-
-  /**
-   * @param {HTMLElement} node
-   * @returns {boolean}
-   */
-  #isItemCandidate(node) {
-    return (
-      // if it’s already an item (useful when focusgroup definition changes)
-      node.hasAttribute(DatasetName.ITEM) ||
-      // if the element is yet to be decorated
-      (isKeyboardFocusable(node, this.#owner) &&
-        getClosestElement(getParentElement(node), "[focusgroup]") ===
-          this.#owner)
-    );
-  }
-
-  /**
-   * @param {HTMLElement} node
-   * @returns {boolean}
-   */
-  #isNestedGroupOwner(node) {
-    return node.hasAttribute("focusgroup") && node !== this.#owner;
   }
 
   /**
