@@ -5,9 +5,10 @@ import { expect, test } from "@playwright/test";
 import { setupPage } from "./utils.js";
 
 // descendant-navigation/simple-descendant-test.html
-test("simple descendant navigation works", async ({ page }) => {
+test("simple descendant navigation works", async ({ page }, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar">
       <button data-testid="item1" tabindex="0">Item 1</button>
       <div>
@@ -29,9 +30,10 @@ test("simple descendant navigation works", async ({ page }) => {
 test.describe("deeply nested items navigation", () => {
   test("forward navigation works with deeply nested focusgroup descendants", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar inline block">
         <span data-testid="item1" tabindex="0">Item 1</span>
         <div class="container">
@@ -72,9 +74,10 @@ test.describe("deeply nested items navigation", () => {
 
   test("backward navigation works with deeply nested focusgroup descendants", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <span data-testid="item1" tabindex="0">Item 1</span>
         <div class="container">
@@ -113,11 +116,12 @@ test.describe("deeply nested items navigation", () => {
     await expect(page.getByTestId("item1")).toBeFocused();
   });
 
-  test("vertical navigation works with nested descendants", async ({
-    page,
+  test("vertical navigation works with nested descendants", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar block">
         <span data-testid="item1" tabindex="0">Item 1</span>
         <div>
@@ -136,9 +140,10 @@ test.describe("deeply nested items navigation", () => {
 test.describe("wrapping with descendants", () => {
   test("forward wrapping should work from nested descendants to first item", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar inline block wrap">
         <div class="first-section">
           <button data-testid="first" tabindex="0">First Item</button>
@@ -165,9 +170,10 @@ test.describe("wrapping with descendants", () => {
 
   test("backward wrapping should work from first item to nested descendants", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar wrap">
         <div class="first-section">
           <button data-testid="first" tabindex="0">First Item</button>
@@ -187,9 +193,10 @@ test.describe("wrapping with descendants", () => {
 
   test("normal navigation should still work correctly with nested items", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar wrap">
         <div>
           <button data-testid="first" tabindex="0">First Item</button>
@@ -213,9 +220,12 @@ test.describe("wrapping with descendants", () => {
     await expect(page.getByTestId("last")).toBeFocused();
   });
 
-  test("vertical wrapping works with nested descendants", async ({ page }) => {
+  test("vertical wrapping works with nested descendants", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar block wrap">
         <div>
           <button data-testid="first" tabindex="0">First Item</button>
@@ -235,9 +245,10 @@ test.describe("wrapping with descendants", () => {
 // descendant-navigation/mixed-content-navigation.html
 test("navigation works with mixed content (buttons, links, inputs)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline block">
       <button data-testid="btn1">Button 1</button>
       <div>
@@ -262,11 +273,12 @@ test("navigation works with mixed content (buttons, links, inputs)", async ({
 });
 
 // descendant-navigation/various-element-types.html
-test("navigation works with various focusable element types", async ({
-  page,
+test("navigation works with various focusable element types", async ({ page }, {
+  project,
 }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline block">
       <button data-testid="btn">Button</button>
       <div>

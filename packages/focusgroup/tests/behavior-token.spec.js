@@ -25,9 +25,10 @@ test.describe("behavior token required to be first", () => {
       "navigation",
     ].join(" ");
 
-    test(testName, async ({ page }) => {
+    test(testName, async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="${def.focusgroup}">
           <span data-testid="item1" tabindex="0">item 1</span>
@@ -61,9 +62,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("toolbar: inline only, no wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="toolbar">
           <button data-testid="item1">item1</button>
@@ -97,9 +99,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("tablist: inline + wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="tablist">
           <button data-testid="item1">item1</button>
@@ -133,9 +136,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("menu: block + wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="menu">
           <button data-testid="item1">item1</button>
@@ -169,9 +173,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("menubar: inline + wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="menubar">
           <button data-testid="item1">item1</button>
@@ -205,9 +210,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("radiogroup: both axes, no wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="radiogroup">
           <button data-testid="item1">item1</button>
@@ -241,9 +247,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("listbox: both axes, no wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox">
           <button data-testid="item1">item1</button>
@@ -277,9 +284,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("none: opt-out", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="none">
           <button data-testid="item1">item1</button>
@@ -302,9 +310,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("tablist block: explicit block overrides default inline", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="tablist block">
           <button data-testid="item1">item1</button>
@@ -338,9 +347,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("tablist nowrap: suppresses default wrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="tablist nowrap">
           <button data-testid="item1">item1</button>
@@ -367,9 +377,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("menu inline: explicit inline overrides default block", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="menu inline">
           <button data-testid="item1">item1</button>
@@ -403,9 +414,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("listbox inline wrap: explicit inline overrides default both axes and suppress default nowrap", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="listbox inline wrap">
           <button data-testid="item1">item1</button>
@@ -439,9 +451,10 @@ test.describe("behavior tokens comprehensive", () => {
   });
 
   test.describe("tablist both axes", () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
+        project,
         `
         <div focusgroup="tablist inline block">
           <button data-testid="item1">item1</button>

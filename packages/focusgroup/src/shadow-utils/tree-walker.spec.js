@@ -216,9 +216,10 @@ test.describe("nextNode() with slotted children", () => {
 
   test("should move to the next slotted or shadow element when started from the middle", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div id="root">
           <template shadowrootmode="open">
@@ -257,9 +258,10 @@ test.describe("nextNode() with slotted children", () => {
 
   test("should move to the next shadow element when started from the last slotted element", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div id="root">
           <template shadowrootmode="open">
@@ -298,9 +300,10 @@ test.describe("nextNode() with slotted children", () => {
 
   test("should move to the next slotted or shadow element when started from the middle and root is inside a shadow tree", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div>
           <template shadowrootmode="open">
@@ -340,9 +343,10 @@ test.describe("nextNode() with slotted children", () => {
 
   test("should move to the next shadow element when started from the last slotted element and root is inside a shadow tree", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div>
           <template shadowrootmode="open">
@@ -380,9 +384,12 @@ test.describe("nextNode() with slotted children", () => {
     expect(ids).toEqual(["slotted-after", "shadow-after"]);
   });
 
-  test("should walk the slotted chidren in order", async ({ page }) => {
+  test("should walk the slotted children in order", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `
       <div id="root">
         <template shadowrootmode="open">
@@ -592,9 +599,10 @@ test.describe("previousnNode() with slotted children", () => {
 
   test("should move to the previous slotted or shadow element when started from the middle", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div id="root">
           <template shadowrootmode="open">
@@ -638,9 +646,10 @@ test.describe("previousnNode() with slotted children", () => {
 
   test("should move to the previous shadow element when started from the first slotted element", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div id="root">
           <template shadowrootmode="open">
@@ -679,9 +688,10 @@ test.describe("previousnNode() with slotted children", () => {
 
   test("should move to the previous slotted or shadow element when started from the middle and root is inside a shadow tree", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div>
           <template shadowrootmode="open">
@@ -726,9 +736,10 @@ test.describe("previousnNode() with slotted children", () => {
 
   test("should move to the previous shadow element when started from the first slotted element and root is inside a shadow tree", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `
         <div>
           <template shadowrootmode="open">
@@ -766,9 +777,12 @@ test.describe("previousnNode() with slotted children", () => {
     expect(ids).toEqual(["slotted-before", "shadow-before", "root"]);
   });
 
-  test("should walk the slotted chidren in order", async ({ page }) => {
+  test("should walk the slotted children in order", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `
       <div id="root">
         <template shadowrootmode="open">
@@ -1171,9 +1185,10 @@ test("shadow host with multiple shadow containing children should walk in DOM or
 
 test("should walk shadow children of slotted hosts before next slotted sibling", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div id="root">
       <div id="item1">
@@ -1359,9 +1374,10 @@ test("should walk shadow children of slotted hosts before next slotted sibling",
 
 test("should enter shadow children after repositioning currentNode to a shadow host", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div id="root">
       <div id="host-a">

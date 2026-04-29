@@ -6,15 +6,19 @@ import { expect as baseExpect } from "@playwright/test";
 /**
  * Navigate to the dev server, set the page HTML, and apply the focusgroup polyfill.
  * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').FullProject} project
  * @param {string} html - HTML body content to set
  */
-export async function setupPage(page, html) {
+export async function setupPage(page, project, html) {
   await page.goto("/test.html");
   await page.setContent(html);
-  await page.evaluate(async () => {
-    const { polyfill } = await import("/src/polyfill.js");
+  const specifier = project.name.endsWith("Shadowless")
+    ? "/build/focusgroup-polyfill-shadowless.mjs"
+    : "/build/focusgroup-polyfill.mjs";
+  await page.evaluate(async (specifier) => {
+    const { polyfill } = await import(specifier);
     polyfill();
-  });
+  }, specifier);
 }
 
 /**

@@ -6,8 +6,8 @@
 /**
  * Finds the closest element from the given element (inclusive) that matches the
  * given selector. Comparing to the native `Element.closest()`, it penatrates
- * shadow trees and considers slotted elements as children of ther assigned slot
- * elements’ ancestors.
+ * shadow trees and considers slotted elements as children of their assigned
+ * slot elements’ ancestors.
  *
  * @param {Element|ShadowRoot} start
  * @param {string} selector

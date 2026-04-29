@@ -6,9 +6,12 @@ import { setupPage } from "./utils.js";
 
 // opt-out-barriers/none-creates-barriers.html
 test.describe("none creates navigation barriers", () => {
-  test("forward navigation skips opted-out subtree", async ({ page }) => {
+  test("forward navigation skips opted-out subtree", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <button data-testid="item2" tabindex="0">Item 2</button>
@@ -31,9 +34,12 @@ test.describe("none creates navigation barriers", () => {
     await expect(page.getByTestId("item3")).toBeFocused();
   });
 
-  test("backward navigation skips opted-out subtree", async ({ page }) => {
+  test("backward navigation skips opted-out subtree", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <button data-testid="item2" tabindex="0">Item 2</button>
@@ -56,9 +62,12 @@ test.describe("none creates navigation barriers", () => {
     await expect(page.getByTestId("item2")).toBeFocused();
   });
 
-  test("arrow keys do not work within opted-out sections", async ({ page }) => {
+  test("arrow keys do not work within opted-out sections", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <div data-testid="optout" focusgroup="none">
@@ -84,9 +93,10 @@ test.describe("none creates navigation barriers", () => {
 test.describe("none opt-out direct child", () => {
   test("forward arrow navigation skips opted-out direct child", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar" focusgroup="toolbar">
         <button data-testid="first">First</button>
         <button data-testid="optedout" focusgroup="none">opted out</button>
@@ -101,9 +111,10 @@ test.describe("none opt-out direct child", () => {
 
   test("backward arrow navigation skips opted-out direct child", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar" focusgroup="toolbar">
         <button data-testid="first">First</button>
         <button data-testid="optedout" focusgroup="none">opted out</button>
@@ -116,9 +127,12 @@ test.describe("none opt-out direct child", () => {
     await expect(page.getByTestId("first")).toBeFocused();
   });
 
-  test("arrow keys do not work from opted-out element", async ({ page }) => {
+  test("arrow keys do not work from opted-out element", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="toolbar" focusgroup="toolbar">
         <button data-testid="first">First</button>
         <button data-testid="optedout" focusgroup="none">opted out</button>
@@ -138,11 +152,12 @@ test.describe("none opt-out direct child", () => {
 
 // opt-out-barriers/complex-nested-opt-out.html
 test.describe("complex nested opt-out scenarios", () => {
-  test("outer focusgroup navigation skips opted-out subtree", async ({
-    page,
+  test("outer focusgroup navigation skips opted-out subtree", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <div>
@@ -178,11 +193,12 @@ test.describe("complex nested opt-out scenarios", () => {
     await expect(page.getByTestId("item4")).toBeFocused();
   });
 
-  test("opt-out subtree blocks navigation for its own items", async ({
-    page,
+  test("opt-out subtree blocks navigation for its own items", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <div data-testid="optout1" focusgroup="none">
@@ -206,9 +222,10 @@ test.describe("complex nested opt-out scenarios", () => {
 
   test("nested focusgroup inside opted-out subtree still works internally", async ({
     page,
-  }) => {
+  }, { project }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <div data-testid="optout1" focusgroup="none">
@@ -233,11 +250,12 @@ test.describe("complex nested opt-out scenarios", () => {
     await expect(page.getByTestId("nested_optout_item1")).toBeFocused();
   });
 
-  test("backward outer navigation skips opted-out subtree", async ({
-    page,
+  test("backward outer navigation skips opted-out subtree", async ({ page }, {
+    project,
   }) => {
     await setupPage(
       page,
+      project,
       `<div data-testid="root" focusgroup="toolbar">
         <button data-testid="item1" tabindex="0">Item 1</button>
         <div>

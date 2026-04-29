@@ -5,9 +5,10 @@ import { test } from "@playwright/test";
 import { expect, setupPage } from "./utils.js";
 
 // ax-role-inference-owner.html
-test("should infer ARIA roles for owners", async ({ page }) => {
+test("should infer ARIA roles for owners", async ({ page }, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div data-testid="toolbar" focusgroup="toolbar"></div>
     <div data-testid="tablist" focusgroup="tablist"></div>
@@ -26,9 +27,12 @@ test("should infer ARIA roles for owners", async ({ page }) => {
   await expect(page.getByTestId("menubar")).toHaveComputedRole("menubar");
 });
 
-test("should infer ARIA roles for custom element owners", async ({ page }) => {
+test("should infer ARIA roles for custom element owners", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `
     <my-element data-testid="toolbar" focusgroup="toolbar"></my-element>
     <my-element data-testid="tablist" focusgroup="tablist"></my-element>
@@ -48,9 +52,10 @@ test("should infer ARIA roles for custom element owners", async ({ page }) => {
 });
 
 // ax-role-inference-children.html
-test("should infer ARIA roles for items", async ({ page }) => {
+test("should infer ARIA roles for items", async ({ page }, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div focusgroup="tablist">
       <span tabindex="0" data-testid="tablist-item-span"></span>
@@ -141,9 +146,10 @@ test("should infer ARIA roles for items", async ({ page }) => {
 
 test("owner and items with a non-generic native role do not get inferred roles", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <nav data-testid="tablist" focusgroup="tablist">
       <a href="" data-testid="tab">tab</a>

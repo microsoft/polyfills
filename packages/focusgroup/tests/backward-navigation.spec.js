@@ -5,9 +5,12 @@ import { expect, test } from "@playwright/test";
 import { setupPage } from "./utils.js";
 
 // backward-navigation/does-not-move-when-on-focusgroup-root.html
-test("does not move when focused on focusgroup root", async ({ page }) => {
+test("does not move when focused on focusgroup root", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" tabindex="0" focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -25,9 +28,10 @@ test("does not move when focused on focusgroup root", async ({ page }) => {
 // backward-navigation/does-not-move-when-on-non-focusgroup-item.html
 test("does not move when focused on element that is not a focusgroup item", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -46,9 +50,10 @@ test("does not move when focused on element that is not a focusgroup item", asyn
 // backward-navigation/does-not-move-when-only-one-item-and-wraps.html
 test("does not move when there is only one item even with wrap", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
     </div>`,
@@ -63,9 +68,12 @@ test("does not move when there is only one item even with wrap", async ({
 });
 
 // backward-navigation/does-not-move-when-only-one-item.html
-test("does not move when there is only one item", async ({ page }) => {
+test("does not move when there is only one item", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
     </div>`,
@@ -82,9 +90,10 @@ test("does not move when there is only one item", async ({ page }) => {
 // backward-navigation/does-not-move-when-outside-focusgroup.html
 test("does not move when focused on element outside focusgroup", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<span data-testid="out" tabindex="0">out</span>
     <div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
@@ -101,9 +110,12 @@ test("does not move when focused on element outside focusgroup", async ({
 });
 
 // backward-navigation/does-not-wrap-when-not-supported.html
-test("does not wrap backward when wrap is not specified", async ({ page }) => {
+test("does not wrap backward when wrap is not specified", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -121,9 +133,10 @@ test("does not wrap backward when wrap is not specified", async ({ page }) => {
 // backward-navigation/moves-to-previous-item-and-skips-focusable-item.html
 test("moves to previous item and skips non-focusable elements", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2">item2</span>
@@ -140,9 +153,12 @@ test("moves to previous item and skips non-focusable elements", async ({
 });
 
 // backward-navigation/moves-to-previous-item.html
-test("moves to previous item on ArrowUp and ArrowLeft", async ({ page }) => {
+test("moves to previous item on ArrowUp and ArrowLeft", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -161,9 +177,10 @@ test("moves to previous item on ArrowUp and ArrowLeft", async ({ page }) => {
 // backward-navigation/skips-non-focusgroup-subtree.html
 test("skips focusgroup=none subtree when navigating backward", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <div focusgroup="none">
@@ -186,9 +203,10 @@ test("skips focusgroup=none subtree when navigating backward", async ({
 // backward-navigation/skips-root-focusgroup-complex-case.html
 test("skips deeply nested root focusgroup subtrees when navigating backward (complex)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <div>
@@ -217,9 +235,10 @@ test("skips deeply nested root focusgroup subtrees when navigating backward (com
 // backward-navigation/skips-root-focusgroup.html
 test("skips unrelated root focusgroup subtree when navigating backward", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <div>
@@ -241,9 +260,10 @@ test("skips unrelated root focusgroup subtree when navigating backward", async (
   await expect(page.getByTestId("item1")).toBeFocused();
 });
 
-test("skip hidden candidates", async ({ page }) => {
+test("skip hidden candidates", async ({ page }, { project }) => {
   await setupPage(
     page,
+    project,
     `
     <div focusgroup="tablist">
       <button data-testid="item1">item1</button>
@@ -264,9 +284,10 @@ test("skip hidden candidates", async ({ page }) => {
 // backward-navigation/wraps-successfully-complex-case.html
 test("wraps successfully when there are non-item elements before and after items", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <div>
         <span data-testid="nonitem1">nonitem1</span>
@@ -292,9 +313,12 @@ test("wraps successfully when there are non-item elements before and after items
 });
 
 // backward-navigation/wraps-successfully.html
-test("wraps successfully from first item to last", async ({ page }) => {
+test("wraps successfully from first item to last", async ({ page }, {
+  project,
+}) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -314,9 +338,10 @@ test("wraps successfully from first item to last", async ({ page }) => {
 // backward-navigation/horizontal/does-not-ascend-out-of-focusgroup.html
 test("horizontal: does not ascend out of nested focusgroup when axis not supported", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<ul focusgroup="toolbar inline">
       <li data-testid="item1" tabindex="0">
         <ul focusgroup="toolbar block">
@@ -334,9 +359,10 @@ test("horizontal: does not ascend out of nested focusgroup when axis not support
 // backward-navigation/horizontal/does-not-move-when-axis-not-supported.html
 test("horizontal: does not move when axis (ArrowLeft) is not supported (block only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -351,9 +377,10 @@ test("horizontal: does not move when axis (ArrowLeft) is not supported (block on
 // backward-navigation/horizontal/does-not-wrap-in-orthogonal-axis.html
 test("horizontal: does not wrap when only block (vertical) axis is supported", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -369,9 +396,10 @@ test("horizontal: does not wrap when only block (vertical) axis is supported", a
 // backward-navigation/horizontal/moves-when-only-current-axis-supported.html
 test("horizontal: moves when only horizontal axis (ArrowLeft) is supported (inline only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -386,9 +414,10 @@ test("horizontal: moves when only horizontal axis (ArrowLeft) is supported (inli
 // backward-navigation/horizontal/wraps-in-axis.html
 test("horizontal: wraps backward when inline axis and wrap are supported", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -404,9 +433,10 @@ test("horizontal: wraps backward when inline axis and wrap are supported", async
 // backward-navigation/vertical/does-not-ascend-out-of-focusgroup.html
 test("vertical: does not ascend out of nested focusgroup when axis not supported", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<ul focusgroup="toolbar block">
       <li data-testid="item1" tabindex="0">
         <ul focusgroup="toolbar inline">
@@ -424,9 +454,10 @@ test("vertical: does not ascend out of nested focusgroup when axis not supported
 // backward-navigation/vertical/does-not-move-when-axis-not-supported.html
 test("vertical: does not move when axis (ArrowUp) is not supported (inline only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar inline">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -441,9 +472,10 @@ test("vertical: does not move when axis (ArrowUp) is not supported (inline only)
 // backward-navigation/vertical/does-not-wrap-in-orthogonal-axis.html
 test("vertical: does not wrap when only inline (horizontal) axis is supported", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar inline wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -459,9 +491,10 @@ test("vertical: does not wrap when only inline (horizontal) axis is supported", 
 // backward-navigation/vertical/moves-when-only-current-axis-supported.html
 test("vertical: moves when only vertical axis (ArrowUp) is supported (block only)", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div data-testid="root" focusgroup="toolbar block">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>
@@ -476,9 +509,10 @@ test("vertical: moves when only vertical axis (ArrowUp) is supported (block only
 // backward-navigation/vertical/wraps-in-axis.html
 test("vertical: wraps backward when block axis and wrap are supported", async ({
   page,
-}) => {
+}, { project }) => {
   await setupPage(
     page,
+    project,
     `<div focusgroup="toolbar block wrap">
       <span data-testid="item1" tabindex="0">item1</span>
       <span data-testid="item2" tabindex="0">item2</span>

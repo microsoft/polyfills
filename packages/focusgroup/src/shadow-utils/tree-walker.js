@@ -122,6 +122,19 @@ class ShadowTreeWalker {
   };
 
   /**
+   * Creates a native TreeWalker scoped to the given root, using the
+   * direction-specific filter produced by `#makeFilter`.
+   * @param {Node} root
+   * @param {boolean} isForward
+   * @returns {TreeWalker}
+   */
+  #createWalker(root, isForward) {
+    return this.#doc.createTreeWalker(root, this.whatToShow, {
+      acceptNode: this.#makeFilter(isForward),
+    });
+  }
+
+  /**
    * Returns a filter callback for native TreeWalker nodes.
    *
    * Both directions accept shadow hosts and apply `#filterNode` to regular
@@ -158,11 +171,7 @@ class ShadowTreeWalker {
             // multiple times for the same node).
             const top = this.#forwardStack[0];
             if (!top || top.walker.root !== shadowRoot) {
-              const walker = this.#doc.createTreeWalker(
-                shadowRoot,
-                this.whatToShow,
-                { acceptNode: this.#makeFilter(true) },
-              );
+              const walker = this.#createWalker(shadowRoot, true);
 
               this.#forwardStack.unshift({ walker, hostNode: node });
             }
@@ -189,8 +198,6 @@ class ShadowTreeWalker {
    * @returns {Array<{walker: TreeWalker, hostNode: Element|null}>}
    */
   #buildStack(isForward) {
-    const makeFilter = () => this.#makeFilter(isForward);
-
     // If currentNode was removed from the DOM, reset to root.
     if (!nodeContains(this.root, this.#currentNode)) {
       this.#currentNode = this.root;
@@ -236,9 +243,7 @@ class ShadowTreeWalker {
     while (currentNode && currentNode !== this.root) {
       if (currentNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
         const shadowRoot = currentNode;
-        const walker = this.#doc.createTreeWalker(shadowRoot, this.whatToShow, {
-          acceptNode: makeFilter(),
-        });
+        const walker = this.#createWalker(shadowRoot, isForward);
         walker.currentNode = walkerCurrentNode;
         stack.push({ walker, hostNode: shadowRoot.host });
 
@@ -259,9 +264,7 @@ class ShadowTreeWalker {
     }
 
     // Create the root-level walker.
-    const rootWalker = this.#doc.createTreeWalker(this.root, this.whatToShow, {
-      acceptNode: makeFilter(),
-    });
+    const rootWalker = this.#createWalker(this.root, isForward);
     rootWalker.currentNode = walkerCurrentNode;
     stack.push({ walker: rootWalker, hostNode: null });
 
@@ -270,11 +273,7 @@ class ShadowTreeWalker {
     // didn't walk through root's shadow root above), push a shadow walker.
     const rootShadow = this.root.shadowRoot;
     if (rootShadow && !stack.some((e) => e.walker.root === rootShadow)) {
-      const shadowWalker = this.#doc.createTreeWalker(
-        rootShadow,
-        this.whatToShow,
-        { acceptNode: makeFilter() },
-      );
+      const shadowWalker = this.#createWalker(rootShadow, isForward);
 
       stack.unshift({ walker: shadowWalker, hostNode: this.root });
     }
@@ -290,11 +289,7 @@ class ShadowTreeWalker {
         currentShadow &&
         !stack.some((e) => e.walker.root === currentShadow)
       ) {
-        const shadowWalker = this.#doc.createTreeWalker(
-          currentShadow,
-          this.whatToShow,
-          { acceptNode: makeFilter() },
-        );
+        const shadowWalker = this.#createWalker(currentShadow, isForward);
 
         // If the currentNode is both a shadow host and slotted, the
         // slotted siblings collected in `initialSlotted` must be deferred
@@ -318,106 +313,104 @@ class ShadowTreeWalker {
    * Functionally identical to the old `nextNode()` body.
    */
   #walkForward() {
-    // Drain the slot queue first — these are assigned elements from a
-    // previously encountered <slot>.
-    if (this.#slotted.length > 0) {
-      const slottedEl = this.#slotted.shift();
+    while (true) {
+      // Drain the slot queue first — these are assigned elements from a
+      // previously encountered <slot>.
+      if (this.#slotted.length > 0) {
+        const slottedEl = this.#slotted.shift();
 
-      if (slottedEl.shadowRoot) {
-        const nodeResult = this.#filterNode(slottedEl);
+        if (slottedEl.shadowRoot) {
+          const nodeResult = this.#filterNode(slottedEl);
 
-        // FILTER_REJECT means skip this node AND its descendants (shadow
-        // children included).
-        if (nodeResult === NodeFilter.FILTER_REJECT) {
-          return this.#walkForward();
+          // FILTER_REJECT means skip this node AND its descendants (shadow
+          // children included).
+          if (nodeResult === NodeFilter.FILTER_REJECT) {
+            continue;
+          }
+
+          // The slotted element is itself a shadow host — push a walker
+          // for its shadow tree onto the forward stack.  Save the remaining
+          // slotted siblings so they are visited *after* this host's shadow
+          // children (depth-first order).
+          const shadowRoot = slottedEl.shadowRoot;
+          const walker = this.#createWalker(shadowRoot, true);
+          const savedSlotted = this.#slotted;
+          this.#slotted = [];
+          this.#forwardStack.unshift({
+            walker,
+            hostNode: slottedEl,
+            savedSlotted,
+          });
+
+          if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+            this.#currentNode = slottedEl;
+            return slottedEl;
+          }
+          continue;
         }
 
-        // The slotted element is itself a shadow host — push a walker
-        // for its shadow tree onto the forward stack.  Save the remaining
-        // slotted siblings so they are visited *after* this host's shadow
-        // children (depth-first order).
-        const shadowRoot = slottedEl.shadowRoot;
-        const walker = this.#doc.createTreeWalker(shadowRoot, this.whatToShow, {
-          acceptNode: this.#makeFilter(true),
-        });
-        const savedSlotted = this.#slotted;
-        this.#slotted = [];
-        this.#forwardStack.unshift({
-          walker,
-          hostNode: slottedEl,
-          savedSlotted,
-        });
+        const nodeResult = this.#filterNode(slottedEl);
+
+        // FILTER_REJECT means skip this node AND its descendants.
+        if (nodeResult !== NodeFilter.FILTER_REJECT) {
+          // Splice light-DOM children into the front of #slotted so they
+          // are walked in tree order before the next slotted sibling.
+          if (slottedEl.firstElementChild) {
+            this.#slotted.unshift(...slottedEl.children);
+          }
+        }
 
         if (nodeResult === NodeFilter.FILTER_ACCEPT) {
           this.#currentNode = slottedEl;
           return slottedEl;
         }
-        return this.#walkForward();
+        continue;
       }
 
-      const nodeResult = this.#filterNode(slottedEl);
-
-      // FILTER_REJECT means skip this node AND its descendants.
-      if (nodeResult !== NodeFilter.FILTER_REJECT) {
-        // Splice light-DOM children into the front of #slotted so they
-        // are walked in tree order before the next slotted sibling.
-        if (slottedEl.firstElementChild) {
-          this.#slotted.unshift(...slottedEl.children);
-        }
-      }
-
-      if (nodeResult === NodeFilter.FILTER_ACCEPT) {
-        this.#currentNode = slottedEl;
-        return slottedEl;
-      }
-      return this.#walkForward();
-    }
-
-    const active = this.#forwardStack[0];
-    if (!active) {
-      return null;
-    }
-
-    const nextNode = active.walker.nextNode();
-
-    if (nextNode) {
-      // Intercept <slot> elements — expand them via assignedElements().
-      if (nextNode.localName === "slot") {
-        this.#slotted = [...nextNode.assignedElements({ flatten: true })];
-        return this.#walkForward();
-      }
-
-      const shadowRoot = nextNode.shadowRoot;
-
-      if (shadowRoot) {
-        const nodeResult = this.#filterNode(nextNode);
-
-        if (nodeResult === NodeFilter.FILTER_ACCEPT) {
-          this.#currentNode = nextNode;
-          return nextNode;
-        }
-
-        // The forward filter should have pushed a new shadow walker.
-        // Recurse into it.
-        return this.#walkForward();
-      }
-
-      this.#currentNode = nextNode;
-      return nextNode;
-    } else {
-      // Walker exhausted — pop it.
-      if (this.#forwardStack.length > 1) {
-        const popped = this.#forwardStack.shift();
-
-        // Restore any slotted siblings that were deferred when we entered
-        // this shadow scope from the slotted queue.
-        if (popped.savedSlotted?.length) {
-          this.#slotted = popped.savedSlotted;
-        }
-
-        return this.#walkForward();
-      } else {
+      const active = this.#forwardStack[0];
+      if (!active) {
         return null;
+      }
+
+      const nextNode = active.walker.nextNode();
+
+      if (nextNode) {
+        // Intercept <slot> elements — expand them via assignedElements().
+        if (nextNode.localName === "slot") {
+          this.#slotted = [...nextNode.assignedElements({ flatten: true })];
+          continue;
+        }
+
+        const shadowRoot = nextNode.shadowRoot;
+
+        if (shadowRoot) {
+          const nodeResult = this.#filterNode(nextNode);
+
+          if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+            this.#currentNode = nextNode;
+            return nextNode;
+          }
+
+          // The forward filter should have pushed a new shadow walker.
+          // Loop to enter it.
+          continue;
+        }
+
+        this.#currentNode = nextNode;
+        return nextNode;
+      } else {
+        // Walker exhausted — pop it.
+        if (this.#forwardStack.length > 1) {
+          const popped = this.#forwardStack.shift();
+
+          // Restore any slotted siblings that were deferred when we entered
+          // this shadow scope from the slotted queue.
+          if (popped.savedSlotted?.length) {
+            this.#slotted = popped.savedSlotted;
+          }
+        } else {
+          return null;
+        }
       }
     }
   }
@@ -435,178 +428,169 @@ class ShadowTreeWalker {
    * before the host.
    */
   #walkBackward() {
-    // Drain the slot queue first — these are assigned elements from a
-    // previously encountered <slot>, in reverse order.
-    if (this.#slotted.length > 0) {
-      const slottedEl = this.#slotted.shift();
+    while (true) {
+      // Drain the slot queue first — these are assigned elements from a
+      // previously encountered <slot>, in reverse order.
+      if (this.#slotted.length > 0) {
+        const slottedEl = this.#slotted.shift();
 
-      if (slottedEl.shadowRoot) {
+        if (slottedEl.shadowRoot) {
+          const nodeResult = this.#filterNode(slottedEl);
+
+          // FILTER_REJECT means skip this node AND its descendants.
+          if (nodeResult === NodeFilter.FILTER_REJECT) {
+            continue;
+          }
+
+          this.#currentNode = slottedEl;
+          // Save remaining slotted siblings so they aren't drained before
+          // this shadow host's content is fully traversed.
+          const savedSlotted = this.#slotted;
+          this.#slotted = [];
+          // Inline #enterShadowBackward: push walker and loop.
+          this.#backwardStack.unshift({
+            walker: this.#createWalker(slottedEl.shadowRoot, false),
+            hostNode: slottedEl,
+            savedSlotted,
+          });
+          continue;
+        }
+
+        // Check the filter before expanding children — FILTER_REJECT means
+        // skip this node and all its descendants.
         const nodeResult = this.#filterNode(slottedEl);
 
-        // FILTER_REJECT means skip this node AND its descendants.
         if (nodeResult === NodeFilter.FILTER_REJECT) {
-          return this.#walkBackward();
+          continue;
         }
 
-        this.#currentNode = slottedEl;
-        // Save remaining slotted siblings so they aren't drained before
-        // this shadow host's content is fully traversed.
-        const savedSlotted = this.#slotted;
-        this.#slotted = [];
-        return this.#enterShadowBackward(slottedEl, savedSlotted);
-      }
-
-      // Check the filter before expanding children — FILTER_REJECT means
-      // skip this node and all its descendants.
-      const nodeResult = this.#filterNode(slottedEl);
-
-      if (nodeResult === NodeFilter.FILTER_REJECT) {
-        return this.#walkBackward();
-      }
-
-      // In reverse tree order, descendants come before ancestors.
-      // If this slotted element has children and hasn't had them queued yet,
-      // re-queue: children (reversed) first, then the parent itself (marked
-      // as expanded so it won't be expanded again).
-      if (
-        slottedEl.firstElementChild &&
-        !this.#slottedWithChildren.has(slottedEl)
-      ) {
-        this.#slottedWithChildren.add(slottedEl);
-        this.#slotted.unshift(...[...slottedEl.children].reverse(), slottedEl);
-        return this.#walkBackward();
-      }
-
-      if (nodeResult === NodeFilter.FILTER_ACCEPT) {
-        this.#currentNode = slottedEl;
-        return slottedEl;
-      }
-      return this.#walkBackward();
-    }
-
-    const active = this.#backwardStack[0];
-    if (!active) {
-      return null;
-    }
-
-    // If the active walker is at its root (shadow root), jump to the last
-    // descendant — this handles the initial entry into a shadow scope when
-    // the walker was just built or just pushed.
-    if (
-      active.walker.currentNode === active.walker.root &&
-      active.walker.root !== this.root
-    ) {
-      const lastChild = getLastElementDescendant(active.walker.root);
-
-      if (lastChild) {
-        active.walker.currentNode = lastChild;
-
-        const gen = this.#handleBackwardNode(lastChild);
-        const { value, done } = gen.next();
-        if (!done) {
-          return value;
-        }
-        // Otherwise filter rejected — fall through to previousNode()
-      }
-    }
-
-    const previousNode = active.walker.previousNode();
-
-    if (previousNode) {
-      const gen = this.#handleBackwardNode(previousNode);
-      const { value, done } = gen.next();
-      if (!done) {
-        return value;
-      }
-      // In the previousNode path the native filter already accepted the
-      // node, so #filterNode will too — this line is just a safety net.
-      this.#currentNode = previousNode;
-      return previousNode;
-    } else {
-      // Walker exhausted (or reached root).
-      if (this.#backwardStack.length > 1) {
-        const popped = this.#backwardStack.shift();
-
-        // Restore any slotted siblings that were deferred when we entered
-        // this shadow scope from the slotted queue.
-        if (popped.savedSlotted?.length) {
-          this.#slotted = popped.savedSlotted;
+        // In reverse tree order, descendants come before ancestors.
+        // If this slotted element has children and hasn't had them queued yet,
+        // re-queue: children (reversed) first, then the parent itself (marked
+        // as expanded so it won't be expanded again).
+        if (
+          slottedEl.firstElementChild &&
+          !this.#slottedWithChildren.has(slottedEl)
+        ) {
+          this.#slottedWithChildren.add(slottedEl);
+          this.#slotted.unshift(
+            ...[...slottedEl.children].reverse(),
+            slottedEl,
+          );
+          continue;
         }
 
-        // The hostNode from the popped entry is the shadow host — return
-        // it if the user filter accepts it (host visited after all its
-        // shadow content in reverse order).
-        const hostNode = popped.hostNode;
-        if (hostNode) {
-          const nodeResult = this.#filterNode(hostNode);
-
-          if (nodeResult === NodeFilter.FILTER_ACCEPT) {
-            this.#currentNode = hostNode;
-            return hostNode;
-          }
+        if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+          this.#currentNode = slottedEl;
+          return slottedEl;
         }
+        continue;
+      }
 
-        return this.#walkBackward();
-      } else {
-        // Root walker exhausted — return the root itself if not yet visited.
-        if (this.#currentNode !== this.root) {
-          const nodeResult = this.#filterNode(this.root);
-          if (nodeResult === NodeFilter.FILTER_ACCEPT) {
-            this.#currentNode = this.root;
-            return this.root;
-          }
-        }
+      const active = this.#backwardStack[0];
+      if (!active) {
         return null;
       }
+
+      // If the active walker is at its root (shadow root), jump to the last
+      // descendant — this handles the initial entry into a shadow scope when
+      // the walker was just built or just pushed.
+      if (
+        active.walker.currentNode === active.walker.root &&
+        active.walker.root !== this.root
+      ) {
+        const lastChild = getLastElementDescendant(active.walker.root);
+
+        if (lastChild) {
+          active.walker.currentNode = lastChild;
+
+          if (lastChild.localName === "slot") {
+            this.#slotted = [
+              ...lastChild.assignedElements({ flatten: true }),
+            ].reverse();
+            continue;
+          }
+          if (lastChild.shadowRoot) {
+            this.#currentNode = lastChild;
+            // Inline #enterShadowBackward: push walker and loop.
+            this.#backwardStack.unshift({
+              walker: this.#createWalker(lastChild.shadowRoot, false),
+              hostNode: lastChild,
+            });
+            continue;
+          }
+          const lastChildResult = this.#filterNode(lastChild);
+          if (lastChildResult === NodeFilter.FILTER_ACCEPT) {
+            this.#currentNode = lastChild;
+            return lastChild;
+          }
+          // Otherwise filter rejected — fall through to previousNode()
+        }
+      }
+
+      const previousNode = active.walker.previousNode();
+
+      if (previousNode) {
+        if (previousNode.localName === "slot") {
+          this.#slotted = [
+            ...previousNode.assignedElements({ flatten: true }),
+          ].reverse();
+          continue;
+        }
+        if (previousNode.shadowRoot) {
+          this.#currentNode = previousNode;
+          // Inline #enterShadowBackward: push walker and loop.
+          this.#backwardStack.unshift({
+            walker: this.#createWalker(previousNode.shadowRoot, false),
+            hostNode: previousNode,
+          });
+          continue;
+        }
+        const nodeResult = this.#filterNode(previousNode);
+        if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+          this.#currentNode = previousNode;
+          return previousNode;
+        }
+        // In the previousNode path the native filter already accepted the
+        // node, so #filterNode will too — this line is just a safety net.
+        this.#currentNode = previousNode;
+        return previousNode;
+      } else {
+        // Walker exhausted (or reached root).
+        if (this.#backwardStack.length > 1) {
+          const popped = this.#backwardStack.shift();
+
+          // Restore any slotted siblings that were deferred when we entered
+          // this shadow scope from the slotted queue.
+          if (popped.savedSlotted?.length) {
+            this.#slotted = popped.savedSlotted;
+          }
+
+          // The hostNode from the popped entry is the shadow host — return
+          // it if the user filter accepts it (host visited after all its
+          // shadow content in reverse order).
+          const hostNode = popped.hostNode;
+          if (hostNode) {
+            const nodeResult = this.#filterNode(hostNode);
+
+            if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+              this.#currentNode = hostNode;
+              return hostNode;
+            }
+          }
+        } else {
+          // Root walker exhausted — return the root itself if not yet visited.
+          if (this.#currentNode !== this.root) {
+            const nodeResult = this.#filterNode(this.root);
+            if (nodeResult === NodeFilter.FILTER_ACCEPT) {
+              this.#currentNode = this.root;
+              return this.root;
+            }
+          }
+          return null;
+        }
+      }
     }
-  }
-
-  /**
-   * Handle a node encountered during backward traversal: expand <slot>s,
-   * enter shadow hosts, or filter regular elements.
-   *
-   * Yields a value to return from #walkBackward, or returns with no
-   * value to signal "fall through" (e.g. filter rejected the node in
-   * the initial-entry path).
-   *
-   * @param {Element} node
-   */
-  *#handleBackwardNode(node) {
-    if (node.localName === "slot") {
-      this.#slotted = [...node.assignedElements({ flatten: true })].reverse();
-      yield this.#walkBackward();
-      return;
-    }
-
-    if (node.shadowRoot) {
-      this.#currentNode = node;
-      yield this.#enterShadowBackward(node);
-      return;
-    }
-
-    const nodeResult = this.#filterNode(node);
-    if (nodeResult === NodeFilter.FILTER_ACCEPT) {
-      this.#currentNode = node;
-      yield node;
-    }
-  }
-
-  /**
-   * Enter a shadow host's shadow root for backward traversal: create a new
-   * shadow walker, push it onto `#backwardStack`, and recurse.
-   *
-   * @param {Element} hostNode - The shadow host to enter.
-   * @param {Element[]} [savedSlotted] - Slotted siblings to restore after
-   *   this shadow scope is exhausted and the host is popped.
-   */
-  #enterShadowBackward(hostNode, savedSlotted) {
-    const shadowRoot = hostNode.shadowRoot;
-    const walker = this.#doc.createTreeWalker(shadowRoot, this.whatToShow, {
-      acceptNode: this.#makeFilter(false),
-    });
-
-    this.#backwardStack.unshift({ walker, hostNode, savedSlotted });
-    return this.#walkBackward();
   }
 }
 
