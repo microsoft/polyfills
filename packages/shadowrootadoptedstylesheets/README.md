@@ -25,10 +25,10 @@ yarn add @microsoft/shadowrootadoptedstylesheets-ponyfill
   ...
 </style>
 
-<my-element data-shadowrootadoptedstylesheets="tokens my-element-styles ./extra-styles.css">
+<my-element data-shadowRootAdoptedStyleSheets="tokens my-element-styles ./extra-styles.css">
   <template
-    shadowrootmode="open"
-    shadowrootadoptedstylesheets="tokens my-element-styles ./extra-styles.css"
+    shadowRootMode="open"
+    shadowRootAdoptedStyleSheets="tokens my-element-styles ./extra-styles.css"
   >
     ...
   </template>
@@ -45,8 +45,8 @@ yarn add @microsoft/shadowrootadoptedstylesheets-ponyfill
 
 The ponyfill works differently than the native implementation in a few ways — hence “ponyfill” rather than “polyfill”:
 
-* The ponyfill requires an extra `data-shadowrootadoptedstylesheets` data attribute on the shadow host, because once a declarative shadow root `<template>` element is parsed, it becomes a shadow root right away, so there’s no way for JavaScript to locate the `<template>` and read the attribute
-    * It’s still recommended to add the `shadowrootadoptedstylesheets` attribute to the declarative shadow root `<template>` element for browsers that do natively support this feature
+* The ponyfill requires an extra `data-shadowRootAdoptedStyleSheets` data attribute on the shadow host, because once a declarative shadow root `<template>` element is parsed, it becomes a shadow root right away, so there’s no way for JavaScript to locate the `<template>` and read the attribute
+    * It’s still recommended to add the `shadowRootAdoptedStyleSheets` attribute to the declarative shadow root `<template>` element for browsers that do natively support this feature
 * The ponyfill does not add `<style type="module" specifier>` elements to the importmap, because it requires browser support for both [multiple importmaps](https://caniuse.com/mdn-html_elements_script_type_importmap_multiple_import_maps) and [CSS module import attribute](https://caniuse.com/wf-css-modules)
 
 ## Testing

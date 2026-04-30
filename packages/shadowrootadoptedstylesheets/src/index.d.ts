@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 /**
- * Whether the current user agent supports the `shadowrootadoptedstylesheets`
+ * Whether the current user agent supports the `shadowRootAdoptedStyleSheets`
  * attribute for Declarative Shadow DOM.
  * @returns {boolean}
  */

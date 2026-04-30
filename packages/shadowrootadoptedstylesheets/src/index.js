@@ -30,7 +30,7 @@ function isCSSModule(element) {
 }
 
 /**
- * Whether the given element has the * `data-shadowrootadoptedstylesheets`
+ * Whether the given element has the * `data-shadowRootAdoptedStyleSheets`
  * attribute and contains a shadow root.
  * @param {Element} element
  * @returns {boolean}
@@ -172,7 +172,7 @@ function supportsAdoptedStyleSheets() {
 }
 
 /**
- * Whether the current user agent supports the `shadowrootadoptedstylesheets`
+ * Whether the current user agent supports the `shadowRootAdoptedStyleSheets`
  * attribute for Declarative Shadow DOM.
  * @returns {boolean}
  */

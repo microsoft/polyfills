@@ -138,10 +138,10 @@ test("should install style sheets to declarative shadow roots added dynamically"
   await page.getByTestId("container").evaluate((node) => {
     node.setHTMLUnsafe(
       `
-    <div data-shadowrootadoptedstylesheets="s1 s2 s3 ./external.css non-existing">
+    <div data-shadowRootAdoptedStyleSheets="s1 s2 s3 ./external.css non-existing">
       <template
-        shadowrootmode="open"
-        shadowrootadoptedstylesheets="s1 s2 s3 ./external.css non-existing"
+        shadowRootMode="open"
+        shadowRootAdoptedStyleSheets="s1 s2 s3 ./external.css non-existing"
       >
         <p data-testid="p7">
           text
@@ -173,10 +173,10 @@ test("should install style sheets to nested declarative shadow roots added dynam
   await page.getByTestId("shadow-container").evaluate((node) => {
     node.setHTMLUnsafe(
       `
-    <div data-shadowrootadoptedstylesheets="s1 s2 s3 ./external.css non-existing">
+    <div data-shadowRootAdoptedStyleSheets="s1 s2 s3 ./external.css non-existing">
       <template
-        shadowrootmode="open"
-        shadowrootadoptedstylesheets="s1 s2 s3 ./external.css non-existing"
+        shadowRootMode="open"
+        shadowRootAdoptedStyleSheets="s1 s2 s3 ./external.css non-existing"
       >
         <p data-testid="p8">
           text

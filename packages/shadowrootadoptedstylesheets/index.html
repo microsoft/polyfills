@@ -3,18 +3,18 @@
  Licensed under the MIT License. -->
 <html lang="en">
 <meta charset="utf-8">
-<title>shadowrootadoptedstylesheets ponyfill</title>
+<title>shadowRootAdoptedStyleSheets ponyfill</title>
 
 <style>
   html {
     color-scheme: light dark;
   }
 
-  [data-shadowrootadoptedstylesheets] {
+  [data-shadowRootAdoptedStyleSheets] {
     visibility: hidden;
   }
 
-  [data-shadowrootadoptedstylesheets-ready] {
+  [data-shadowRootAdoptedStyleSheets-ready] {
     visibility: unset;
   }
 </style>
@@ -66,7 +66,7 @@
         }
       </style>
       <div
-        data-shadowrootadoptedstylesheets="
+        data-shadowRootAdoptedStyleSheets="
           my-style-1
           my-style-2-light
           my-style-2-dark
@@ -77,8 +77,8 @@
         "
       >
         <template
-          shadowrootmode="open"
-          shadowrootadoptedstylesheets="
+          shadowRootMode="open"
+          shadowRootAdoptedStyleSheets="
             my-style-1
             my-style-2-light
             my-style-2-dark
@@ -98,7 +98,7 @@
 <p>outside the world</p>
 
 <my-element
-  data-shadowrootadoptedstylesheets="
+  data-shadowRootAdoptedStyleSheets="
     my-style-1
     my-style-2-light
     my-style-2-dark
@@ -108,8 +108,8 @@
   "
 >
   <template
-    shadowrootmode="open"
-    shadowrootadoptedstylesheets="
+    shadowRootMode="open"
+    shadowRootAdoptedStyleSheets="
       my-style-1
       my-style-2-light
       my-style-2-dark
@@ -127,16 +127,16 @@
     </style>
 
     <my-button
-      data-shadowrootadoptedstylesheets="my-button"
+      data-shadowRootAdoptedStyleSheets="my-button"
     >
       <template
-        shadowrootmode="open"
-        shadowrootadoptedstylesheets="my-button"
+        shadowRootMode="open"
+        shadowRootAdoptedStyleSheets="my-button"
       >
         <button>
           <slot></slot>
           <my-span
-            data-shadowrootadoptedstylesheets="
+            data-shadowRootAdoptedStyleSheets="
               my-span
               my-style-2-light
               my-style-2-dark
@@ -144,8 +144,8 @@
             "
           >
             <template
-              shadowrootmode="open"
-              shadowrootadoptedstylesheets="
+              shadowRootMode="open"
+              shadowRootAdoptedStyleSheets="
                 my-span
                 my-style-2-light
                 my-style-2-dark
@@ -170,7 +170,7 @@
 </div>
 
 <div style="margin: 1rem; padding: 1rem; border: 1px solid;">
-  <template shadowrootmode="open">
+  <template shadowRootMode="open">
     <p>This shadow root doesn’t have declarative adopted stylesheet.</p>
     <div id="more" style="margin-block-start: 1rem;">
       <button onclick="addMore(this)">add more content</button>

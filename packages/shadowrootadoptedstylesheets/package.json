@@ -2,7 +2,7 @@
   "name": "@microsoft/shadowrootadoptedstylesheets-ponyfill",
   "version": "0.0.1",
   "private": true,
-  "description": "A pony fill for `shadowrootadoptedstylesheets` attribute on Declarative Shadow DOM.",
+  "description": "A pony fill for `shadowRootAdoptedStyleSheets` attribute on Declarative Shadow DOM.",
   "scripts": {
     "dev": "vite",
     "build": "npm run build:lib && npm run build:lib:min",
