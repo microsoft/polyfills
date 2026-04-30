@@ -199,3 +199,79 @@ test("should install style sheets to nested declarative shadow roots added dynam
   );
   await expect(page.getByTestId("b8")).toHaveCSS("padding", "4px");
 });
+
+test("should install style sheets to descendants of dynamically added subtrees", async ({
+  page,
+  channel,
+}) => {
+  await setupPage(page, channel);
+  // The marker is on a *descendant* of the added node, not the immediate
+  // child. The MutationObserver must walk into the added subtree.
+  await page.getByTestId("container").evaluate((node) => {
+    node.setHTMLUnsafe(
+      `
+    <section>
+      <article>
+        <div data-shadowRootAdoptedStyleSheets="s1 s2">
+          <template shadowRootMode="open" shadowRootAdoptedStyleSheets="s1 s2">
+            <p data-testid="p9">text <span data-testid="span9">text</span></p>
+          </template>
+        </div>
+      </article>
+    </section>
+    `,
+    );
+  });
+
+  await expect(page.getByTestId("p9")).toHaveCSS(
+    "text-decoration",
+    "underline",
+  );
+  await expect(page.getByTestId("span9")).toHaveCSS(
+    "text-decoration",
+    "line-through",
+  );
+});
+
+test("should observe shadow roots added dynamically", async ({
+  page,
+  channel,
+}) => {
+  await setupPage(page, channel);
+  // First, add a fresh shadow host with no marker.
+  await page.getByTestId("container").evaluate((node) => {
+    node.setHTMLUnsafe(
+      `
+    <div id="dyn-host">
+      <template shadowRootMode="open">
+        <div id="dyn-inner"></div>
+      </template>
+    </div>
+    `,
+    );
+  });
+  // Then mutate inside that newly-created shadow root. The polyfill must
+  // have installed a MutationObserver on the new shadow root for this to
+  // be picked up.
+  await page.getByTestId("container").evaluate((node) => {
+    const sr = node.querySelector("#dyn-host").shadowRoot;
+    sr.getElementById("dyn-inner").setHTMLUnsafe(
+      `
+    <div data-shadowRootAdoptedStyleSheets="s1 s2">
+      <template shadowRootMode="open" shadowRootAdoptedStyleSheets="s1 s2">
+        <p data-testid="p10">text <span data-testid="span10">text</span></p>
+      </template>
+    </div>
+    `,
+    );
+  });
+
+  await expect(page.getByTestId("p10")).toHaveCSS(
+    "text-decoration",
+    "underline",
+  );
+  await expect(page.getByTestId("span10")).toHaveCSS(
+    "text-decoration",
+    "line-through",
+  );
+});

@@ -36,7 +36,6 @@ export default defineConfig({
 
     {
       name: "Google Chrome Canary",
-      testMatch: "tests/*.spec.js",
       use: {
         ...devices["Desktop Chrome"],
         channel: "chrome-canary",

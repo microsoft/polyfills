@@ -69,18 +69,12 @@ export default ({ mode }) => {
             "NodeFilter.FILTER_ACCEPT": 1,
             "NodeFilter.FILTER_REJECT": 2,
             "NodeFilter.FILTER_SKIP": 3,
-            "Node.DOCUMENT_NODE": 9,
             "Node.ELEMENT_NODE": 1,
-            "Node.DOCUMENT_FRAGMENT_NODE": 11,
-            "document.DOCUMENT_FRAGMENT_NODE": 11,
           },
         },
         mangle: {
           module: true,
           toplevel: true,
-          properties: {
-            regex: /^(savedSlotted|hostNode|walker)$/,
-          },
         },
         format: {
           comments: false,

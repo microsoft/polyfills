@@ -2,9 +2,12 @@
 // Licensed under the MIT License.
 
 const PROP_NAME = "shadowRootAdoptedStyleSheets";
-const ATTR_NAME_DATA_BASE = `data-${PROP_NAME.toLocaleLowerCase()}`;
+const ATTR_NAME_DATA_BASE = `data-${PROP_NAME.toLowerCase()}`;
 const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
 const ATTR_NAME_SPECIFIER = "specifier";
+
+const processedHosts = new WeakSet();
+const installedRoots = new WeakSet();
 
 /**
  * Whether the given specifier string is a fetchable external module.
@@ -30,7 +33,7 @@ function isCSSModule(element) {
 }
 
 /**
- * Whether the given element has the * `data-shadowRootAdoptedStyleSheets`
+ * Whether the given element has the `data-shadowRootAdoptedStyleSheets`
  * attribute and contains a shadow root.
  * @param {Element} element
  * @returns {boolean}
@@ -60,6 +63,10 @@ function processElement(map, element) {
   }
 
   if (hasSpecifier(element)) {
+    if (processedHosts.has(element)) {
+      return;
+    }
+    processedHosts.add(element);
     const attrValue = element.getAttribute(ATTR_NAME_DATA_BASE).trim();
     const specifiers = attrValue.split(" ");
     const pending = [];
@@ -91,6 +98,10 @@ function processElement(map, element) {
   }
 }
 
+/**
+ * @param {Node} element
+ * @returns {boolean}
+ */
 function shouldProcessElement(element) {
   return (
     element.nodeType === Node.ELEMENT_NODE &&
@@ -99,20 +110,14 @@ function shouldProcessElement(element) {
 }
 
 /**
- * Installs declarative adopted stylesheets to a given DOM root node.
- * @param {Map<string, CSSStyleSheet>} map
- * @param {Document!} doc
- * @param {(Document|ShadowRoot)?} root
+ * Yields the given element and all of its descendants that should be processed.
+ * @param {Document} doc
+ * @param {Node} root
  */
-function installToRoot(map, doc, root) {
-  root ??= doc;
-
-  function processElementList(list) {
-    for (const element of list ?? []) {
-      processElement(map, element);
-    }
+function* collectProcessable(doc, root) {
+  if (root.nodeType === Node.ELEMENT_NODE && shouldProcessElement(root)) {
+    yield/** @type {Element} */ (root);
   }
-
   const walker = doc.createTreeWalker(
     root,
     NodeFilter.SHOW_ELEMENT,
@@ -121,33 +126,72 @@ function installToRoot(map, doc, root) {
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_SKIP,
   );
-  function* walkerElements() {
-    while (walker.nextNode()) {
-      yield walker.currentNode;
-    }
+  while (walker.nextNode()) {
+    yield/** @type {Element} */ (walker.currentNode);
   }
-  processElementList(walkerElements());
+}
 
-  new MutationObserver((entries) => {
-    const addedElements = entries
-      .filter((e) => e.addedNodes)
-      .flatMap((e) => [...e.addedNodes])
-      .filter(shouldProcessElement);
-    processElementList(addedElements);
-  }).observe(root, {
-    childList: true,
-    subtree: true,
-  });
-
-  // Install this to all shadow roots.
-  const shadowRootWalker = doc.createTreeWalker(
+/**
+ * Yields the shadow roots attached to the given element and all of its
+ * descendants.
+ * @param {Document} doc
+ * @param {Node} root
+ */
+function* collectShadowRoots(doc, root) {
+  if (
+    root.nodeType === Node.ELEMENT_NODE &&
+    /** @type {Element} */ (root).shadowRoot
+  ) {
+    yield/** @type {Element} */ (root).shadowRoot;
+  }
+  const walker = doc.createTreeWalker(
     root,
     NodeFilter.SHOW_ELEMENT,
     (element) =>
       element.shadowRoot ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
   );
-  while (shadowRootWalker.nextNode()) {
-    installToRoot(map, doc, shadowRootWalker.currentNode.shadowRoot);
+  while (walker.nextNode()) {
+    yield walker.currentNode.shadowRoot;
+  }
+}
+
+/**
+ * Installs declarative adopted stylesheets to a given DOM root node.
+ * @param {Map<string, CSSStyleSheet>} map
+ * @param {Document} doc
+ * @param {Document|ShadowRoot} [root]
+ */
+function installToRoot(map, doc, root) {
+  root ??= doc;
+
+  if (installedRoots.has(root)) {
+    return;
+  }
+  installedRoots.add(root);
+
+  for (const element of collectProcessable(doc, root)) {
+    processElement(map, element);
+  }
+
+  new MutationObserver((entries) => {
+    for (const entry of entries) {
+      for (const added of entry.addedNodes) {
+        for (const element of collectProcessable(doc, added)) {
+          processElement(map, element);
+        }
+        for (const shadowRoot of collectShadowRoots(doc, added)) {
+          installToRoot(map, doc, shadowRoot);
+        }
+      }
+    }
+  }).observe(root, {
+    childList: true,
+    subtree: true,
+  });
+
+  // Install this to all existing shadow roots.
+  for (const shadowRoot of collectShadowRoots(doc, root)) {
+    installToRoot(map, doc, shadowRoot);
   }
 }
 
@@ -162,7 +206,12 @@ function domReady() {
   });
 }
 
-/** @returns {boolean} */
+/**
+ * NOTE: This currently isn’t working because browsers that support the feature
+ * doesn’t have the `shadowRootAdoptedStyleSheets` property, the working group
+ * is working on this.
+ * @returns {boolean}
+ */
 function supportsAdoptedStyleSheets() {
   return (
     typeof document !== "undefined" &&
