@@ -682,7 +682,7 @@ test.describe("getNavigationDirection()", () => {
     ).toBeNull();
   });
 
-  // Unrecognised keys
+  // Unrecognized keys
 
   test("should return null when a non-arrow/Home/End key is pressed", async ({
     page,
