@@ -38,6 +38,7 @@ extends:
         os: windows  # OS of the image. Allowed values: windows, linux, macOS
     settings:
       networkIsolationPolicy: Permissive
+      networkIsolationMode: None
     stages:
     - stage: Stage
       jobs:
