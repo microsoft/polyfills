@@ -209,7 +209,7 @@ test.describe("behavior tokens comprehensive", () => {
     });
   });
 
-  test.describe("radiogroup: both axes, no wrap", () => {
+  test.describe("radiogroup: both axes, wrap", () => {
     test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
@@ -238,15 +238,15 @@ test.describe("behavior tokens comprehensive", () => {
       await expect(item2).toBeFocused();
     });
 
-    test.test("radiogroup: does not wrap", async ({ page }) => {
+    test.test("radiogroup: wraps", async ({ page }) => {
       await item3.focus();
       await page.keyboard.press("ArrowRight");
 
-      await expect(item3).toBeFocused();
+      await expect(item1).toBeFocused();
     });
   });
 
-  test.describe("listbox: both axes, no wrap", () => {
+  test.describe("listbox: block only, no wrap", () => {
     test.beforeEach(async ({ page }, { project }) => {
       await setupPage(
         page,
@@ -261,11 +261,11 @@ test.describe("behavior tokens comprehensive", () => {
       );
     });
 
-    test.test("listbox: ArrowRight navigates", async ({ page }) => {
+    test.test("listbox: ArrowRight doesn’t navigate", async ({ page }) => {
       await item1.focus();
       await page.keyboard.press("ArrowRight");
 
-      await expect(item2).toBeFocused();
+      await expect(item1).toBeFocused();
     });
 
     test.test("listbox: ArrowDown navigates", async ({ page }) => {

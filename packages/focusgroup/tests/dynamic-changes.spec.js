@@ -44,7 +44,7 @@ test.describe("`focusgroup` attribute", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group">
+        <div focusgroup="toolbar" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -76,7 +76,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "listbox");
+        node.setAttribute("focusgroup", "toolbar");
       });
 
       await item1.focus();
@@ -92,7 +92,7 @@ test.describe("`focusgroup` attribute", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group">
+        <div focusgroup="toolbar" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -100,7 +100,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "inline listbox");
+        node.setAttribute("focusgroup", "inline toolbar");
       });
 
       await item1.focus();
@@ -147,7 +147,7 @@ test.describe("`focusgroup` attribute", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group">
+        <div focusgroup="toolbar" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -155,7 +155,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "listbox block");
+        node.setAttribute("focusgroup", "toolbar block");
       });
 
       await item1.focus();
@@ -176,7 +176,7 @@ test.describe("`focusgroup` attribute", () => {
         page,
         project,
         `
-        <div focusgroup="listbox inline" data-testid="group">
+        <div focusgroup="toolbar inline" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -184,7 +184,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "listbox block");
+        node.setAttribute("focusgroup", "toolbar block");
       });
 
       await item1.focus();
@@ -217,7 +217,7 @@ test.describe("`focusgroup` attribute", () => {
       });
 
       await item2.focus();
-      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowDown");
 
       await expect(item1).toBeFocused();
     });
@@ -227,7 +227,7 @@ test.describe("`focusgroup` attribute", () => {
         page,
         project,
         `
-        <div focusgroup="listbox wrap" data-testid="group">
+        <div focusgroup="toolbar wrap" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -235,7 +235,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "listbox");
+        node.setAttribute("focusgroup", "toolbar");
       });
 
       await item2.focus();
@@ -251,7 +251,7 @@ test.describe("`focusgroup` attribute", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group">
+        <div focusgroup="toolbar" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -260,7 +260,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "listbox nomemory");
+        node.setAttribute("focusgroup", "toolbar nomemory");
       });
 
       await item1.focus();
@@ -289,7 +289,7 @@ test.describe("`focusgroup` attribute", () => {
       });
 
       await item1.focus();
-      await page.keyboard.press("ArrowRight");
+      await page.keyboard.press("ArrowDown");
       await page.keyboard.press("Tab");
       await page.keyboard.press("Shift+Tab");
 
@@ -317,7 +317,7 @@ test.describe("writing direction CSS changes", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group">
+        <div focusgroup="toolbar" data-testid="group">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -341,7 +341,7 @@ test.describe("writing direction CSS changes", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group" dir="rtl">
+        <div focusgroup="toolbar" data-testid="group" dir="rtl">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -365,7 +365,7 @@ test.describe("writing direction CSS changes", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group" style="writing-mode: vertical-rl;">
+        <div focusgroup="toolbar" data-testid="group" style="writing-mode: vertical-rl;">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -389,7 +389,7 @@ test.describe("writing direction CSS changes", () => {
         page,
         project,
         `
-        <div focusgroup="listbox" data-testid="group" dir="rtl" style="writing-mode: vertical-rl;">
+        <div focusgroup="toolbar" data-testid="group" dir="rtl" style="writing-mode: vertical-rl;">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -454,7 +454,7 @@ test.describe("opt-out", () => {
       page,
       project,
       `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
           <button data-testid="item3">item 3</button>
@@ -483,7 +483,7 @@ test.describe("opt-out", () => {
       page,
       project,
       `
-        <div data-testid="group" focusgroup="listbox">
+        <div data-testid="group" focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -552,7 +552,7 @@ test.describe("opt-in", () => {
       page,
       project,
       `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2" focusgroup="none">item 2</button>
         </div>
@@ -584,7 +584,7 @@ test.describe("opt-in", () => {
     );
 
     await group.evaluate((node) => {
-      node.setAttribute("focusgroup", "listbox");
+      node.setAttribute("focusgroup", "toolbar");
     });
 
     await item1.focus();
@@ -644,7 +644,7 @@ test.describe("`focusgroupstart` item", () => {
         page,
         project,
         `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
         </div>
@@ -860,7 +860,7 @@ test.describe("item keyboard focusability", () => {
         page,
         project,
         `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
           <button data-testid="item3">item 3</button>
@@ -885,7 +885,7 @@ test.describe("item keyboard focusability", () => {
         page,
         project,
         `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2" tabindex="-1">item 2</button>
         </div>
@@ -911,7 +911,7 @@ test.describe("item keyboard focusability", () => {
         page,
         project,
         `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2">item 2</button>
           <button data-testid="item3">item 3</button>
@@ -936,7 +936,7 @@ test.describe("item keyboard focusability", () => {
         page,
         project,
         `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="item2" disabled>item 2</button>
         </div>
@@ -1313,7 +1313,7 @@ test.describe("segmentor", () => {
         page,
         project,
         `
-        <div focusgroup="listbox">
+        <div focusgroup="toolbar">
           <button data-testid="item1">item 1</button>
           <button data-testid="segmentor" focusgroup="none">opt out</button>
           <button data-testid="item2">item 2</button>
