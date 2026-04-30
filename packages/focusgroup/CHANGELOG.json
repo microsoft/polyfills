@@ -2,6 +2,47 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Thu, 30 Apr 2026 21:42:54 GMT",
+      "version": "1.2.2",
+      "tag": "@microsoft/focusgroup-polyfill_v1.2.2",
+      "comments": {
+        "none": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "47d30d6d23a06823c3f0f8e78eaa439f02b572a4",
+            "comment": "update dependencies"
+          },
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "2154616ba7e3233cb199725af8efc6aa4c95070e",
+            "comment": "update vite"
+          }
+        ],
+        "patch": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "9b09d0315be56df2337b4e568b65c572837e0535",
+            "comment": "fixed slotted items not being polyfilled in shadowless bundle"
+          },
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "9b09d0315be56df2337b4e568b65c572837e0535",
+            "comment": "fixed nested focusgroups not being properly observed"
+          },
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "9b09d0315be56df2337b4e568b65c572837e0535",
+            "comment": "fixed nested focusability not being restored when focus leaves a group that has nomemory"
+          }
+        ]
+      }
+    },
+    {
       "date": "Fri, 10 Apr 2026 17:18:38 GMT",
       "version": "1.2.1",
       "tag": "@microsoft/focusgroup-polyfill_v1.2.1",

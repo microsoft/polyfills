@@ -1,8 +1,18 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Fri, 10 Apr 2026 17:18:38 GMT and should not be manually modified. -->
+<!-- This log was last generated on Thu, 30 Apr 2026 21:42:54 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.2.2
+
+Thu, 30 Apr 2026 21:42:54 GMT
+
+### Patches
+
+- fixed slotted items not being polyfilled in shadowless bundle (machi@microsoft.com)
+- fixed nested focusgroups not being properly observed (machi@microsoft.com)
+- fixed nested focusability not being restored when focus leaves a group that has nomemory (machi@microsoft.com)
 
 ## 1.2.1
 
