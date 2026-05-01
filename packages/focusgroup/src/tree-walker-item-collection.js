@@ -335,7 +335,7 @@ export class TreeWalkerItemCollection {
     ) {
       return NodeFilter.FILTER_REJECT;
     }
-    return node.getAttribute(DatasetName.ITEM) === this.id
+    return this.isItem(node)
       ? NodeFilter.FILTER_ACCEPT
       : NodeFilter.FILTER_SKIP;
   }
