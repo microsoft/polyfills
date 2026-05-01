@@ -4,69 +4,6 @@
 import { expect, test } from "@playwright/test";
 import { setupPage } from "./utils.js";
 
-/**
- * Walk through `ids` forward (Right/Down) and backward (Left/Up), asserting
- * that arrow navigation visits each item in order. Mirrors WPT's
- * `assert_directional_navigation_bidirectional` helper.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string[]} ids - testIds in expected navigation order
- * @param {{ axis?: "inline" | "block", shouldWrap?: boolean }} [options]
- */
-async function assertBidirectional(page, ids, options = {}) {
-  const { axis = "inline", shouldWrap = false } = options;
-  const forward = axis === "inline" ? "ArrowRight" : "ArrowDown";
-  const backward = axis === "inline" ? "ArrowLeft" : "ArrowUp";
-
-  await page.getByTestId(ids[0]).focus();
-  for (let i = 1; i < ids.length; i++) {
-    await page.keyboard.press(forward);
-    await expect(page.getByTestId(ids[i])).toBeFocused();
-  }
-  if (shouldWrap) {
-    await page.keyboard.press(forward);
-    await expect(page.getByTestId(ids[0])).toBeFocused();
-  }
-
-  await page.getByTestId(ids[ids.length - 1]).focus();
-  for (let i = ids.length - 2; i >= 0; i--) {
-    await page.keyboard.press(backward);
-    await expect(page.getByTestId(ids[i])).toBeFocused();
-  }
-  if (shouldWrap) {
-    await page.keyboard.press(backward);
-    await expect(page.getByTestId(ids[ids.length - 1])).toBeFocused();
-  }
-}
-
-/** Verify that arrow keys do not move focus away from the given testId. */
-async function assertArrowsDoNotMoveFocus(page, testId) {
-  const locator = page.getByTestId(testId);
-  await locator.focus();
-  for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]) {
-    await page.keyboard.press(key);
-    await expect(locator).toBeFocused();
-  }
-}
-
-/** Tab through the given sequence of testIds starting from the first one. */
-async function assertTabSequence(page, ids) {
-  await page.getByTestId(ids[0]).focus();
-  for (let i = 1; i < ids.length; i++) {
-    await page.keyboard.press("Tab");
-    await expect(page.getByTestId(ids[i])).toBeFocused();
-  }
-}
-
-/** Shift+Tab through the given sequence of testIds starting from the first one. */
-async function assertShiftTabSequence(page, ids) {
-  await page.getByTestId(ids[0]).focus();
-  for (let i = 1; i < ids.length; i++) {
-    await page.keyboard.press("Shift+Tab");
-    await expect(page.getByTestId(ids[i])).toBeFocused();
-  }
-}
-
 // top-layer-dialog-excluded.html
 test.describe("top-layer modal dialog", () => {
   test("modal dialog's own focusgroup navigates in both directions while in the top layer", async ({
@@ -92,7 +29,17 @@ test.describe("top-layer modal dialog", () => {
 
     await page.getByTestId("dlg").evaluate((el) => el.showModal());
 
-    await assertBidirectional(page, ["dlg_x", "dlg_y", "dlg_close"]);
+    await page.getByTestId("dlg_x").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("dlg_y")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("dlg_close")).toBeFocused();
+
+    await page.getByTestId("dlg_close").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("dlg_y")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("dlg_x")).toBeFocused();
   });
 });
 
@@ -115,7 +62,13 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
 
     await page.getByTestId("popover_simple").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["before_pop", "after_pop"]);
+    await page.getByTestId("before_pop").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("after_pop")).toBeFocused();
+
+    await page.getByTestId("after_pop").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("before_pop")).toBeFocused();
   });
 
   test("arrow keys do not navigate from inside a top-layer popover without own focusgroup", async ({
@@ -139,7 +92,11 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
 
     await page.getByTestId("popover_simple").evaluate((el) => el.showPopover());
 
-    await assertArrowsDoNotMoveFocus(page, "pop_item");
+    await page.getByTestId("pop_item").focus();
+    for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]) {
+      await page.keyboard.press(key);
+      await expect(page.getByTestId("pop_item")).toBeFocused();
+    }
   });
 
   test("popover as the first focusgroup child does not break Home/arrow navigation", async ({
@@ -159,7 +116,13 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
 
     await page.getByTestId("first_pop").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["first_a", "first_b"]);
+    await page.getByTestId("first_a").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("first_b")).toBeFocused();
+
+    await page.getByTestId("first_b").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("first_a")).toBeFocused();
 
     await page.getByTestId("first_b").focus();
     await page.keyboard.press("Home");
@@ -190,7 +153,13 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
 
     await page.getByTestId("seg_pop").evaluate((el) => el.showPopover());
 
-    await assertTabSequence(page, ["seg_a", "seg_x", "seg_c", "seg_after"]);
+    await page.getByTestId("seg_a").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("seg_x")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("seg_c")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("seg_after")).toBeFocused();
   });
 
   test("popover sibling of focusgroup does not interfere with arrow navigation", async ({
@@ -213,9 +182,22 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
 
     await page.getByTestId("sib_pop").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["sib_info", "sib_toggle", "sib_copy"], {
-      shouldWrap: true,
-    });
+    // tablist wraps by default.
+    await page.getByTestId("sib_info").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("sib_toggle")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("sib_copy")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("sib_info")).toBeFocused();
+
+    await page.getByTestId("sib_copy").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("sib_toggle")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("sib_info")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("sib_copy")).toBeFocused();
   });
 
   test("focusgroup=none popover inside focusgroup: arrows skip, Tab reaches", async ({
@@ -242,6 +224,7 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
 
     await page.getByTestId("none_pop").evaluate((el) => el.showPopover());
 
+    // Arrow keys in the parent focusgroup skip the focusgroup="none" subtree.
     await page.getByTestId("none_info").focus();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByTestId("none_toggle")).toBeFocused();
@@ -250,15 +233,23 @@ test.describe("top-layer popover excluded from ancestor navigation", () => {
     await page.keyboard.press("ArrowRight");
     await expect(page.getByTestId("none_copy")).toBeFocused();
 
-    await assertArrowsDoNotMoveFocus(page, "none_share");
+    // Arrow keys do not move focus from inside the focusgroup="none" subtree.
+    await page.getByTestId("none_share").focus();
+    for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]) {
+      await page.keyboard.press(key);
+      await expect(page.getByTestId("none_share")).toBeFocused();
+    }
 
-    await assertTabSequence(page, [
-      "none_before",
-      "none_info",
-      "none_share",
-      "none_copy",
-      "none_after",
-    ]);
+    // Tab still reaches share as a normal sequential tab stop.
+    await page.getByTestId("none_before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("none_info")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("none_share")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("none_copy")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("none_after")).toBeFocused();
   });
 });
 
@@ -309,7 +300,13 @@ test.describe("top-layer element with own focusgroup", () => {
 
     await page.getByTestId("popover_fg").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["inner_x", "inner_y"]);
+    await page.getByTestId("inner_x").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("inner_y")).toBeFocused();
+
+    await page.getByTestId("inner_y").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("inner_x")).toBeFocused();
   });
 
   test("focusable top-layer element with own focusgroup is not an outer entry", async ({
@@ -329,22 +326,30 @@ test.describe("top-layer element with own focusgroup", () => {
 
     await page.getByTestId("focusable_pop").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["focusable_outer_a", "focusable_outer_b"]);
+    await page.getByTestId("focusable_outer_a").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("focusable_outer_b")).toBeFocused();
+
+    await page.getByTestId("focusable_outer_b").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("focusable_outer_a")).toBeFocused();
   });
 });
 
 // top-layer-dynamic-exclusion.html
 test.describe("top-layer exclusion is dynamic", () => {
-  const inlineFgHtml = `<div focusgroup="toolbar inline wrap">
-    <button data-testid="a">A</button>
-    <div data-testid="pop" popover>
-      <button data-testid="x">X</button>
-    </div>
-    <button data-testid="b">B</button>
-  </div>`;
-
   test("show and hide cycles", async ({ page }, { project }) => {
-    await setupPage(page, project, inlineFgHtml);
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="toolbar inline wrap">
+        <button data-testid="a">A</button>
+        <div data-testid="pop" popover>
+          <button data-testid="x">X</button>
+        </div>
+        <button data-testid="b">B</button>
+      </div>`,
+    );
 
     // Hidden popover phase.
     await page.getByTestId("a").focus();
@@ -367,16 +372,46 @@ test.describe("top-layer exclusion is dynamic", () => {
   test("wrapping navigation skips shown popover subtree", async ({ page }, {
     project,
   }) => {
-    await setupPage(page, project, inlineFgHtml);
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="toolbar inline wrap">
+        <button data-testid="a">A</button>
+        <div data-testid="pop" popover>
+          <button data-testid="x">X</button>
+        </div>
+        <button data-testid="b">B</button>
+      </div>`,
+    );
     await page.getByTestId("pop").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["a", "b"], { shouldWrap: true });
+    await page.getByTestId("a").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("b")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("a")).toBeFocused();
+
+    await page.getByTestId("b").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("a")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("b")).toBeFocused();
   });
 
   test("Home and End keys skip shown popover subtree", async ({ page }, {
     project,
   }) => {
-    await setupPage(page, project, inlineFgHtml);
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="toolbar inline wrap">
+        <button data-testid="a">A</button>
+        <div data-testid="pop" popover>
+          <button data-testid="x">X</button>
+        </div>
+        <button data-testid="b">B</button>
+      </div>`,
+    );
     await page.getByTestId("pop").evaluate((el) => el.showPopover());
 
     await page.getByTestId("a").focus();
@@ -438,7 +473,17 @@ test.describe("top-layer exclusion is dynamic", () => {
     await page.getByTestId("pop_m1").evaluate((el) => el.showPopover());
     await page.getByTestId("pop_m2").evaluate((el) => el.showPopover());
 
-    await assertBidirectional(page, ["m_a", "m_b", "m_c"]);
+    await page.getByTestId("m_a").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("m_b")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("m_c")).toBeFocused();
+
+    await page.getByTestId("m_c").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("m_b")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("m_a")).toBeFocused();
   });
 
   test("focusgroup memory falls through when the remembered item enters the top layer", async ({
@@ -478,53 +523,97 @@ test.describe("top-layer exclusion is dynamic", () => {
 
 // top-layer-popover-invoker.html
 test.describe("popover invoker inside focusgroup", () => {
-  const invokerHtml = `<div focusgroup="toolbar inline">
-    <button data-testid="before">Before</button>
-    <button data-testid="invoker" popovertarget="pop">Invoker</button>
-    <button data-testid="after">After</button>
-  </div>
-  <div id="pop" data-testid="pop" popover>
-    <button data-testid="pop_first">Popover first</button>
-    <button data-testid="pop_last">Popover last</button>
-  </div>
-  <button data-testid="outside">Outside</button>`;
-
-  async function openViaInvoker(page) {
-    await page.getByTestId("invoker").focus();
-    await page.getByTestId("invoker").click();
-    await expect(page.getByTestId("pop")).toBeVisible();
-  }
-
   test("arrow keys skip a popover opened by a focusgroup-item invoker", async ({
     page,
   }, { project }) => {
-    await setupPage(page, project, invokerHtml);
-    await openViaInvoker(page);
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="toolbar inline">
+        <button data-testid="before">Before</button>
+        <button data-testid="invoker" popovertarget="pop">Invoker</button>
+        <button data-testid="after">After</button>
+      </div>
+      <div id="pop" data-testid="pop" popover>
+        <button data-testid="pop_first">Popover first</button>
+        <button data-testid="pop_last">Popover last</button>
+      </div>
+      <button data-testid="outside">Outside</button>`,
+    );
 
-    await assertBidirectional(page, ["before", "invoker", "after"]);
+    await page.getByTestId("invoker").focus();
+    await page.getByTestId("invoker").click();
+    await expect(page.getByTestId("pop")).toBeVisible();
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("invoker")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("after")).toBeFocused();
+
+    await page.getByTestId("after").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("invoker")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("before")).toBeFocused();
   });
 
   test("Tab from a focusgroup-item invoker enters the open popover", async ({
     page,
   }, { project }) => {
-    await setupPage(page, project, invokerHtml);
-    await openViaInvoker(page);
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="toolbar inline">
+        <button data-testid="before">Before</button>
+        <button data-testid="invoker" popovertarget="pop">Invoker</button>
+        <button data-testid="after">After</button>
+      </div>
+      <div id="pop" data-testid="pop" popover>
+        <button data-testid="pop_first">Popover first</button>
+        <button data-testid="pop_last">Popover last</button>
+      </div>
+      <button data-testid="outside">Outside</button>`,
+    );
 
-    await assertTabSequence(page, [
-      "invoker",
-      "pop_first",
-      "pop_last",
-      "outside",
-    ]);
+    await page.getByTestId("invoker").focus();
+    await page.getByTestId("invoker").click();
+    await expect(page.getByTestId("pop")).toBeVisible();
+
+    await page.getByTestId("invoker").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("pop_first")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("pop_last")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("outside")).toBeFocused();
   });
 
   test("Shift+Tab from popover content opened by an invoker returns to the invoker", async ({
     page,
   }, { project }) => {
-    await setupPage(page, project, invokerHtml);
-    await openViaInvoker(page);
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="toolbar inline">
+        <button data-testid="before">Before</button>
+        <button data-testid="invoker" popovertarget="pop">Invoker</button>
+        <button data-testid="after">After</button>
+      </div>
+      <div id="pop" data-testid="pop" popover>
+        <button data-testid="pop_first">Popover first</button>
+        <button data-testid="pop_last">Popover last</button>
+      </div>
+      <button data-testid="outside">Outside</button>`,
+    );
 
-    await assertShiftTabSequence(page, ["pop_first", "invoker"]);
+    await page.getByTestId("invoker").focus();
+    await page.getByTestId("invoker").click();
+    await expect(page.getByTestId("pop")).toBeVisible();
+
+    await page.getByTestId("pop_first").focus();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("invoker")).toBeFocused();
   });
 
   test("Tab and Shift+Tab on a tabindex=-1 popover invoker do not crash", async ({
