@@ -72,7 +72,6 @@ export default defineConfig({
   webServer: {
     command: "npm run build && npm run dev",
     port: 5173,
-    timeout: 180_000,
     stdout: "pipe",
     stderr: "pipe",
   },
