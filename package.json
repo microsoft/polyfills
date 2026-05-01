@@ -14,7 +14,7 @@
     "change": "beachball change --dependent-change-type none",
     "checkchange": "beachball check --changehint \"Run 'npm run change' to generate a change file\"",
     "publish": "beachball publish",
-    "publish-ci": "beachball publish -y --no-publish"
+    "publish-ci": "beachball publish -y --no-publish --no-push"
   },
   "repository": {
     "type": "git",
