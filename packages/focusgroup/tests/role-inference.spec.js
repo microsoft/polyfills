@@ -160,3 +160,26 @@ test("owner and items with a non-generic native role do not get inferred roles",
   await expect(page.getByTestId("tablist")).not.toHaveComputedRole("tablist");
   await expect(page.getByTestId("tab")).not.toHaveComputedRole("tab");
 });
+
+// ax-role-inference-top-layer.html
+test("top-layer items skip role inference", async ({ page }, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="tablist">
+        <span tabindex="0" data-testid="outsideItem">Outside</span>
+        <div data-testid="pop" popover>
+          <span tabindex="0" data-testid="insideItem">Inside</span>
+        </div>
+      </div>
+    `,
+  );
+
+  await expect(page.getByTestId("outsideItem")).toHaveComputedRole("tab");
+  await expect(page.getByTestId("insideItem")).not.toHaveComputedRole("tab");
+
+  await page.getByTestId("pop").evaluate((el) => el.showPopover());
+
+  await expect(page.getByTestId("insideItem")).not.toHaveComputedRole("tab");
+});
