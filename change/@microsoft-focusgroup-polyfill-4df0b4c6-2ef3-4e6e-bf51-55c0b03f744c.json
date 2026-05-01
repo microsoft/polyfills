@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "fixed slotted items not being polyfilled in shadowless bundle",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}

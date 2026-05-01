@@ -153,6 +153,82 @@ class MyTablist extends HTMLElement {
 
 If the focusgroup’s reentry point doesn’t need to align with the element that has the selected state within a group, you can skip the `focusgroupstart` attribute manipulation and feel free to remove `nomemory` as you see fit, but it’s still recommended to use `focusin` event on the focusgroup owner element to update selection states.
 
+## Advanced usage
+
+The `polyfill()` and `polyfillBodyAndObserve()` functions can be a bit heavy-handed, and some of what they do may overlap with logic your application already has. If most of the following statements are true, the lower-level `FocusGroup` API documented in this section may be a better fit:
+
+* Your code already maintains its own list of focusgroup items — often the case when you also need to manage selection.
+* You’re using focusgroup on a component whose definition is fixed, so you don’t need the polyfill to read the `focusgroup` attribute and infer a definition.
+* You already set ARIA roles on your owner and item elements yourself.
+
+The package exports a `FocusGroup` class that handles just directional keyboard navigation and tab-stops (`tabindex`). You supply:
+
+1. The owner element.
+2. A `FocusGroupItemCollection` — an adapter that exposes your items to `FocusGroup`.
+3. An options bag with the `definition`, and optional decoration hooks.
+
+### Implementing a `FocusGroupItemCollection`
+
+`FocusGroupItemCollection` is an interface — `FocusGroup` only depends on the shape of the object you pass in, not on any specific implementation. You can implement it however is most natural for your code: as a plain object literal, a class, an instance of an existing data structure with the right methods bolted on, or anything else that satisfies the contract.
+
+The minimum surface is `items()`, `first()`, `last()`, `next()`, `previous()`, and `contains()`. Optional members add support for segments, mutation observation, and a designated start item. See the per-property JSDoc and a minimal array-backed example in [`src/focusgroup-items.js`](./src/focusgroup-items.js). For a fully featured, class-based reference implementation, see `TreeWalkerItemCollection` in [`src/tree-walker-item-collection.js`](./src/tree-walker-item-collection.js).
+
+### Constructing a `FocusGroup`
+
+```js
+import { FocusGroup } from "@microsoft/focusgroup-polyfill";
+
+const owner = document.querySelector("my-tablist");
+const focusGroup = new FocusGroup(owner, itemCollection, {
+  definition: {
+    behavior: "tablist",
+    wrap: false,
+    axis: "inline",
+    memory: false,
+  },
+});
+```
+
+If you don’t need the polyfill to infer ARIA roles (because your component already sets them), simply omit `decorateOwner` and `decorateItem`. When provided, each hook is called with `(element, behavior)` during decoration and `(element, null)` on teardown:
+
+```js
+new FocusGroup(owner, itemCollection, {
+  definition: { behavior: "toolbar" },
+  decorateOwner: (el, behavior) => {
+    if (el.hasAttribute("role")) {
+      // Don’t infer role if the element has an explicit role.
+      return;
+    }
+
+    if (!behavior || behavior === "none") {
+      el.removeAttribute("role");
+    } else {
+      el.setAttribute("role", behavior);
+    }
+  },
+});
+```
+
+### Reacting to changes
+
+`FocusGroup` does not observe the DOM on its own — it relies on the collection (or your application) to tell it when to reconcile. Whenever your item list, the focusgroup definition, or an item’s author-set `tabindex` changes, call `update()`:
+
+```js
+// Items added or removed.
+myItems.push(newItem);
+focusGroup.update();
+
+// The component’s focusgroup definition changed.
+focusGroup.update({
+  definition: { behavior: "tablist", wrap: true, memory: true },
+});
+
+// One or more items’ author-set `tabindex` changed and should be re-snapshotted.
+focusGroup.update({ authorTabindexChanges: [changedItem] });
+```
+
+If your collection has its own observation (e.g. a `MutationObserver`), it can call `focusGroup.update()` directly — `TreeWalkerItemCollection` does this.
+
 ## Testing
 
 See [TESTING.md](./TESTING.md) for details on how to test this project.

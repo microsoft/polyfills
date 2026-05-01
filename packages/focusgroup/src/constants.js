@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+/** @enum {string} */
 export const DatasetName = {
   // Whether the polyfill added an inferred role to the element due to lack of
   // explicit author role.
@@ -19,6 +20,7 @@ export const DatasetName = {
   SEGMENT_START: "data-fg-segs",
 };
 
+/** @enum {string} */
 export const BehaviorToken = {
   TOOLBAR: "toolbar",
   TABLIST: "tablist",
@@ -28,7 +30,15 @@ export const BehaviorToken = {
   MENUBAR: "menubar",
   NONE: "none",
 };
-export const BEHAVIOR_TOKENS = Object.values(BehaviorToken);
+export const BEHAVIOR_TOKENS = [
+  BehaviorToken.TOOLBAR,
+  BehaviorToken.TABLIST,
+  BehaviorToken.RADIOGROUP,
+  BehaviorToken.LISTBOX,
+  BehaviorToken.MENU,
+  BehaviorToken.MENUBAR,
+  BehaviorToken.NONE,
+];
 
 /**
  * @typedef {Object} Behavior
@@ -38,35 +48,42 @@ export const BEHAVIOR_TOKENS = Object.values(BehaviorToken);
  * @property {("inline"|"block"|undefined)} axis
  */
 
-/** @type {Map<BehaviorToken, Behavior>} */
-export const BehaviorMap = new Map([
-  [
-    BehaviorToken.TOOLBAR,
-    { ownerRole: "toolbar", childRole: null, wrap: false, axis: "inline" },
-  ],
-  [
-    BehaviorToken.TABLIST,
-    { ownerRole: "tablist", childRole: "tab", wrap: true, axis: "inline" },
-  ],
-  [
-    BehaviorToken.RADIOGROUP,
-    {
-      ownerRole: "radiogroup",
-      childRole: "radio",
-      wrap: false,
-      axis: undefined,
-    },
-  ],
-  [
-    BehaviorToken.LISTBOX,
-    { ownerRole: "listbox", childRole: "option", wrap: false, axis: undefined },
-  ],
-  [
-    BehaviorToken.MENU,
-    { ownerRole: "menu", childRole: "menuitem", wrap: true, axis: "block" },
-  ],
-  [
-    BehaviorToken.MENUBAR,
-    { ownerRole: "menubar", childRole: "menuitem", wrap: true, axis: "inline" },
-  ],
-]);
+/** @type {Record<BehaviorToken, Behavior>} */
+export const BehaviorMap = {
+  toolbar: {
+    ownerRole: "toolbar",
+    childRole: null,
+    wrap: false,
+    axis: "inline",
+  },
+  tablist: {
+    ownerRole: "tablist",
+    childRole: "tab",
+    wrap: true,
+    axis: "inline",
+  },
+  radiogroup: {
+    ownerRole: "radiogroup",
+    childRole: "radio",
+    wrap: false,
+    axis: undefined,
+  },
+  listbox: {
+    ownerRole: "listbox",
+    childRole: "option",
+    wrap: false,
+    axis: undefined,
+  },
+  menu: {
+    ownerRole: "menu",
+    childRole: "menuitem",
+    wrap: true,
+    axis: "block",
+  },
+  menubar: {
+    ownerRole: "menubar",
+    childRole: "menuitem",
+    wrap: true,
+    axis: "inline",
+  },
+};

@@ -1,7 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { BehaviorMap, DatasetName } from "./constants.js";
+import {
+  BEHAVIOR_TOKENS,
+  BehaviorMap,
+  BehaviorToken,
+  DatasetName,
+} from "./constants.js";
 import { createTreeWalker, getParentElement } from "./shadow-utils/index.js";
 
 /**
@@ -20,6 +25,52 @@ export function hasDocument() {
  */
 export function supportsFocusGroup() {
   return "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {});
+}
+
+/**
+ * @typedef {Object} FocusGroupDefinition
+ * @property {BehaviorToken} [behavior]
+ * @property {boolean} [wrap]
+ * @property {("inline"|"block"|undefined)} [axis]
+ * @property {boolean} [memory]
+ */
+
+/**
+ * Parse a `FocusGroupDefinition` from the owner element's `focusgroup`
+ * attribute according to the HTML focusgroup spec. Used by `polyfill()` to
+ * configure the `FocusGroup` constructor's `options.definition`.
+ *
+ * @param {HTMLElement} owner
+ * @returns {FocusGroupDefinition}
+ */
+export function parseDefinition(owner) {
+  const tokens = (owner.getAttribute("focusgroup") ?? "").split(" ");
+  const behavior = BEHAVIOR_TOKENS.includes(tokens[0])
+    ? tokens[0]
+    : BehaviorToken.NONE;
+  const base = BehaviorMap[behavior];
+  let wrap = base?.wrap ?? false;
+  if (tokens.includes("wrap")) {
+    wrap = true;
+  } else if (tokens.includes("nowrap")) {
+    wrap = false;
+  }
+  const hasInline = tokens.includes("inline");
+  const hasBlock = tokens.includes("block");
+  const axis =
+    hasInline === hasBlock
+      ? hasInline
+        ? undefined
+        : base?.axis
+      : hasInline
+        ? "inline"
+        : "block";
+  return {
+    behavior,
+    wrap,
+    axis,
+    memory: !tokens.includes("nomemory"),
+  };
 }
 
 /**
@@ -81,12 +132,13 @@ export function isKeyboardFocusable(element, owner) {
  *     if there shouldn’t be navigation, e.g. when directional limit applies.
  */
 export function getNavigationDirection(event, owner, axis) {
+  const FORWARD = "forward";
+  const BACKWARD = "backward";
+  const BLOCK = "block";
+  const INLINE = "inline";
+
   if (isKeyConflictElement(event.composedPath()[0])) {
-    return event.key === "Tab"
-      ? event.shiftKey
-        ? "backward"
-        : "forward"
-      : null;
+    return event.key === "Tab" ? (event.shiftKey ? BACKWARD : FORWARD) : null;
   }
 
   if (event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -96,8 +148,8 @@ export function getNavigationDirection(event, owner, axis) {
   const { writingMode, direction } = window.getComputedStyle(owner);
   const isVertical = !writingMode.startsWith("horizontal-");
   const isRtl = direction === "rtl";
-  const horizontal = isVertical ? "block" : "inline";
-  const vertical = isVertical ? "inline" : "block";
+  const horizontal = isVertical ? BLOCK : INLINE;
+  const vertical = isVertical ? INLINE : BLOCK;
   const isHorizontalReversed = isVertical
     ? writingMode.endsWith("-rl") !== isRtl
     : isRtl;
@@ -106,19 +158,19 @@ export function getNavigationDirection(event, owner, axis) {
   const map = {
     ArrowUp: {
       axis: vertical,
-      dir: isVerticalReversed ? "forward" : "backward",
+      dir: isVerticalReversed ? FORWARD : BACKWARD,
     },
     ArrowDown: {
       axis: vertical,
-      dir: isVerticalReversed ? "backward" : "forward",
+      dir: isVerticalReversed ? BACKWARD : FORWARD,
     },
     ArrowLeft: {
       axis: horizontal,
-      dir: isHorizontalReversed ? "forward" : "backward",
+      dir: isHorizontalReversed ? FORWARD : BACKWARD,
     },
     ArrowRight: {
       axis: horizontal,
-      dir: isHorizontalReversed ? "backward" : "forward",
+      dir: isHorizontalReversed ? BACKWARD : FORWARD,
     },
     Home: { dir: "start" },
     End: { dir: "end" },
@@ -249,8 +301,11 @@ export function inferRole(element, behavior, kind) {
   const allowRoleInferring =
     hasGenericRole(element) ||
     (kind === "child" && element.nodeName === "BUTTON");
+  const cfg = BehaviorMap[behavior];
   const role = allowRoleInferring
-    ? BehaviorMap.get(behavior)?.[`${kind}Role`]
+    ? kind === "owner"
+      ? cfg?.ownerRole
+      : cfg?.childRole
     : undefined;
 
   if (role) {

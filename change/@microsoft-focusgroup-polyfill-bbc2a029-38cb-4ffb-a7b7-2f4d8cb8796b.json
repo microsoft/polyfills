@@ -1,7 +1,0 @@
-{
-  "type": "patch",
-  "comment": "fixed nested focusgroups not being properly observed",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}
