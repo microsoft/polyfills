@@ -2,21 +2,6 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
-      "date": "Fri, 01 May 2026 00:02:49 GMT",
-      "version": "1.3.0",
-      "tag": "@microsoft/focusgroup-polyfill_v1.3.0",
-      "comments": {
-        "minor": [
-          {
-            "author": "machi@microsoft.com",
-            "package": "@microsoft/focusgroup-polyfill",
-            "commit": "f73531435faf57aa67af89c8de32785ddca313a7",
-            "comment": "added exports of FocusGroup and FocusGroupItemCollection"
-          }
-        ]
-      }
-    },
-    {
       "date": "Thu, 30 Apr 2026 21:42:54 GMT",
       "version": "1.2.2",
       "tag": "@microsoft/focusgroup-polyfill_v1.2.2",

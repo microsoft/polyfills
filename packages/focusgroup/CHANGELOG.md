@@ -1,16 +1,8 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Fri, 01 May 2026 00:02:49 GMT and should not be manually modified. -->
+<!-- This log was last generated on Thu, 30 Apr 2026 21:42:54 GMT and should not be manually modified. -->
 
 <!-- Start content -->
-
-## 1.3.0
-
-Fri, 01 May 2026 00:02:49 GMT
-
-### Minor changes
-
-- added exports of FocusGroup and FocusGroupItemCollection (machi@microsoft.com)
 
 ## 1.2.2
 
