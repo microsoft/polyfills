@@ -1,7 +1,0 @@
-{
-  "type": "minor",
-  "comment": "added exports of FocusGroup and FocusGroupItemCollection",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}
