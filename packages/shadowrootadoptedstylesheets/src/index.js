@@ -5,8 +5,12 @@ const PROP_NAME = "shadowRootAdoptedStyleSheets";
 const ATTR_NAME_DATA_BASE = `data-${PROP_NAME.toLowerCase()}`;
 const ATTR_NAME_DATA_READY = `${ATTR_NAME_DATA_BASE}-ready`;
 const ATTR_NAME_SPECIFIER = "specifier";
+/** @enum {number} */
+const CollectType = {
+  PROCESSABLE_ELEMENT: 0,
+  SHADOW_ROOT: 1,
+};
 
-const processedHosts = new WeakSet();
 const installedRoots = new WeakSet();
 
 /**
@@ -16,7 +20,7 @@ const installedRoots = new WeakSet();
  * @returns {boolean}
  */
 function isFetchableModule(specifier) {
-  return /\.{0,2}\//.test(specifier) || URL.canParse?.(specifier);
+  return /\.{0,2}\//.test(specifier) || !!URL.canParse?.(specifier);
 }
 
 /**
@@ -51,7 +55,7 @@ function processElement(map, element) {
   if (isCSSModule(element)) {
     const specifier = element.getAttribute(ATTR_NAME_SPECIFIER).trim();
 
-    if (!specifier || map.has(specifier)) {
+    if (map.has(specifier)) {
       return;
     }
 
@@ -63,26 +67,24 @@ function processElement(map, element) {
   }
 
   if (hasSpecifier(element)) {
-    if (processedHosts.has(element)) {
-      return;
-    }
-    processedHosts.add(element);
     const attrValue = element.getAttribute(ATTR_NAME_DATA_BASE).trim();
-    const specifiers = attrValue.split(" ");
+    const specifiers = attrValue.split(/\s+/).filter(Boolean);
     const pending = [];
-    const sheets = specifiers.filter(Boolean).map((s) => {
-      const specifier = s.trim();
-      const sheet = map.get(specifier) ?? new CSSStyleSheet();
-
-      if (!map.has(specifier)) {
+    const sheets = specifiers.map((specifier) => {
+      let sheet = map.get(specifier);
+      if (!sheet) {
+        sheet = new CSSStyleSheet();
         map.set(specifier, sheet);
         if (isFetchableModule(specifier)) {
           pending.push(
             fetch(specifier, { headers: { accept: "text/css" } })
-              .then((res) => (res.ok && res.status === 200 ? res.text() : ""))
-              .then((text) => {
-                sheet.replaceSync(text);
-              }),
+              .then((res) => (res.ok ? res.text() : ""))
+              .then(
+                (text) => {
+                  sheet.replaceSync(text);
+                },
+                () => {},
+              ),
           );
         }
       }
@@ -110,48 +112,39 @@ function shouldProcessElement(element) {
 }
 
 /**
- * Yields the given element and all of its descendants that should be processed.
+ * Yields elements (or their shadow roots) that are descendants of the given
+ * `root` (inclusive). The `type` parameter determines what to collect:
+ * - `CollectType.PROCESSABLE_ELEMENT`: yields elements that should be processed.
+ * - `CollectType.SHADOW_ROOT`: yields shadow roots attached to elements.
+ * @param {typeof CollectType[keyof typeof CollectType]} type
  * @param {Document} doc
  * @param {Node} root
+ * @returns {Generator<Element | ShadowRoot>}
  */
-function* collectProcessable(doc, root) {
-  if (root.nodeType === Node.ELEMENT_NODE && shouldProcessElement(root)) {
-    yield/** @type {Element} */ (root);
+function* collect(type, doc, root) {
+  const matches = (/** @type {Element} */ element) =>
+    type === CollectType.PROCESSABLE_ELEMENT
+      ? shouldProcessElement(element)
+      : !!element.shadowRoot;
+  const get = (/** @type {Element} */ element) =>
+    type === CollectType.PROCESSABLE_ELEMENT ? element : element.shadowRoot;
+
+  if (
+    root.nodeType === Node.ELEMENT_NODE &&
+    matches(/** @type {Element} */ (root))
+  ) {
+    yield get(/** @type {Element} */ (root));
   }
   const walker = doc.createTreeWalker(
     root,
     NodeFilter.SHOW_ELEMENT,
     (element) =>
-      shouldProcessElement(element)
+      matches(/** @type {Element} */ (element))
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_SKIP,
   );
   while (walker.nextNode()) {
-    yield/** @type {Element} */ (walker.currentNode);
-  }
-}
-
-/**
- * Yields the shadow roots attached to the given element and all of its
- * descendants.
- * @param {Document} doc
- * @param {Node} root
- */
-function* collectShadowRoots(doc, root) {
-  if (
-    root.nodeType === Node.ELEMENT_NODE &&
-    /** @type {Element} */ (root).shadowRoot
-  ) {
-    yield/** @type {Element} */ (root).shadowRoot;
-  }
-  const walker = doc.createTreeWalker(
-    root,
-    NodeFilter.SHOW_ELEMENT,
-    (element) =>
-      element.shadowRoot ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
-  );
-  while (walker.nextNode()) {
-    yield walker.currentNode.shadowRoot;
+    yield get(/** @type {Element} */ (walker.currentNode));
   }
 }
 
@@ -169,18 +162,22 @@ function installToRoot(map, doc, root) {
   }
   installedRoots.add(root);
 
-  for (const element of collectProcessable(doc, root)) {
-    processElement(map, element);
+  for (const element of collect(CollectType.PROCESSABLE_ELEMENT, doc, root)) {
+    processElement(map, /** @type {Element} */ (element));
   }
 
   new MutationObserver((entries) => {
     for (const entry of entries) {
       for (const added of entry.addedNodes) {
-        for (const element of collectProcessable(doc, added)) {
-          processElement(map, element);
+        for (const element of collect(
+          CollectType.PROCESSABLE_ELEMENT,
+          doc,
+          added,
+        )) {
+          processElement(map, /** @type {Element} */ (element));
         }
-        for (const shadowRoot of collectShadowRoots(doc, added)) {
-          installToRoot(map, doc, shadowRoot);
+        for (const shadowRoot of collect(CollectType.SHADOW_ROOT, doc, added)) {
+          installToRoot(map, doc, /** @type {ShadowRoot} */ (shadowRoot));
         }
       }
     }
@@ -190,8 +187,8 @@ function installToRoot(map, doc, root) {
   });
 
   // Install this to all existing shadow roots.
-  for (const shadowRoot of collectShadowRoots(doc, root)) {
-    installToRoot(map, doc, shadowRoot);
+  for (const shadowRoot of collect(CollectType.SHADOW_ROOT, doc, root)) {
+    installToRoot(map, doc, /** @type {ShadowRoot} */ (shadowRoot));
   }
 }
 
@@ -208,7 +205,7 @@ function domReady() {
 
 /**
  * NOTE: This currently isn’t working because browsers that support the feature
- * doesn’t have the `shadowRootAdoptedStyleSheets` property, the working group
+ * don’t have the `shadowRootAdoptedStyleSheets` property, the working group
  * is working on this.
  * @returns {boolean}
  */
