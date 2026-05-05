@@ -226,7 +226,7 @@ export function isSegmentor(element, owner) {
     return false;
   }
   if (isKeyboardFocusable(element, owner)) {
-    return element.getAttribute("focusgroup").includes("none");
+    return element.getAttribute("focusgroup").includes(BehaviorToken.NONE);
   }
   const walker = createTreeWalker(document, element, NodeFilter.SHOW_ELEMENT);
   while (walker.nextNode()) {

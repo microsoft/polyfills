@@ -397,7 +397,7 @@ export class FocusGroup {
     }
 
     if (
-      (evt.relatedTarget && this.#owner.contains(evt.relatedTarget)) ||
+      (evt.relatedTarget && nodeContains(this.#owner, evt.relatedTarget)) ||
       this.#memory ||
       !this.#start
     ) {
@@ -410,32 +410,23 @@ export class FocusGroup {
     // undecorate+decorate cycle — the latter churns the owner proxy tabindex
     // synchronously inside focusout, which can race with the browser's
     // tab-target resolution and pull focus back to the owner proxy.
-    if (!this.#memory && this.#start) {
-      const prev = this.#current;
+    const prev = this.#current;
 
-      this.#current = null;
+    this.#current = null;
 
-      const nextStart = this.#items.start ?? this.#items.first?.() ?? null;
+    const nextStart = this.#items.start ?? this.#items.first?.() ?? null;
 
-      if (prev !== this.#start || nextStart !== this.#start) {
-        for (const { element, segmentBoundary } of this.#items.items()) {
-          element.tabIndex = segmentBoundary ? 0 : -1;
-        }
-
-        if (nextStart) {
-          nextStart.tabIndex = 0;
-          this.#start = nextStart;
-        }
-
-        this.#items.flush?.();
+    if (prev !== this.#start || nextStart !== this.#start) {
+      for (const { element, segmentBoundary } of this.#items.items()) {
+        element.tabIndex = segmentBoundary ? 0 : -1;
       }
-    }
 
-    // Re-enable the owner as a Tab-entry proxy so Tab can re-enter the group.
-    const tabStop = this.#memory ? this.#current || this.#start : this.#start;
+      if (nextStart) {
+        nextStart.tabIndex = 0;
+        this.#start = nextStart;
+      }
 
-    if (tabStop) {
-      this.#enableFocusabilityProxy(tabStop);
+      this.#items.flush?.();
     }
   }
 

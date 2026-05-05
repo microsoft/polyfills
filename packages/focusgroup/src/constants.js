@@ -65,14 +65,14 @@ export const BehaviorMap = {
   radiogroup: {
     ownerRole: "radiogroup",
     childRole: "radio",
-    wrap: false,
+    wrap: true,
     axis: undefined,
   },
   listbox: {
     ownerRole: "listbox",
     childRole: "option",
     wrap: false,
-    axis: undefined,
+    axis: "block",
   },
   menu: {
     ownerRole: "menu",

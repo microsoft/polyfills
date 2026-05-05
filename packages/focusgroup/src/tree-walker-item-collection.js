@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { DatasetName } from "./constants.js";
+import { BehaviorToken, DatasetName } from "./constants.js";
 import { observers } from "./observer-registry.js";
 import {
   createMutationObserver,
@@ -181,7 +181,9 @@ export class TreeWalkerItemCollection {
         if (isSegmentor(node, this.#owner)) {
           pendingSegmentBoundary = true;
         }
-        const isOptedOut = node.getAttribute("focusgroup").includes("none");
+        const isOptedOut = node
+          .getAttribute("focusgroup")
+          .includes(BehaviorToken.NONE);
         if (isOptedOut) {
           skipSubtreeOf = node;
           continue;
@@ -333,7 +335,7 @@ export class TreeWalkerItemCollection {
     ) {
       return NodeFilter.FILTER_REJECT;
     }
-    return node.getAttribute(DatasetName.ITEM) === this.id
+    return this.isItem(node)
       ? NodeFilter.FILTER_ACCEPT
       : NodeFilter.FILTER_SKIP;
   }

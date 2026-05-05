@@ -32,7 +32,7 @@ if (
 
         for (const node of entry.removedNodes) {
           if (elementPolyfillMap.has(node)) {
-            elementPolyfillMap.get(node).disconnect();
+            elementPolyfillMap.get(node)?.disconnect();
             elementPolyfillMap.delete(node);
           }
         }
@@ -83,8 +83,18 @@ export function polyfill(root) {
       continue;
     }
 
+    // Reserve the slot synchronously so a re-entrant polyfill() call (e.g.
+    // from the global mutation observer) cannot schedule a duplicate
+    // FocusGroup before the rAF callback below installs the real instance.
+    elementPolyfillMap.set(element, null);
+
     // Make sure the element is ready during initial polyfilling.
     requestAnimationFrame(() => {
+      // The element may have been removed (and its slot deleted) before the
+      // rAF fired; bail out so we don't resurrect a tracking entry.
+      if (!elementPolyfillMap.has(element)) {
+        return;
+      }
       const items = new TreeWalkerItemCollection(element);
       const fg = new FocusGroup(element, items, {
         definition: parseDefinition(element),

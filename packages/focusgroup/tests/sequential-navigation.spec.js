@@ -227,7 +227,7 @@ test.describe("native arrow key handler elements block arrow exit", () => {
       page,
       project,
       `<div data-testid="toolbar-select" focusgroup="toolbar">
-        <button data-testid="btn-select-before" tabindex="0">Before</button>
+        <button data-testid="btn-select-before">Before</button>
         <select data-testid="select-input">
           <option>A</option>
           <option>B</option>
@@ -235,6 +235,9 @@ test.describe("native arrow key handler elements block arrow exit", () => {
         <button data-testid="btn-select-after">After</button>
       </div>`,
     );
+
+    // Make the test less flaky in Safari
+    await page.getByTestId("select-input").waitFor();
 
     await page.getByTestId("btn-select-before").focus();
     await page.keyboard.press("ArrowRight");
