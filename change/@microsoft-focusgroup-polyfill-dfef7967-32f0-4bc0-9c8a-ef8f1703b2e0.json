@@ -1,6 +1,6 @@
 {
   "type": "minor",
-  "comment": "update for spec changes: added default modifier for listbox and radiogroup and opt out top-layer elements",
+  "comment": "added default modifier for listbox and radiogroup to align with spec updates",
   "packageName": "@microsoft/focusgroup-polyfill",
   "email": "machi@microsoft.com",
   "dependentChangeType": "none"
