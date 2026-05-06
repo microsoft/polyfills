@@ -294,16 +294,15 @@ export class FocusGroup {
     }
 
     // Only handle events targeted at our own items. The collection's
-    // candidacy filter already excludes opted-out subtrees and items owned
-    // by nested focusgroups, so this guard subsumes both the legacy
-    // closest-`[focusgroup]` opt-out check and the propagation-stopping
-    // logic for nested groups. `contains()` is intentionally lax so that
-    // untraversable (`tabindex=-1`) items still count as ours when focused.
+    // candidacy filter excludes opted-out subtrees and items owned by
+    // nested focusgroups (via an ancestor walk), so this guard alone
+    // prevents nested-group double-handling — no `stopPropagation` needed,
+    // which keeps author event delegation working. `contains()` is
+    // intentionally lax so that untraversable (`tabindex=-1`) items still
+    // count as ours when focused.
     if (!this.#items.contains(current)) {
       return;
     }
-
-    evt.stopPropagation();
 
     let target;
 
