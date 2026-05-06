@@ -1,8 +1,16 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Fri, 01 May 2026 00:02:49 GMT and should not be manually modified. -->
+<!-- This log was last generated on Wed, 06 May 2026 00:11:30 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.4.0
+
+Wed, 06 May 2026 00:11:30 GMT
+
+### Minor changes
+
+- added default modifier for listbox and radiogroup to align with spec updates (machi@microsoft.com)
 
 ## 1.3.0
 

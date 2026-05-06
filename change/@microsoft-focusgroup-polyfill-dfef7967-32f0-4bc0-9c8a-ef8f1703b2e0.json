@@ -1,7 +1,0 @@
-{
-  "type": "minor",
-  "comment": "added default modifier for listbox and radiogroup to align with spec updates",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}
