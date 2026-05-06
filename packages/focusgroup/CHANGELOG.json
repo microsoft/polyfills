@@ -2,6 +2,21 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Wed, 06 May 2026 16:42:21 GMT",
+      "version": "1.4.1",
+      "tag": "@microsoft/focusgroup-polyfill_v1.4.1",
+      "comments": {
+        "patch": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "638d443e0cd689b032938ed6db1a27b8d8058772",
+            "comment": "allow keydown event propagation"
+          }
+        ]
+      }
+    },
+    {
       "date": "Wed, 06 May 2026 00:11:30 GMT",
       "version": "1.4.0",
       "tag": "@microsoft/focusgroup-polyfill_v1.4.0",

@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/focusgroup-polyfill",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "A polyfill for the focusgroup HTML attribute.",
   "scripts": {
     "dev": "vite",

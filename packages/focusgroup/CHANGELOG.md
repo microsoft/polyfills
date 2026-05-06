@@ -1,8 +1,16 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Wed, 06 May 2026 00:11:30 GMT and should not be manually modified. -->
+<!-- This log was last generated on Wed, 06 May 2026 16:42:21 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.4.1
+
+Wed, 06 May 2026 16:42:21 GMT
+
+### Patches
+
+- allow keydown event propagation (machi@microsoft.com)
 
 ## 1.4.0
 
