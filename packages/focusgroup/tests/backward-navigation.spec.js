@@ -524,3 +524,47 @@ test("vertical: wraps backward when block axis and wrap are supported", async ({
   await page.keyboard.press("ArrowUp");
   await expect(page.getByTestId("item3")).toBeFocused();
 });
+
+test.describe("nested focusgroup is not an item of parent focusgroup", () => {
+  test("arrow left at first item of inner does not bleed into parent (no wrap)", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="outer" focusgroup="toolbar nomemory">
+        <button data-testid="btn1">btn1</button>
+        <div data-testid="inner" focusgroup="toolbar nomemory">
+          <button data-testid="inner_btn1">inner btn1</button>
+          <button data-testid="inner_btn2">inner btn2</button>
+        </div>
+        <button data-testid="btn4">btn4</button>
+      </div>`,
+    );
+
+    await page.getByTestId("inner_btn1").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("inner_btn1")).toBeFocused();
+  });
+
+  test("inner backward navigation moves to previous inner item, not parent's previous item", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="outer" focusgroup="toolbar nomemory">
+        <button data-testid="btn1">btn1</button>
+        <div data-testid="inner" focusgroup="toolbar nomemory">
+          <button data-testid="inner_btn1">inner btn1</button>
+          <button data-testid="inner_btn2">inner btn2</button>
+        </div>
+        <button data-testid="btn4">btn4</button>
+      </div>`,
+    );
+
+    await page.getByTestId("inner_btn2").focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByTestId("inner_btn1")).toBeFocused();
+  });
+});

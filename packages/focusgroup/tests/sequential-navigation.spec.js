@@ -548,6 +548,42 @@ test.describe("memory behavior", () => {
     await page.keyboard.press("ArrowLeft");
     await expect(page.getByTestId("memory-item1")).toBeFocused();
   });
+
+  test("parent focusgroup memory is preserved when focus traverses through a nested focusgroup", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="before" tabindex="0">before</div>
+        <div data-testid="parent" focusgroup="toolbar">
+          <button data-testid="parent-item1">parent 1</button>
+          <button data-testid="parent-item2">parent 2</button>
+          <div data-testid="inner" focusgroup="toolbar">
+            <button data-testid="inner-item1">inner 1</button>
+            <button data-testid="inner-item2">inner 2</button>
+          </div>
+          <button data-testid="parent-item3">parent 3</button>
+        </div>
+        <div data-testid="after" tabindex="0">after</div>`,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("parent-item1")).toBeFocused();
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("parent-item2")).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("inner-item1")).toBeFocused();
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("inner-item2")).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("parent-item2")).toBeFocused();
+  });
 });
 
 // sequential-navigation/guaranteed-tab-stop-priority.html
