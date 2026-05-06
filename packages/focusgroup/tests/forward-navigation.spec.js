@@ -307,6 +307,96 @@ test.describe("nested focusgroup is item of parent focusgroup", () => {
   });
 });
 
+test.describe("nested focusgroup is not an item of parent focusgroup", () => {
+  test("arrow right at last item of inner does not bleed into parent (no wrap)", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="outer" focusgroup="toolbar nomemory">
+        <button data-testid="btn1">btn1</button>
+        <div data-testid="inner" focusgroup="toolbar nomemory">
+          <button data-testid="inner_btn1">inner btn1</button>
+          <button data-testid="inner_btn2">inner btn2</button>
+        </div>
+        <button data-testid="btn4">btn4</button>
+      </div>`,
+    );
+
+    await page.getByTestId("inner_btn2").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("inner_btn2")).toBeFocused();
+  });
+
+  test("inner navigation moves to next inner item, not parent's next item", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="outer" focusgroup="toolbar nomemory">
+        <button data-testid="btn1">btn1</button>
+        <div data-testid="inner" focusgroup="toolbar nomemory">
+          <button data-testid="inner_btn1">inner btn1</button>
+          <button data-testid="inner_btn2">inner btn2</button>
+        </div>
+        <button data-testid="btn4">btn4</button>
+      </div>`,
+    );
+
+    await page.getByTestId("inner_btn1").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("inner_btn2")).toBeFocused();
+  });
+
+  test("Home/End at inner item operates within inner, not parent", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="outer" focusgroup="toolbar nomemory">
+        <button data-testid="btn1">btn1</button>
+        <div data-testid="inner" focusgroup="toolbar nomemory">
+          <button data-testid="inner_btn1">inner btn1</button>
+          <button data-testid="inner_btn2">inner btn2</button>
+          <button data-testid="inner_btn3">inner btn3</button>
+        </div>
+        <button data-testid="btn4">btn4</button>
+      </div>`,
+    );
+
+    await page.getByTestId("inner_btn2").focus();
+    await page.keyboard.press("End");
+    await expect(page.getByTestId("inner_btn3")).toBeFocused();
+
+    await page.keyboard.press("Home");
+    await expect(page.getByTestId("inner_btn1")).toBeFocused();
+  });
+
+  test("axis-supported parent does not act on key the inner failed to handle (orthogonal axis)", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="outer" focusgroup="toolbar inline">
+        <button data-testid="btn1">btn1</button>
+        <div data-testid="inner" focusgroup="toolbar block">
+          <button data-testid="inner_btn1">inner btn1</button>
+          <button data-testid="inner_btn2">inner btn2</button>
+        </div>
+        <button data-testid="btn4">btn4</button>
+      </div>`,
+    );
+
+    await page.getByTestId("inner_btn1").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("inner_btn1")).toBeFocused();
+  });
+});
+
 // forward-navigation/mixed-ltr-rtl-visual-order.html
 test.describe("Arrow keys follow the focused element's writing direction", () => {
   test.describe("LTR container with RTL wrapper", () => {

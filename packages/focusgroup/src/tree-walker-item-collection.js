@@ -335,6 +335,22 @@ export class TreeWalkerItemCollection {
     ) {
       return NodeFilter.FILTER_REJECT;
     }
+
+    // Reject anything inside a nested focusgroup. The leaf node itself has
+    // no marker — only its ancestor (the nested owner) does. This makes
+    // `contains()` correctly return false for events that bubble up from a
+    // nested group, which removes the need for `stopPropagation` in the
+    // keydown handler and lets author event delegation work. Uses the
+    // shadow-aware traversal so slotted nodes are correctly attributed to
+    // the focusgroup that flat-tree contains them.
+    const closestForeignGroup = getClosestElement(
+      getParentElement(node),
+      `[focusgroup]:not([${DatasetName.ITEM}="${this.id}"])`,
+    );
+    if (closestForeignGroup && closestForeignGroup !== this.#owner) {
+      return NodeFilter.FILTER_REJECT;
+    }
+
     return this.isItem(node)
       ? NodeFilter.FILTER_ACCEPT
       : NodeFilter.FILTER_SKIP;
