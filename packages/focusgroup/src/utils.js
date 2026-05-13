@@ -24,7 +24,10 @@ export function hasDocument() {
  * @returns {boolean}
  */
 export function supportsFocusGroup() {
-  return "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {});
+  return (
+    "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {}) ||
+    "focusGroup" in (globalThis?.HTMLElement?.prototype ?? {})
+  );
 }
 
 /**
