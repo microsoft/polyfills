@@ -79,7 +79,10 @@ export function polyfill(root) {
   do {
     const element = walker.currentNode;
 
-    if (elementPolyfillMap.has(element)) {
+    if (
+      (element === root && !element.hasAttribute("focusgroup")) ||
+      elementPolyfillMap.has(element)
+    ) {
       continue;
     }
 
