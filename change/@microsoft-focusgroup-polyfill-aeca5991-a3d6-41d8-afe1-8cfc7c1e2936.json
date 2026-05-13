@@ -1,6 +1,6 @@
 {
   "type": "minor",
-  "comment": "update feature detection to check `focusGroup` property as per implementation update",
+  "comment": "support `focusGroup` in feature detection as per implementation update",
   "packageName": "@microsoft/focusgroup-polyfill",
   "email": "machi@microsoft.com",
   "dependentChangeType": "none"
