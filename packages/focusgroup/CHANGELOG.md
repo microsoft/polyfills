@@ -1,8 +1,16 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Wed, 06 May 2026 16:42:21 GMT and should not be manually modified. -->
+<!-- This log was last generated on Thu, 14 May 2026 00:04:39 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.5.0
+
+Thu, 14 May 2026 00:04:39 GMT
+
+### Minor changes
+
+- support `focusGroup` in feature detection as per implementation update (machi@microsoft.com)
 
 ## 1.4.1
 

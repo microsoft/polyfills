@@ -63,8 +63,8 @@ The same function also exists in the “shadowless” bundle.
 While one of the polyfill’s principles is “correctness”, it’s still bound to the web platform’s limitations, especially when considering performance.
 
 * The `focusgroup` spec is still evolving, the polyfill may not reflect the latest spec changes and the native implementations, check the [CHANGELOG.md](./CHANGELOG.md) for details
-* Doesn’t support `focusgroup` property
-    * If the polyfill adds the `focusgroup` property to `HTMLElement.prototype`, it will break feature detection when `polyfill()` is called again. But if it only adds the `focusgroup` property to individual HTML elements, it can’t change the `focusgroup` property’s value on an arbitrary element
+* Doesn’t support `focusGroup` property
+    * If the polyfill adds the `focusGroup` property to `HTMLElement.prototype`, it will break feature detection when `polyfill()` is called again. But if it only adds the `focusGroup` property to individual HTML elements, it can’t change the `focusGroup` property’s value on an arbitrary element
 * Polyfill explicitly manipulates `tabindex` attributes
     * It does save the attribute’s value that the author defined, so that it can restore the attribute to its original value when needed
 * Polyfill doesn’t work with CSS’s `reading-flow`
