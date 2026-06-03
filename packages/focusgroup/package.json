@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/focusgroup-polyfill",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "A polyfill for the focusgroup HTML attribute.",
   "scripts": {
     "dev": "vite",
@@ -84,14 +84,5 @@
   "bugs": {
     "url": "https://github.com/Microsoft/polyfills/issues"
   },
-  "homepage": "https://github.com/microsoft/polyfills/tree/main/packages/focusgroup#readme",
-  "devDependencies": {
-    "@playwright/test": "1.59.1",
-    "@size-limit/preset-small-lib": "12.1.0",
-    "@types/node": "^25.6.0",
-    "size-limit": "12.1.0",
-    "terser": "5.46.2",
-    "typescript": "^6.0.3",
-    "vite": "8.0.10"
-  }
+  "homepage": "https://github.com/microsoft/polyfills/tree/main/packages/focusgroup#readme"
 }

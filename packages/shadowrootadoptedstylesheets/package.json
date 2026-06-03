@@ -1,0 +1,60 @@
+{
+  "name": "@microsoft/shadowrootadoptedstylesheets-ponyfill",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A pony fill for `shadowRootAdoptedStyleSheets` attribute on Declarative Shadow DOM.",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:lib && npm run build:lib:min",
+    "build:app": "vite build",
+    "build:lib": "vite build --config vite.config.lib.js",
+    "build:lib:min": "npm run build:lib -- --mode minified",
+    "test": "playwright test",
+    "test:ci": "npm test -- --project=chromium --project=firefox --project=webkit",
+    "size": "size-limit"
+  },
+  "module": "./build/index.mjs",
+  "types": "./build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.mjs"
+    },
+    "./minified": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.min.mjs"
+    }
+  },
+  "size-limit": [
+    {
+      "path": "build/index.min.mjs",
+      "limit": "2 kB",
+      "gzip": true
+    },
+    {
+      "path": "build/index.min.mjs",
+      "limit": "1 kB"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Microsoft/polyfills.git",
+    "directory": "packages/shadowrootadoptedstylesheets"
+  },
+  "keywords": [
+    "html",
+    "adopted style sheets",
+    "web components",
+    "custom elements",
+    "shadow dom",
+    "declarative shadow dom",
+    "css module",
+    "declarative css module",
+    "ponyfill",
+    "polyfill"
+  ],
+  "author": "Microsoft",
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/microsoft/polyfills/tree/main/packages/shadowrootadoptedstylesheets#readme"
+}

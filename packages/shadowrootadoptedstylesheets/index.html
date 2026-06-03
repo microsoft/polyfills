@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<!-- Copyright (c) Microsoft Corporation.
+ Licensed under the MIT License. -->
+<html lang="en">
+<meta charset="utf-8">
+<title>shadowRootAdoptedStyleSheets ponyfill</title>
+
+<style>
+  html {
+    color-scheme: light dark;
+  }
+
+  [data-shadowRootAdoptedStyleSheets] {
+    visibility: hidden;
+  }
+
+  [data-shadowRootAdoptedStyleSheets-ready] {
+    visibility: unset;
+  }
+</style>
+
+<style type="module" specifier="my-style-1">
+  p {
+    color: red;
+  }
+</style>
+
+<style type="module" specifier="my-style-1">
+  /* THESE STYLES SHOULD NOT APPLY */
+  p::after {
+    content: "this text should never show up";
+  }
+</style>
+
+<style type="module" specifier="my-style-2-light"
+  media="(prefers-color-scheme: light)"
+>
+  span {
+    color: blue;
+  }
+</style>
+
+<style type="module" specifier="my-style-2-dark"
+  media="(prefers-color-scheme: dark)"
+>
+  span {
+    color: yellow;
+  }
+</style>
+
+<style type="module" specifier="my-button">
+  button {
+    background-color: green;
+  }
+</style>
+
+<script>
+  function addMore(el) {
+    if (!("setHTML" in Element.prototype)) {
+      return;
+    }
+    el.getRootNode().getElementById("more").setHTMLUnsafe(`
+      <style type="module" specifier="more-styles">
+        .more {
+          font-size: 200%;
+        }
+      </style>
+      <div
+        data-shadowRootAdoptedStyleSheets="
+          my-style-1
+          my-style-2-light
+          my-style-2-dark
+          non-exist
+          ./non-exist.css
+          ./my-external.css
+          more-styles
+        "
+      >
+        <template
+          shadowRootMode="open"
+          shadowRootAdoptedStyleSheets="
+            my-style-1
+            my-style-2-light
+            my-style-2-dark
+            non-exist
+            ./non-exist.css
+            ./my-external.css
+          "
+        >
+          <p>hello, <span>world</span>! <span class="external">and moon</span></p>
+          <p class="more">more more more</p>
+        </template>
+      </div>
+    `);
+  }
+</script>
+
+<p>outside the world</p>
+
+<my-element
+  data-shadowRootAdoptedStyleSheets="
+    my-style-1
+    my-style-2-light
+    my-style-2-dark
+    non-exist
+    ./non-exist.css
+    ./my-external.css
+  "
+>
+  <template
+    shadowRootMode="open"
+    shadowRootAdoptedStyleSheets="
+      my-style-1
+      my-style-2-light
+      my-style-2-dark
+      non-exist
+      ./non-exist.css
+      ./my-external.css
+    "
+  >
+    <p>hello, <span>world</span>! <span class="external">and moon</span></p>
+
+    <style type="module" specifier="my-span">
+      :host {
+        color: white;
+      }
+    </style>
+
+    <my-button
+      data-shadowRootAdoptedStyleSheets="my-button"
+    >
+      <template
+        shadowRootMode="open"
+        shadowRootAdoptedStyleSheets="my-button"
+      >
+        <button>
+          <slot></slot>
+          <my-span
+            data-shadowRootAdoptedStyleSheets="
+              my-span
+              my-style-2-light
+              my-style-2-dark
+              ./my-external.css
+            "
+          >
+            <template
+              shadowRootMode="open"
+              shadowRootAdoptedStyleSheets="
+                my-span
+                my-style-2-light
+                my-style-2-dark
+                ./my-external.css
+              "
+            >
+              me <span>now</span> <span class="external">external</span>
+              <div id="more" style="margin-block-start: 1rem;">
+                <button onclick="addMore(this)">add more content</button>
+              </div>
+            </template>
+          </my-span>
+        </button>
+      </template>
+      click
+    </my-button>
+  </template>
+</my-element>
+
+<div id="more" style="margin-block-start: 2rem;">
+  <button onclick="addMore(this)">add more content</button>
+</div>
+
+<div style="margin: 1rem; padding: 1rem; border: 1px solid;">
+  <template shadowRootMode="open">
+    <p>This shadow root doesn’t have declarative adopted stylesheet.</p>
+    <div id="more" style="margin-block-start: 1rem;">
+      <button onclick="addMore(this)">add more content</button>
+    </div>
+  </template>
+</div>
+
+<script type="module">
+  import { install } from "./src/index.js";
+
+  install();
+</script>
+
+</html>

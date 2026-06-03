@@ -2,6 +2,21 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Thu, 14 May 2026 00:04:39 GMT",
+      "version": "1.5.0",
+      "tag": "@microsoft/focusgroup-polyfill_v1.5.0",
+      "comments": {
+        "minor": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "4d7c45fd597a3a54dd03f666a5b9adcf02a5bb10",
+            "comment": "support `focusGroup` in feature detection as per implementation update"
+          }
+        ]
+      }
+    },
+    {
       "date": "Wed, 06 May 2026 16:42:21 GMT",
       "version": "1.4.1",
       "tag": "@microsoft/focusgroup-polyfill_v1.4.1",

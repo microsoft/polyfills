@@ -32,9 +32,9 @@ export class FocusGroup {
 
   /**
    * The focus group behavior.
-   * @type {BehaviorToken!}
+   * @type {BehaviorToken | null}
    */
-  #behavior = BehaviorToken.NONE;
+  #behavior = null;
 
   /**
    * The focus group navigation axis limitation.
@@ -203,7 +203,7 @@ export class FocusGroup {
 
   /** @param {FocusGroupDefinition} [def] */
   #updateDefinition(def) {
-    this.#behavior = def?.behavior ?? BehaviorToken.NONE;
+    this.#behavior = def?.behavior ?? null;
     this.#wrap = def?.wrap ?? false;
     this.#axis = def?.axis;
     this.#memory = def?.memory ?? true;
@@ -213,7 +213,7 @@ export class FocusGroup {
   }
 
   #decorateItems() {
-    if (this.#behavior === BehaviorToken.NONE) {
+    if (!this.#behavior || this.#behavior === BehaviorToken.NONE) {
       this.#undecorateItems();
       return;
     }
