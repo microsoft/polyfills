@@ -2,11 +2,12 @@ trigger: none
 pr: none
 
 schedules:
-- cron: '0 0 * * *'
-  displayName: Daily Release
+- cron: '0 9 * * *'
+  displayName: Daily npm publish from GitHub Releases
   branches:
     include:
     - main
+  always: true
 
 # The `resources` specify the location and version of the 1ES PT.
 resources:
@@ -40,21 +41,47 @@ extends:
       networkIsolationPolicy: Permissive
       networkIsolationAdditionalDomainAllowList: registry.npmjs.org
     stages:
-    - stage: Stage
+    - stage: Check
+      displayName: Detect undeployed GitHub releases
       jobs:
-      - job: HostJob
-
-        variables:
-          npm_config_cache: $(Pipeline.Workspace)/.npm
-
+      - job: CheckVersion
         steps:
           - checkout: self
             persistCredentials: "true"
+            fetchTags: true
+
+          - task: UseNode@1
+            inputs:
+              version: "24.x"
+            displayName: "Install Node.js"
+
+          - script: |
+              npm run check-github-releases
+            displayName: "Detect releases whose tarballs have not been published"
+            name: deploymentCheck
+            env:
+              GITHUB_REPOSITORY: microsoft/polyfills
+
+    - stage: Package
+      displayName: Publish tarballs to npm
+      dependsOn: Check
+      condition: eq(dependencies.Check.outputs['CheckVersion.deploymentCheck.needsDeployment'], 'true')
+      variables:
+        npm_config_cache: $(Pipeline.Workspace)/.npm
+        undeployedTags: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.undeployedTags'] ]
+        focusgroupPolyfillNeedsDeployment: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.focusgroupPolyfillNeedsDeployment'] ]
+        focusgroupPolyfillReleaseTag: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.focusgroupPolyfillReleaseTag'] ]
+      jobs:
+      - job: Deploy
+        steps:
+          - checkout: self
+            persistCredentials: "true"
+            fetchTags: true
 
           - script: |
               git config --global user.email polyfills@microsoft.com
               git config --global user.name "Microsoft Polyfills Builds"
-              git remote set-url origin https://$(GH_TOKEN)@github.com/microsoft/polyfills.git
+            displayName: "Configure git for tag push"
 
           - task: UseNode@1
             inputs:
@@ -73,14 +100,57 @@ extends:
               npm ci
             displayName: "Install package dependencies"
 
-          - script: |
-              npm run build
-            displayName: "Build workspaces"
+          - task: DownloadGitHubRelease@0
+            displayName: "Download @microsoft/focusgroup-polyfill release assets"
+            condition: and(succeeded(), eq(variables['focusgroupPolyfillNeedsDeployment'], 'true'))
+            inputs:
+              connection: polyfills
+              userRepository: microsoft/polyfills
+              defaultVersionType: 'specificTag'
+              version: '$(focusgroupPolyfillReleaseTag)'
+              downloadPath: '$(System.ArtifactsDirectory)'
 
           - script: |
-              npm run publish-ci
-            displayName: "Use Beachball publish to bump, pack, and commit without publishing"
-            env:
-              GH_TOKEN: $(GH_TOKEN)
+              set -euo pipefail
+              rm -rf publish_artifacts publish_artifacts_meta
+              mkdir -p publish_artifacts publish_artifacts_meta
+
+              if find "$(System.ArtifactsDirectory)" -name "*.tgz" -print -quit | grep -q .; then
+                find "$(System.ArtifactsDirectory)" -name "*.tgz" -exec cp {} publish_artifacts/ \;
+              fi
+
+              printf '%s\n' "$(undeployedTags)" | tr ',' '\n' | sed '/^$/d' > publish_artifacts_meta/undeployed-tags.txt
+
+              if ! find publish_artifacts -maxdepth 1 -type f -print -quit | grep -q .; then
+                echo "No GitHub release assets were downloaded."
+                exit 1
+              fi
+
+              echo "npm artifacts:"
+              find publish_artifacts -maxdepth 1 -type f -print | sort
+
+              echo "deployment markers:"
+              cat publish_artifacts_meta/undeployed-tags.txt
+            displayName: "Prepare release artifacts"
 
           - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines  # Template reference
+
+          - script: |
+              set -euo pipefail
+              META_FILE=publish_artifacts_meta/undeployed-tags.txt
+              if [ ! -s "$META_FILE" ]; then
+                echo "No tags to mark as deployed."
+                exit 0
+              fi
+              while IFS= read -r tag; do
+                [ -z "$tag" ] && continue
+                DEPLOY_TAG="deployed/${tag}"
+                if git rev-parse --verify --quiet "refs/tags/${DEPLOY_TAG}" >/dev/null; then
+                  echo "Already marked deployed: ${DEPLOY_TAG} (skipping)"
+                  continue
+                fi
+                echo "Marking deployed: ${DEPLOY_TAG}"
+                git tag "${DEPLOY_TAG}" "refs/tags/${tag}"
+                git push origin "${DEPLOY_TAG}"
+              done < "$META_FILE"
+            displayName: "Mark releases as deployed"
