@@ -48,9 +48,9 @@ export function supportsFocusGroup() {
  */
 export function parseDefinition(owner) {
   const tokens = (owner.getAttribute("focusgroup") ?? "").split(" ");
-  const behavior = BEHAVIOR_TOKENS.includes(tokens[0])
-    ? tokens[0]
-    : BehaviorToken.NONE;
+  const behavior =
+    tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ??
+    BehaviorToken.NONE;
   const base = BehaviorMap[behavior];
   let wrap = base?.wrap ?? false;
   if (tokens.includes("wrap")) {

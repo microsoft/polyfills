@@ -715,4 +715,368 @@ test.describe("getNavigationDirection()", () => {
       await evaluate(page, { eventInit: { key: "End" }, axis: "block" }),
     ).toBe("end");
   });
+
+  test("should return forward on Tab inside a key-conflict element", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getNavigationDirection } = await import("/src/utils.js");
+        const owner = document.createElement("div");
+        const input = document.createElement("input");
+        owner.append(input);
+        document.body.append(owner);
+        let result;
+        input.addEventListener("keydown", (e) => {
+          result = getNavigationDirection(e, owner);
+        });
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+        return result;
+      }),
+    ).toBe("forward");
+  });
+
+  test("should return backward on Shift+Tab inside a key-conflict element", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getNavigationDirection } = await import("/src/utils.js");
+        const owner = document.createElement("div");
+        const input = document.createElement("input");
+        owner.append(input);
+        document.body.append(owner);
+        let result;
+        input.addEventListener("keydown", (e) => {
+          result = getNavigationDirection(e, owner);
+        });
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Tab", shiftKey: true }),
+        );
+        return result;
+      }),
+    ).toBe("backward");
+  });
+
+  test("should return null on a non-Tab key inside a key-conflict element", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { getNavigationDirection } = await import("/src/utils.js");
+        const owner = document.createElement("div");
+        const input = document.createElement("input");
+        owner.append(input);
+        document.body.append(owner);
+        let result;
+        input.addEventListener("keydown", (e) => {
+          result = getNavigationDirection(e, owner);
+        });
+        input.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "ArrowRight" }),
+        );
+        return result;
+      }),
+    ).toBeNull();
+  });
+});
+
+test.describe("parseDefinition()", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/test.html");
+  });
+
+  function parse(page, attr) {
+    return page.evaluate(async (attr) => {
+      const { parseDefinition } = await import("/src/utils.js");
+      const el = document.createElement("div");
+      if (attr !== null) {
+        el.setAttribute("focusgroup", attr);
+      }
+      return parseDefinition(el);
+    }, attr);
+  }
+
+  test("returns 'none' behavior when focusgroup attribute is missing", async ({
+    page,
+  }) => {
+    expect((await parse(page, null)).behavior).toBe("none");
+  });
+
+  test("returns 'none' behavior when focusgroup attribute is empty", async ({
+    page,
+  }) => {
+    expect((await parse(page, "")).behavior).toBe("none");
+  });
+
+  test("parses a single behavior token", async ({ page }) => {
+    const def = await parse(page, "toolbar");
+    expect(def).toEqual({
+      behavior: "toolbar",
+      wrap: false,
+      axis: "inline",
+      memory: true,
+    });
+  });
+
+  test("uses the first valid behavior token regardless of position", async ({
+    page,
+  }) => {
+    expect((await parse(page, "wrap tablist")).behavior).toBe("tablist");
+    expect((await parse(page, "inline menubar")).behavior).toBe("menubar");
+    expect((await parse(page, "nomemory wrap radiogroup")).behavior).toBe(
+      "radiogroup",
+    );
+  });
+
+  test("uses the first valid behavior token when multiple are present", async ({
+    page,
+  }) => {
+    expect((await parse(page, "menu tablist")).behavior).toBe("menu");
+    expect((await parse(page, "wrap tablist menu")).behavior).toBe("tablist");
+  });
+
+  test("falls back to 'none' when no valid behavior token is present", async ({
+    page,
+  }) => {
+    expect((await parse(page, "wrap")).behavior).toBe("none");
+    expect((await parse(page, "inline block nomemory")).behavior).toBe("none");
+  });
+
+  test("'wrap' overrides default no-wrap behaviors", async ({ page }) => {
+    expect((await parse(page, "toolbar wrap")).wrap).toBe(true);
+    expect((await parse(page, "listbox wrap")).wrap).toBe(true);
+  });
+
+  test("'nowrap' overrides default wrap behaviors", async ({ page }) => {
+    expect((await parse(page, "tablist nowrap")).wrap).toBe(false);
+    expect((await parse(page, "menu nowrap")).wrap).toBe(false);
+  });
+
+  test("explicit 'block' overrides default inline axis", async ({ page }) => {
+    expect((await parse(page, "tablist block")).axis).toBe("block");
+  });
+
+  test("explicit 'inline' overrides default block axis", async ({ page }) => {
+    expect((await parse(page, "menu inline")).axis).toBe("inline");
+  });
+
+  test("both 'inline' and 'block' yield no axis restriction", async ({
+    page,
+  }) => {
+    expect((await parse(page, "tablist inline block")).axis).toBeUndefined();
+  });
+
+  test("uses the behavior's default axis when neither 'inline' nor 'block' is set", async ({
+    page,
+  }) => {
+    expect((await parse(page, "radiogroup")).axis).toBeUndefined();
+    expect((await parse(page, "listbox")).axis).toBe("block");
+    expect((await parse(page, "menubar")).axis).toBe("inline");
+  });
+
+  test("'nomemory' disables memory", async ({ page }) => {
+    expect((await parse(page, "toolbar nomemory")).memory).toBe(false);
+    expect((await parse(page, "toolbar")).memory).toBe(true);
+  });
+});
+
+test.describe("isKeyConflictElement()", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/test.html");
+  });
+
+  test("returns false for null/undefined", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        return [isKeyConflictElement(null), isKeyConflictElement(undefined)];
+      }),
+    ).toEqual([false, false]);
+  });
+
+  test("returns false for non-element nodes (text node)", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        return isKeyConflictElement(document.createTextNode("hi"));
+      }),
+    ).toBe(false);
+  });
+
+  test("returns true for text <input>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        const el = document.createElement("input");
+        el.type = "text";
+        return isKeyConflictElement(el);
+      }),
+    ).toBe(true);
+  });
+
+  test("returns false for <input type='checkbox'> and <input type='radio'>", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        return [isKeyConflictElement(checkbox), isKeyConflictElement(radio)];
+      }),
+    ).toEqual([false, false]);
+  });
+
+  test("returns true for <textarea> and <select>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        return [
+          isKeyConflictElement(document.createElement("textarea")),
+          isKeyConflictElement(document.createElement("select")),
+        ];
+      }),
+    ).toEqual([true, true]);
+  });
+
+  test("returns true for a contentEditable element", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        const el = document.createElement("div");
+        el.contentEditable = "true";
+        document.body.append(el);
+        return isKeyConflictElement(el);
+      }),
+    ).toBe(true);
+  });
+
+  test("returns true for <audio>/<video> with controls", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        const video = document.createElement("video");
+        video.controls = true;
+        return [isKeyConflictElement(audio), isKeyConflictElement(video)];
+      }),
+    ).toEqual([true, true]);
+  });
+
+  test("returns false for <audio>/<video> without controls", async ({
+    page,
+  }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        return [
+          isKeyConflictElement(document.createElement("audio")),
+          isKeyConflictElement(document.createElement("video")),
+        ];
+      }),
+    ).toEqual([false, false]);
+  });
+
+  test("returns true for <iframe> and <object>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        return [
+          isKeyConflictElement(document.createElement("iframe")),
+          isKeyConflictElement(document.createElement("object")),
+        ];
+      }),
+    ).toEqual([true, true]);
+  });
+
+  test("returns false for ordinary elements", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { isKeyConflictElement } = await import("/src/utils.js");
+        return [
+          isKeyConflictElement(document.createElement("div")),
+          isKeyConflictElement(document.createElement("span")),
+          isKeyConflictElement(document.createElement("button")),
+          isKeyConflictElement(document.createElement("a")),
+        ];
+      }),
+    ).toEqual([false, false, false, false]);
+  });
+});
+
+test.describe("hasGenericRole()", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/test.html");
+  });
+
+  test("returns true for <div>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { hasGenericRole } = await import("/src/utils.js");
+        const el = document.createElement("div");
+        document.body.append(el);
+        return hasGenericRole(el);
+      }),
+    ).toBe(true);
+  });
+
+  test("returns true for <span>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { hasGenericRole } = await import("/src/utils.js");
+        const el = document.createElement("span");
+        document.body.append(el);
+        return hasGenericRole(el);
+      }),
+    ).toBe(true);
+  });
+
+  test("returns true for custom elements", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { hasGenericRole } = await import("/src/utils.js");
+        const el = document.createElement("my-widget");
+        document.body.append(el);
+        return hasGenericRole(el);
+      }),
+    ).toBe(true);
+  });
+
+  test("returns false for <button>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { hasGenericRole } = await import("/src/utils.js");
+        const el = document.createElement("button");
+        document.body.append(el);
+        return hasGenericRole(el);
+      }),
+    ).toBe(false);
+  });
+
+  test("returns false for <a> with href", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { hasGenericRole } = await import("/src/utils.js");
+        const el = document.createElement("a");
+        el.href = "#";
+        document.body.append(el);
+        return hasGenericRole(el);
+      }),
+    ).toBe(false);
+  });
+
+  test("returns false for <nav>", async ({ page }) => {
+    expect(
+      await page.evaluate(async () => {
+        const { hasGenericRole } = await import("/src/utils.js");
+        const el = document.createElement("nav");
+        document.body.append(el);
+        return hasGenericRole(el);
+      }),
+    ).toBe(false);
+  });
 });

@@ -5,15 +5,16 @@ import { expect, test } from "@playwright/test";
 import { setupPage } from "./utils.js";
 
 // behavior-first-requirement.html
-test.describe("behavior token required to be first", () => {
+test.describe("behavior token can appear in any position", () => {
   const defs = [
     { focusgroup: "toolbar", valid: true },
     { focusgroup: "tablist inline", valid: true },
     { focusgroup: "radiogroup wrap", valid: true },
+    { focusgroup: "wrap tablist", valid: true },
+    { focusgroup: "inline menubar", valid: true },
     { focusgroup: "", valid: false },
     { focusgroup: "inline", valid: false },
     { focusgroup: "wrap", valid: false },
-    { focusgroup: "wrap tablist", valid: false },
   ];
 
   for (const def of defs) {
