@@ -1,0 +1,7 @@
+{
+  "type": "minor",
+  "comment": "relax token order in focusgroup attribute",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "machi@microsoft.com",
+  "dependentChangeType": "none"
+}
