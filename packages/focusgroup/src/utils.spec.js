@@ -797,16 +797,16 @@ test.describe("parseDefinition()", () => {
     }, attr);
   }
 
-  test("returns 'none' behavior when focusgroup attribute is missing", async ({
+  test("returns null behavior when focusgroup attribute is missing", async ({
     page,
   }) => {
-    expect((await parse(page, null)).behavior).toBe("none");
+    expect((await parse(page, null)).behavior).toBeNull();
   });
 
-  test("returns 'none' behavior when focusgroup attribute is empty", async ({
+  test("returns null behavior when focusgroup attribute is empty", async ({
     page,
   }) => {
-    expect((await parse(page, "")).behavior).toBe("none");
+    expect((await parse(page, "")).behavior).toBeNull();
   });
 
   test("parses a single behavior token", async ({ page }) => {
@@ -836,11 +836,11 @@ test.describe("parseDefinition()", () => {
     expect((await parse(page, "wrap tablist menu")).behavior).toBe("tablist");
   });
 
-  test("falls back to 'none' when no valid behavior token is present", async ({
+  test("falls back to null when no valid behavior token is present", async ({
     page,
   }) => {
-    expect((await parse(page, "wrap")).behavior).toBe("none");
-    expect((await parse(page, "inline block nomemory")).behavior).toBe("none");
+    expect((await parse(page, "wrap")).behavior).toBeNull();
+    expect((await parse(page, "inline block nomemory")).behavior).toBeNull();
   });
 
   test("'wrap' overrides default no-wrap behaviors", async ({ page }) => {
