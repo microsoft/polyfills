@@ -100,7 +100,7 @@ test.describe("`focusgroup` attribute", () => {
       );
 
       await group.evaluate((node) => {
-        node.setAttribute("focusgroup", "inline toolbar");
+        node.setAttribute("focusgroup", "inline invalid");
       });
 
       await item1.focus();

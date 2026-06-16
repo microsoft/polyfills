@@ -32,7 +32,7 @@ export function supportsFocusGroup() {
 
 /**
  * @typedef {Object} FocusGroupDefinition
- * @property {BehaviorToken} [behavior]
+ * @property {BehaviorToken | null} [behavior]
  * @property {boolean} [wrap]
  * @property {("inline"|"block"|undefined)} [axis]
  * @property {boolean} [memory]
@@ -48,9 +48,8 @@ export function supportsFocusGroup() {
  */
 export function parseDefinition(owner) {
   const tokens = (owner.getAttribute("focusgroup") ?? "").split(" ");
-  const behavior = BEHAVIOR_TOKENS.includes(tokens[0])
-    ? tokens[0]
-    : BehaviorToken.NONE;
+  const behavior =
+    tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ?? null;
   const base = BehaviorMap[behavior];
   let wrap = base?.wrap ?? false;
   if (tokens.includes("wrap")) {
