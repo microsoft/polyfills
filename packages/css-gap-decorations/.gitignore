@@ -1,0 +1,8 @@
+node_modules/
+dist/
+wpt-runner/wpt/
+wpt-runner/wpt.bak/
+wpt-runner/snapshots/
+test-results/
+playwright-report/
+*.tsbuildinfo
