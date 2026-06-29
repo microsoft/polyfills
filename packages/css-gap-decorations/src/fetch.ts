@@ -8,6 +8,7 @@ import { type ParsedDeclaration, parseStylesheet } from "./parse.js";
 export interface FetchedStylesheet {
   element: HTMLStyleElement | HTMLLinkElement;
   declarations: ParsedDeclaration[];
+  layerStatements: string[];
 }
 
 /**
@@ -24,14 +25,22 @@ export async function fetchAllStylesheets(
       const cssText = el.textContent || "";
       const parsed = parseStylesheet(cssText);
       if (parsed.declarations.length > 0) {
-        results.push({ element: el, declarations: parsed.declarations });
+        results.push({
+          element: el,
+          declarations: parsed.declarations,
+          layerStatements: parsed.layerStatements,
+        });
       }
     } else if (el instanceof HTMLLinkElement) {
       const cssText = await fetchStylesheetText(el);
       if (cssText) {
         const parsed = parseStylesheet(cssText);
         if (parsed.declarations.length > 0) {
-          results.push({ element: el, declarations: parsed.declarations });
+          results.push({
+            element: el,
+            declarations: parsed.declarations,
+            layerStatements: parsed.layerStatements,
+          });
         }
       }
     }

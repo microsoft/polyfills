@@ -4,10 +4,9 @@
  */
 
 import {
+  collectGapContainers,
   detectContainerType,
   getComputedGapStyles,
-  resolveElementStyles,
-  resolveStyles,
 } from "./cascade.js";
 import { fetchAllStylesheets } from "./fetch.js";
 import type { GapGeometry } from "./geometry/common.js";
@@ -18,6 +17,7 @@ import { paintSegments, removeOverlay } from "./painter.js";
 import type { ParsedDeclaration } from "./parse.js";
 import { resetSourceOrder } from "./parse.js";
 import { generateSegments } from "./segments.js";
+import { buildShiftedStylesheet, collectInlineGapElements } from "./shift.js";
 
 let headObserver: MutationObserver | null = null;
 const containerObservers = new Map<
@@ -27,8 +27,16 @@ const containerObservers = new Map<
 let pendingFullUpdate = false;
 const pendingContainerUpdates = new Set<Element>();
 let allDeclarations: ParsedDeclaration[] = [];
+let allLayerStatements: string[] = [];
 let styledElements = new Set<Element>();
 let destroyed = false;
+
+/**
+ * The adopted stylesheet that holds the shifted `--gdp-*` custom properties and
+ * their `@property` registrations. The browser resolves the gap-decoration
+ * cascade through this sheet; we read the results back via getComputedStyle.
+ */
+let shiftedSheet: CSSStyleSheet | null = null;
 
 /**
  * Initialize the polyfill: read all stylesheets, resolve styles,
@@ -40,6 +48,7 @@ export async function initialize(): Promise<void> {
   // Initial stylesheet read
   const sheets = await fetchAllStylesheets();
   allDeclarations = sheets.flatMap((s) => s.declarations);
+  allLayerStatements = sheets.flatMap((s) => s.layerStatements);
 
   // Resolve and paint
   updateAll();
@@ -62,6 +71,44 @@ export async function initialize(): Promise<void> {
 }
 
 /**
+ * Rebuild the shifted stylesheet from the current declarations + inline gap
+ * elements and (re)attach it as an adopted stylesheet so the native engine
+ * resolves the gap-decoration cascade.
+ */
+function injectShiftedStyles(): void {
+  // Inline-shift candidates: elements with a parseable `style` attribute plus
+  // every discovered container (which may carry JS-set style-object gap props
+  // that create no `style` attribute and so aren't found by an attribute scan).
+  const inlineEls = new Set<HTMLElement>(collectInlineGapElements());
+  for (const el of styledElements) {
+    if (el instanceof HTMLElement) {
+      inlineEls.add(el);
+    }
+  }
+  const css = buildShiftedStylesheet(allDeclarations, allLayerStatements, [
+    ...inlineEls,
+  ]);
+
+  if (!shiftedSheet) {
+    shiftedSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [
+      ...document.adoptedStyleSheets,
+      shiftedSheet,
+    ];
+  }
+  shiftedSheet.replaceSync(css);
+}
+
+function removeShiftedStyles(): void {
+  if (shiftedSheet) {
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+      (s) => s !== shiftedSheet,
+    );
+    shiftedSheet = null;
+  }
+}
+
+/**
  * Tear down the polyfill: remove overlays, disconnect observers.
  */
 export function destroy(): void {
@@ -80,6 +127,8 @@ export function destroy(): void {
   containerObservers.clear();
   styledElements.clear();
   allDeclarations = [];
+  allLayerStatements = [];
+  removeShiftedStyles();
 }
 
 function onHeadMutation(mutations: MutationRecord[]): void {
@@ -129,6 +178,7 @@ function scheduleFullUpdate(): void {
     resetSourceOrder();
     const sheets = await fetchAllStylesheets();
     allDeclarations = sheets.flatMap((s) => s.declarations);
+    allLayerStatements = sheets.flatMap((s) => s.layerStatements);
     updateAll();
   });
 }
@@ -162,8 +212,11 @@ function updateAll(): void {
     }
   }
 
-  // Resolve styles for all matching elements
-  styledElements = resolveStyles(allDeclarations);
+  // Discover gap containers first (selector + inline based), then build the
+  // shifted stylesheet so JS-set-only containers are included as inline-shift
+  // candidates. The native engine then resolves the cascade through the sheet.
+  styledElements = collectGapContainers(allDeclarations);
+  injectShiftedStyles();
 
   // Paint each container
   for (const el of styledElements) {
@@ -202,8 +255,9 @@ function updateContainerUnsafe(el: Element): void {
     return;
   }
 
-  // Re-resolve styles for this element (picks up inline style changes)
-  resolveElementStyles(el, allDeclarations);
+  // Read the natively-cascaded styles for this element (the shifted stylesheet
+  // is kept current by updateAll / scheduleFullUpdate; inline changes are picked
+  // up below when needed).
   const styles = getComputedGapStyles(el);
 
   // Compute geometry
@@ -265,6 +319,7 @@ function ensureContainerObservers(el: Element): void {
     // the polyfill's own elements (overlay, probes) are ignored to avoid
     // self-triggered repaint loops.
     let relevant = false;
+    let styleChangedOnContainer = false;
     for (const m of mutations) {
       if (m.type === "childList") {
         if (m.target !== el) {
@@ -279,7 +334,6 @@ function ensureContainerObservers(el: Element): void {
         );
         if (hasUserNode) {
           relevant = true;
-          break;
         }
         continue;
       }
@@ -288,10 +342,18 @@ function ensureContainerObservers(el: Element): void {
         (m.target === el || m.target.parentNode === el)
       ) {
         relevant = true;
-        break;
+        // An inline style change on the container itself may alter its inline
+        // gap-decoration declarations, which are baked into the shifted
+        // stylesheet — rebuild it so getComputedStyle reflects the new values.
+        if (m.target === el && m.attributeName === "style") {
+          styleChangedOnContainer = true;
+        }
       }
     }
 
+    if (styleChangedOnContainer) {
+      injectShiftedStyles();
+    }
     if (relevant) {
       scheduleContainerUpdate(el);
     }

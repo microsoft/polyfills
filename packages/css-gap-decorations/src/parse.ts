@@ -15,22 +15,32 @@ import {
   type RuleBreak,
   type RuleOverlap,
   type RuleVisibilityItems,
-  SHORTHANDS,
 } from "./properties.js";
 
 // ---- Types for parsed declarations ----
 
 export interface ParsedDeclaration {
   selector: string;
-  specificity: [number, number, number];
   property: string;
   value: string; // raw CSS text
   important: boolean;
   sourceOrder: number;
+  /**
+   * The stack of at-rule preludes (e.g. `@media (...)`, `@supports (...)`,
+   * `@layer foo`) enclosing this declaration, outermost first.  Used by the
+   * shift engine to reproduce the conditional / layer context when re-emitting
+   * the declaration as a custom property so the native cascade matches.
+   */
+  atRules: string[];
 }
 
 export interface ParsedStylesheet {
   declarations: ParsedDeclaration[];
+  /**
+   * Top-level `@layer a, b;` ordering statements (no block), in source order.
+   * Re-emitted first in the shifted stylesheet so layer precedence is preserved.
+   */
+  layerStatements: string[];
 }
 
 // ---- Stylesheet walking ----
@@ -52,25 +62,34 @@ export function resetSourceOrder(): void {
  */
 export function parseStylesheet(cssText: string): ParsedStylesheet {
   const declarations: ParsedDeclaration[] = [];
+  const layerStatements: string[] = [];
   const stripped = stripComments(cssText);
-  walkRuleBlocks(stripped, (selector, body) => {
-    const specificity = computeSpecificity(selector);
-    for (const decl of parseDeclarationBlock(body)) {
-      const propName = decl.property.toLowerCase();
-      if (!isGapDecorationProperty(propName)) {
-        continue;
+  walkRuleBlocks(
+    stripped,
+    (selector, body, atRules) => {
+      for (const decl of parseDeclarationBlock(body)) {
+        const propName = decl.property.toLowerCase();
+        if (!isGapDecorationProperty(propName)) {
+          continue;
+        }
+        declarations.push({
+          selector,
+          property: propName,
+          value: decl.value,
+          important: decl.important,
+          sourceOrder: globalSourceOrder++,
+          atRules,
+        });
       }
-      declarations.push({
-        selector,
-        specificity,
-        property: propName,
-        value: decl.value,
-        important: decl.important,
-        sourceOrder: globalSourceOrder++,
-      });
-    }
-  });
-  return { declarations };
+    },
+    (statement) => {
+      // Capture top-level `@layer a, b;` ordering statements.
+      if (/^@layer\b/i.test(statement)) {
+        layerStatements.push(statement);
+      }
+    },
+  );
+  return { declarations, layerStatements };
 }
 
 /**
@@ -438,72 +457,6 @@ export function parseInsetValue(value: string): InsetValue | null {
   return null;
 }
 
-/**
- * Parse an inset shorthand: <v> <v>? [ / <v> <v>? ]?
- * where the part before / is cap, after / is junction.
- * If no /, junction = cap.
- */
-export function parseInsetShorthand(value: string): {
-  capStart: InsetValue;
-  capEnd: InsetValue;
-  junctionStart: InsetValue;
-  junctionEnd: InsetValue;
-} | null {
-  const slashParts = value.split("/").map((s) => s.trim());
-  if (slashParts.length > 2) {
-    return null;
-  }
-
-  const capPart = slashParts[0];
-  const junctionPart = slashParts.length > 1 ? slashParts[1] : null;
-
-  // Parse cap pair
-  const capTokens = capPart.split(/\s+/).filter(Boolean);
-  if (capTokens.length === 0 || capTokens.length > 2) {
-    return null;
-  }
-
-  const capStart = parseInsetValue(capTokens[0]);
-  if (!capStart) {
-    return null;
-  }
-  const capEnd =
-    capTokens.length > 1 ? parseInsetValue(capTokens[1]) : { ...capStart };
-  if (!capEnd) {
-    return null;
-  }
-
-  // Parse junction pair (or copy from cap)
-  let junctionStart: InsetValue;
-  let junctionEnd: InsetValue;
-
-  if (junctionPart) {
-    const jTokens = junctionPart.split(/\s+/).filter(Boolean);
-    if (jTokens.length === 0 || jTokens.length > 2) {
-      return null;
-    }
-    const js = parseInsetValue(jTokens[0]);
-    if (!js) {
-      return null;
-    }
-    junctionStart = js;
-    if (jTokens.length > 1) {
-      const je = parseInsetValue(jTokens[1]);
-      if (!je) {
-        return null;
-      }
-      junctionEnd = je;
-    } else {
-      junctionEnd = { ...js };
-    }
-  } else {
-    junctionStart = { ...capStart };
-    junctionEnd = { ...capEnd };
-  }
-
-  return { capStart, capEnd, junctionStart, junctionEnd };
-}
-
 // ---- Shorthand decomposition ----
 
 /**
@@ -577,131 +530,9 @@ export function decomposeShorthand(
     return result;
   }
 
-  // rule-break: single keyword → both axes
-  if (shorthand === "rule-break") {
-    const v = parseRuleBreak(value);
-    if (!v) {
-      return null;
-    }
-    setRuleLonghands(result, ["column", "row"], "break", v);
-    return result;
-  }
-
-  // rule-visibility-items: single keyword → both axes
-  if (shorthand === "rule-visibility-items") {
-    const v = parseVisibilityItems(value);
-    if (!v) {
-      return null;
-    }
-    setRuleLonghands(result, ["column", "row"], "visibility-items", v);
-    return result;
-  }
-
-  // Inset shorthands
-  return decomposeInsetShorthand(shorthand, value);
-}
-
-function decomposeInsetShorthand(
-  shorthand: string,
-  value: string,
-): Map<LonghandName, unknown> | null {
-  const result = new Map<LonghandName, unknown>();
-  const def = SHORTHANDS[shorthand];
-  if (!def) {
-    return null;
-  }
-
-  // column-rule-inset / row-rule-inset: <cap-start> <cap-end>? [ / <junction-start> <junction-end>? ]?
-  if (shorthand === "column-rule-inset" || shorthand === "row-rule-inset") {
-    const parsed = parseInsetShorthand(value);
-    if (!parsed) {
-      return null;
-    }
-    const prefix = shorthand === "column-rule-inset" ? "column" : "row";
-    result.set(
-      `${prefix}-rule-inset-cap-start` as LonghandName,
-      parsed.capStart,
-    );
-    result.set(`${prefix}-rule-inset-cap-end` as LonghandName, parsed.capEnd);
-    result.set(
-      `${prefix}-rule-inset-junction-start` as LonghandName,
-      parsed.junctionStart,
-    );
-    result.set(
-      `${prefix}-rule-inset-junction-end` as LonghandName,
-      parsed.junctionEnd,
-    );
-    return result;
-  }
-
-  if (shorthand === "rule-inset") {
-    const parsed = parseInsetShorthand(value);
-    if (!parsed) {
-      return null;
-    }
-    for (const prefix of ["column", "row"]) {
-      result.set(
-        `${prefix}-rule-inset-cap-start` as LonghandName,
-        parsed.capStart,
-      );
-      result.set(`${prefix}-rule-inset-cap-end` as LonghandName, parsed.capEnd);
-      result.set(
-        `${prefix}-rule-inset-junction-start` as LonghandName,
-        parsed.junctionStart,
-      );
-      result.set(
-        `${prefix}-rule-inset-junction-end` as LonghandName,
-        parsed.junctionEnd,
-      );
-    }
-    return result;
-  }
-
-  // cap / junction pair shorthands: <start> <end>?
-  if (shorthand.endsWith("-cap") || shorthand.endsWith("-junction")) {
-    const tokens = value.trim().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0 || tokens.length > 2) {
-      return null;
-    }
-    const startVal = parseInsetValue(tokens[0]);
-    if (!startVal) {
-      return null;
-    }
-    const endVal =
-      tokens.length > 1 ? parseInsetValue(tokens[1]) : { ...startVal };
-    if (!endVal) {
-      return null;
-    }
-
-    // Set all longhands in this shorthand's list: first half = start, second half = end
-    const lh = def.longhands;
-    // Longhands are listed as: ...start..., ...end... (alternating by axis for bidirectional)
-    // For per-axis: [start, end]
-    // For bidirectional: [col-start, col-end, row-start, row-end]
-    if (lh.length === 2) {
-      result.set(lh[0], startVal);
-      result.set(lh[1], endVal);
-    } else if (lh.length === 4) {
-      result.set(lh[0], startVal); // col-start
-      result.set(lh[1], endVal); // col-end
-      result.set(lh[2], startVal); // row-start
-      result.set(lh[3], endVal); // row-end
-    }
-    return result;
-  }
-
-  // start / end shorthands: single value → both cap and junction (start or end)
-  if (shorthand.endsWith("-start") || shorthand.endsWith("-end")) {
-    const parsed = parseInsetValue(value);
-    if (!parsed) {
-      return null;
-    }
-    for (const lh of def.longhands) {
-      result.set(lh, { ...parsed });
-    }
-    return result;
-  }
-
+  // rule-break, rule-visibility-items, and the inset shorthands are decomposed
+  // separately by the shift engine (raw-text injection), so they are not
+  // handled here.
   return null;
 }
 
@@ -736,11 +567,16 @@ function stripComments(css: string): string {
 
 /**
  * Walk top-level and nested rule blocks in CSS text (comments already stripped).
- * Calls `callback(selector, body)` for each style rule found, recursing into @-rule blocks.
+ * Calls `callback(selector, body, atRules)` for each style rule found, recursing
+ * into @-rule blocks while threading the stack of enclosing at-rule preludes.
+ * Calls `onStatement(prelude)` for `;`-terminated statement at-rules (e.g.
+ * `@layer a, b;`, `@import ...;`).
  */
 function walkRuleBlocks(
   css: string,
-  callback: (selector: string, body: string) => void,
+  callback: (selector: string, body: string, atRules: string[]) => void,
+  onStatement?: (statement: string) => void,
+  atRules: string[] = [],
 ): void {
   let i = 0;
   while (i < css.length) {
@@ -752,8 +588,21 @@ function walkRuleBlocks(
       break;
     }
 
-    // Find the next '{' — everything before it is the selector or @-rule prelude
+    // Find the next top-level '{' and ';'. Whichever comes first decides
+    // whether this is a block rule or a statement at-rule.
     const braceIdx = indexOfTopLevel(css, "{", i);
+    const semiIdx = indexOfTopLevel(css, ";", i);
+
+    if (semiIdx !== -1 && (braceIdx === -1 || semiIdx < braceIdx)) {
+      // Statement at-rule terminated by ';' (e.g. `@layer a, b;`).
+      const statement = css.slice(i, semiIdx).trim();
+      if (statement && onStatement) {
+        onStatement(statement);
+      }
+      i = semiIdx + 1;
+      continue;
+    }
+
     if (braceIdx === -1) {
       break;
     }
@@ -767,10 +616,12 @@ function walkRuleBlocks(
     const body = css.slice(braceIdx + 1, blockEnd);
 
     if (prelude.startsWith("@")) {
-      // Recurse into @-rule blocks (e.g. @media, @supports, @layer)
-      walkRuleBlocks(body, callback);
+      // Recurse into @-rule blocks (e.g. @media, @supports, @layer), pushing
+      // this prelude onto the at-rule stack so nested declarations know their
+      // conditional / layer context.
+      walkRuleBlocks(body, callback, onStatement, [...atRules, prelude]);
     } else if (prelude) {
-      callback(prelude, body);
+      callback(prelude, body, atRules);
     }
 
     i = blockEnd + 1;
@@ -1012,24 +863,4 @@ export function parseLengthToPx(value: string): number | null {
   }
 
   return null;
-}
-
-/**
- * Compute selector specificity as [id, class, type].
- * Simplified — correct for the common patterns used in WPTs.
- */
-function computeSpecificity(selector: string): [number, number, number] {
-  // Strip :where(...) — zero specificity
-  const s = selector.replace(/:where\([^)]*\)/g, "");
-  // Count #ids
-  const ids = (s.match(/#[a-zA-Z_-][\w-]*/g) || []).length;
-  // Count .classes, [attrs], :pseudo-classes (except :where)
-  const classes =
-    (s.match(/\.[a-zA-Z_-][\w-]*/g) || []).length +
-    (s.match(/\[[^\]]*\]/g) || []).length +
-    (s.match(/:[a-zA-Z_-][\w-]*/g) || []).length;
-  // Count type selectors
-  const types = (s.match(/(^|[\s+>~])[\w-]+/g) || []).length;
-
-  return [ids, classes, types];
 }

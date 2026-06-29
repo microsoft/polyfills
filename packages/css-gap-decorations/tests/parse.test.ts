@@ -3,7 +3,6 @@ import {
   decomposeShorthand,
   parseColorList,
   parseGapRule,
-  parseInsetShorthand,
   parseInsetValue,
   parseRuleBreak,
   parseRuleOverlap,
@@ -158,48 +157,6 @@ describe("parseInsetValue", () => {
   });
 });
 
-describe("parseInsetShorthand", () => {
-  it("parses single value", () => {
-    const result = parseInsetShorthand("5px");
-    expect(result).toEqual({
-      capStart: { type: "length", value: 5 },
-      capEnd: { type: "length", value: 5 },
-      junctionStart: { type: "length", value: 5 },
-      junctionEnd: { type: "length", value: 5 },
-    });
-  });
-
-  it("parses two values (cap start/end)", () => {
-    const result = parseInsetShorthand("5px 10px");
-    expect(result).toEqual({
-      capStart: { type: "length", value: 5 },
-      capEnd: { type: "length", value: 10 },
-      junctionStart: { type: "length", value: 5 },
-      junctionEnd: { type: "length", value: 10 },
-    });
-  });
-
-  it("parses with / separator (cap / junction)", () => {
-    const result = parseInsetShorthand("5px / -50%");
-    expect(result).toEqual({
-      capStart: { type: "length", value: 5 },
-      capEnd: { type: "length", value: 5 },
-      junctionStart: { type: "percentage", value: -50 },
-      junctionEnd: { type: "percentage", value: -50 },
-    });
-  });
-
-  it("parses overlap-join", () => {
-    const result = parseInsetShorthand("overlap-join");
-    expect(result).toEqual({
-      capStart: { type: "keyword", value: "overlap-join" },
-      capEnd: { type: "keyword", value: "overlap-join" },
-      junctionStart: { type: "keyword", value: "overlap-join" },
-      junctionEnd: { type: "keyword", value: "overlap-join" },
-    });
-  });
-});
-
 describe("parseGapRule", () => {
   it("parses width + style + color", () => {
     const result = parseGapRule("1px solid red");
@@ -273,29 +230,5 @@ describe("decomposeShorthand", () => {
     expect(result).not.toBeNull();
     expect(result?.has("column-rule-width")).toBe(true);
     expect(result?.has("row-rule-width")).toBe(true);
-  });
-
-  it("decomposes rule-break", () => {
-    const result = decomposeShorthand("rule-break", "intersection");
-    expect(result).not.toBeNull();
-    expect(result?.get("column-rule-break")).toBe("intersection");
-    expect(result?.get("row-rule-break")).toBe("intersection");
-  });
-
-  it("decomposes rule-inset", () => {
-    const result = decomposeShorthand("rule-inset", "5px / -50%");
-    expect(result).not.toBeNull();
-    expect(result?.get("column-rule-inset-cap-start")).toEqual({
-      type: "length",
-      value: 5,
-    });
-    expect(result?.get("column-rule-inset-junction-start")).toEqual({
-      type: "percentage",
-      value: -50,
-    });
-    expect(result?.get("row-rule-inset-cap-start")).toEqual({
-      type: "length",
-      value: 5,
-    });
   });
 });
