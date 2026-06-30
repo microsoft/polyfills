@@ -24,14 +24,15 @@ geometry per container, and paints decorations as positioned, CSS-border-styled
 ## Pipeline
 
 ```
-fetch → parse → cascade → resolve → geometry → segments → paint → observe
+fetch → parse → shift → resolve → geometry → segments → paint → observe
 ```
 
 | Stage | File(s) | Responsibility |
 |-------|---------|----------------|
 | fetch | `fetch.ts` | Collect stylesheet text (`<style>`, `<link>`; cross-origin via `fetch()`). |
-| parse | `parse.ts` | Hand-written CSS parser: walk rules (incl. `@media`/`@supports`), parse gap-decoration declarations, decompose shorthands → longhands, compute specificity. |
-| cascade | `cascade.ts` | Match selectors to elements, order by specificity/source order, read inline styles, produce a `ComputedGapStyles` per container. |
+| parse | `parse.ts` | Hand-written CSS parser: walk rules (incl. `@media`/`@supports`/`@layer`), parse gap-decoration declarations and shorthands → longhands, and capture each declaration's at-rule/`@layer` context. |
+| shift | `shift.ts` | Rewrite gap-decoration declarations into `--gdp-*` custom properties (registered via `@property`) in an adopted stylesheet, so the browser resolves the cascade; read the results back with `getComputedStyle`. |
+| cascade | `cascade.ts` | Discover gap containers (matched selectors + inline declarations) and read their resolved `ComputedGapStyles` via `shift`. |
 | resolve | `resolve.ts` | Resolve container-dependent keyword defaults (e.g. multicol `column-rule-break: normal` → `intersection`). |
 | geometry | `geometry/{grid,flex,multicol}.ts`, `common.ts` | Compute gap positions, intersections, cell occupancy, blocked/empty ranges. The heaviest area (multicol and grid). |
 | segments | `segments.ts` | Convert geometry + styles into drawable `Segment[]`: visibility filtering, rule-break merging, cap/junction classification, inset resolution. |
@@ -82,9 +83,27 @@ suppresses native `column-rule` via the adopted stylesheet to avoid
 double-painting. Standard single-value column rules are left to native rendering
 (pixel-perfect, avoids sub-pixel diffs).
 
-**Hand-written CSS parser, zero dependencies.** `parse.ts` tokenizes and parses
-gap-decoration declarations and shorthands itself (a former `css-tree`
-dependency was removed). Gap-decoration values set via JS that the engine isn't
+**Cascade delegated to the browser (the "shift" strategy).** Rather than
+implementing the CSS cascade in JavaScript, `shift.ts` rewrites each
+gap-decoration declaration into a `--gdp-<longhand>` custom property
+(registered via `@property`) and emits them into an adopted stylesheet that
+mirrors the original selector, source order, `!important`, and
+at-rule/`@layer`/`@media` context. The engine then resolves specificity,
+source order, `!important`, `@layer`, and `var()`, and the polyfill reads the
+winning values back with `getComputedStyle`. Inset and keyword longhands are
+registered with specific `@property` syntaxes (so the engine validates them
+and resolves `calc()`/units/percentages); the color/style/width list longhands
+use `syntax: "*"` and are parsed/serialized by the polyfill, because the
+`repeat()` grammar can't be expressed as a registered syntax. Inline (and
+JS-set) declarations are emitted last via `[data-gdp-inline]` marker-attribute
+rules. This custom-property-rename approach is the same technique the CSS
+Anchor Positioning polyfill (`@oddbird/css-anchor-positioning`) uses to
+polyfill engine-unrecognized properties.
+
+**Hand-written CSS parser, zero dependencies.** `parse.ts` tokenizes and
+parses the gap-decoration value grammar — including `repeat()`, `<gap-rule>`,
+and insets — that no native API exposes, and decomposes the list shorthands
+into longhands. Gap-decoration values set via JS that the engine isn't
 required to serialize are also read directly from the `CSSStyleDeclaration`
 object.
 
