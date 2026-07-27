@@ -3,7 +3,10 @@
 
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
-import { createTreeWalker } from "./shadow-utils/index.js";
+import {
+  createMutationObserver,
+  createTreeWalker,
+} from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import {
   hasDocument,
@@ -23,8 +26,12 @@ if (
   elementPolyfillMap = state.m ??= new Map();
 
   if (!state.g) {
-    // Only observe light DOM for perfoamance.
-    const observer = new MutationObserver((entries) => {
+    // Observe shadow trees too: custom elements commonly render their
+    // `focusgroup` element into a shadow root *after* the polyfill is
+    // installed (e.g. Lit renders in a microtask following the upgrade), and
+    // a plain `MutationObserver` never sees those additions. The shadowless
+    // build swaps this for a plain `MutationObserver`.
+    const observer = createMutationObserver((entries) => {
       for (const entry of entries) {
         if (entry.type !== "childList") {
           continue;
@@ -79,7 +86,14 @@ export function polyfill(root) {
   do {
     const element = walker.currentNode;
 
-    if (elementPolyfillMap.has(element)) {
+    // The walker's filter never runs on its own root, so `root` has to be
+    // vetted here — otherwise every element passed to `polyfill()` (including
+    // the default `<body>` and every node reported by the mutation observer)
+    // would be treated as a focusgroup owner.
+    if (
+      !element.hasAttribute?.("focusgroup") ||
+      elementPolyfillMap.has(element)
+    ) {
       continue;
     }
 
