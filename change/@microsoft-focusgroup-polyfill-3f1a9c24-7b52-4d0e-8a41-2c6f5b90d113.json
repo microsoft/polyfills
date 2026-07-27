@@ -1,0 +1,7 @@
+{
+  "type": "patch",
+  "comment": "polyfill focusgroup elements that custom elements render into their shadow roots after the polyfill is installed, and stop treating the polyfill() root as a focusgroup owner when it has no focusgroup attribute",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "jeroen.zwartepoorte@gmail.com",
+  "dependentChangeType": "none"
+}
