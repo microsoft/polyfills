@@ -13,7 +13,8 @@
     "fix": "biome check --fix",
     "change": "beachball change --dependent-change-type none",
     "bump": "beachball bump",
-    "checkchange": "node build/scripts/checkchange.mjs",
+    "checkchange": "node build/scripts/check-publish-pipeline.mjs && node build/scripts/checkchange.mjs",
+    "test:scripts": "node --test build/scripts/*.test.mjs",
     "create-github-releases": "node build/scripts/create-github-releases.mjs",
     "check-github-releases": "node build/scripts/download-github-releases.mjs --check-only",
     "publish": "beachball publish"

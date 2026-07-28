@@ -61,4 +61,4 @@ jobs:
     - name: Pack and create GitHub releases
       run: npm run create-github-releases
       env:
-        GITHUB_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ github.token }}

@@ -2,7 +2,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -51,6 +51,10 @@ function getActorLogin() {
 function getToken() {
   if (process.env.GITHUB_TOKEN?.trim()) {
     return { value: process.env.GITHUB_TOKEN.trim(), source: "GITHUB_TOKEN" };
+  }
+
+  if (process.env.GH_TOKEN?.trim()) {
+    return { value: process.env.GH_TOKEN.trim(), source: "GH_TOKEN" };
   }
 
   const token = gh(["auth", "token"]);
@@ -193,7 +197,20 @@ async function main() {
   logBypassBanner(branch, actor, permission);
 }
 
-main().catch(error => {
-  console.error("[checkchange] Unexpected error:", error);
-  process.exit(1);
-});
+const invokedDirectly =
+  process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+
+if (invokedDirectly) {
+  main().catch(error => {
+    console.error("[checkchange] Unexpected error:", error);
+    process.exit(1);
+  });
+}
+
+export {
+  fetchPermission,
+  getActorLogin,
+  getBranchName,
+  getToken,
+  publishBranchPattern,
+};

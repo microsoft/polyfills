@@ -115,7 +115,7 @@ function parsePackOutput(output) {
 }
 
 function hasGitHubCliAuth() {
-  if (process.env.GITHUB_TOKEN?.trim()) {
+  if (process.env.GH_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim()) {
     return true;
   }
 
@@ -151,7 +151,7 @@ if (checkOnly || missingReleases.length === 0) {
 
 if (!hasGitHubCliAuth()) {
   console.error("GitHub CLI authentication is required to create releases.");
-  console.error("In GitHub Actions, set GITHUB_TOKEN to ${{ github.token }}.");
+  console.error("In GitHub Actions, set GH_TOKEN to ${{ github.token }}.");
   process.exit(1);
 }
 
