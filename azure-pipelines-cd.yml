@@ -67,7 +67,6 @@ extends:
       dependsOn: Check
       condition: eq(dependencies.Check.outputs['CheckVersion.deploymentCheck.needsDeployment'], 'true')
       variables:
-        npm_config_cache: $(Pipeline.Workspace)/.npm
         undeployedTags: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.undeployedTags'] ]
         focusgroupPolyfillNeedsDeployment: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.focusgroupPolyfillNeedsDeployment'] ]
         focusgroupPolyfillReleaseTag: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.focusgroupPolyfillReleaseTag'] ]
@@ -82,23 +81,6 @@ extends:
               git config --global user.email polyfills@microsoft.com
               git config --global user.name "Microsoft Polyfills Builds"
             displayName: "Configure git for tag push"
-
-          - task: UseNode@1
-            inputs:
-              version: "24.x"
-            displayName: "Install Node.js"
-
-          - task: Cache@2
-            inputs:
-              key: 'npm | "$(Agent.OS)" | package-lock.json'
-              restoreKeys: |
-                npm | "$(Agent.OS)"
-              path: $(npm_config_cache)
-            displayName: "Cache npm"
-
-          - script: |
-              npm ci
-            displayName: "Install package dependencies"
 
           - task: DownloadGitHubRelease@0
             displayName: "Download @microsoft/focusgroup-polyfill release assets"
