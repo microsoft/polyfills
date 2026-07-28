@@ -10,7 +10,7 @@ const deployedPrefix = "deployed/";
 
 // Legacy bare-tag shim configuration.
 //
-// Unlike FAST, polyfills already has historical package-version tags that were
+// Polyfills already has historical package-version tags that were
 // pushed before this tokenless CD flow existed and therefore have no GitHub
 // Release (notably `@microsoft/focusgroup-polyfill_v1.5.0`). Azure's
 // `DownloadGitHubRelease@0` task would fail if it tried to download a release

@@ -13,8 +13,6 @@
  * `DownloadGitHubRelease@0` task wired to the `polyfills` service connection.
  * It also fails when two packages collapse to the same Azure output prefix,
  * which would make their pipeline variables collide.
- *
- * Polyfills has no paired Rust crates, so this port omits FAST's crate checks.
  */
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
