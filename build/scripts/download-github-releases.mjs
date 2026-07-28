@@ -8,18 +8,17 @@ import { fileURLToPath } from "node:url";
 const checkOnly = process.argv.includes("--check-only");
 const deployedPrefix = "deployed/";
 
-// Legacy bare-tag shim configuration.
+// Bare-tag handling configuration.
 //
-// Polyfills already has historical package-version tags that were
-// pushed before this tokenless CD flow existed and therefore have no GitHub
-// Release (notably `@microsoft/focusgroup-polyfill_v1.5.0`). Azure's
-// `DownloadGitHubRelease@0` task would fail if it tried to download a release
-// that does not exist, so the Check stage queries GitHub's "release by tag" API
-// to distinguish real releases from these bare/legacy tags. Transient GitHub
-// failures must not be misread as "no release" (that would drop a real
-// deployment) nor as "release exists" (that would queue a download that fails),
-// so transient responses are retried with bounded backoff and, if still
-// unresolved, surfaced as an error that fails the idempotent Check stage safely.
+// Some package-version tags have no GitHub Release (notably
+// `@microsoft/focusgroup-polyfill_v1.5.0`). Azure's `DownloadGitHubRelease@0`
+// task would fail if it tried to download a release that does not exist, so
+// the Check stage queries GitHub's "release by tag" API to distinguish real
+// releases from these bare tags. Transient GitHub failures must not be
+// misread as "no release" (that would drop a real deployment) nor as
+// "release exists" (that would queue a download that fails), so transient
+// responses are retried with bounded backoff and, if still unresolved,
+// surfaced as an error that fails the idempotent Check stage safely.
 const releaseLookupRetries = 3;
 const releaseLookupBackoffMs = 500;
 
@@ -154,7 +153,7 @@ async function githubReleaseExists(repo, tag, options = {}) {
       continue;
     }
 
-    // A missing release is a definitive answer (legacy/bare tag): stop retrying.
+    // A missing release is a definitive answer (bare tag): stop retrying.
     if (response.status === 404) {
       return false;
     }
