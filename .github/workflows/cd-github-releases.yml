@@ -1,0 +1,64 @@
+name: Release packages to GitHub releases
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 8 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      hasMissingReleases: ${{ steps.check.outputs.hasMissingReleases }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+
+    - id: check
+      name: Detect publishable workspaces without a release tag
+      run: npm run create-github-releases -- --check-only
+
+  release:
+    needs: detect
+    if: needs.detect.outputs.hasMissingReleases == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+
+    - name: Cache npm
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-node-modules
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+
+    - name: Install package dependencies
+      run: npm ci
+
+    - name: Build workspaces
+      run: npm run build
+
+    - name: Pack and create GitHub releases
+      run: npm run create-github-releases
+      env:
+        GH_TOKEN: ${{ github.token }}

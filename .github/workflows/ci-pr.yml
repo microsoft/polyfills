@@ -9,6 +9,9 @@ on:
     branches:
     - main
 
+permissions:
+  contents: read
+
 jobs:
   test_js:
     runs-on: ubuntu-latest
@@ -41,9 +44,14 @@ jobs:
 
     - name: Check for the presence of changed files inside ./change
       run: npm run checkchange
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
 
     - name: Check Biome formatting
       run: npm run check
+
+    - name: Run build script tests
+      run: npm run test:scripts
 
     - name: Build workspaces
       run: npx lage build ${{ github.event_name == 'pull_request' && format('--since origin/{0}', github.event.pull_request.base.ref) || '' }} --allow-no-target-runs --verbose
