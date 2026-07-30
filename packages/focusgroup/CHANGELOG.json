@@ -2,6 +2,37 @@
   "name": "@microsoft/focusgroup-polyfill",
   "entries": [
     {
+      "date": "Thu, 30 Jul 2026 18:34:53 GMT",
+      "version": "1.6.0",
+      "tag": "@microsoft/focusgroup-polyfill_v1.6.0",
+      "comments": {
+        "patch": [
+          {
+            "author": "jeroen.zwartepoorte@gmail.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "2191485c9325436511c06a911af7e001721ceb82",
+            "comment": "polyfill focusgroup elements that custom elements render into their shadow roots after the polyfill is installed, and stop treating the polyfill() root as a focusgroup owner when it has no focusgroup attribute"
+          }
+        ],
+        "minor": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "d993d77e69adc7dc572a7bbc9fd093162363fa3e",
+            "comment": "no longer require behavior token to be the first token in focusgroup attribute"
+          }
+        ],
+        "none": [
+          {
+            "author": "machi@microsoft.com",
+            "package": "@microsoft/focusgroup-polyfill",
+            "commit": "9645a8608cf08bd31edb13ed70e3b86a047e1709",
+            "comment": "hoist common dependencies"
+          }
+        ]
+      }
+    },
+    {
       "date": "Thu, 14 May 2026 00:04:39 GMT",
       "version": "1.5.0",
       "tag": "@microsoft/focusgroup-polyfill_v1.5.0",

@@ -1,8 +1,20 @@
 # Change Log - @microsoft/focusgroup-polyfill
 
-<!-- This log was last generated on Thu, 14 May 2026 00:04:39 GMT and should not be manually modified. -->
+<!-- This log was last generated on Thu, 30 Jul 2026 18:34:53 GMT and should not be manually modified. -->
 
 <!-- Start content -->
+
+## 1.6.0
+
+Thu, 30 Jul 2026 18:34:53 GMT
+
+### Minor changes
+
+- no longer require behavior token to be the first token in focusgroup attribute (machi@microsoft.com)
+
+### Patches
+
+- polyfill focusgroup elements that custom elements render into their shadow roots after the polyfill is installed, and stop treating the polyfill() root as a focusgroup owner when it has no focusgroup attribute (jeroen.zwartepoorte@gmail.com)
 
 ## 1.5.0
 

@@ -1,7 +1,0 @@
-{
-  "type": "minor",
-  "comment": "no longer require behavior token to be the first token in focusgroup attribute",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}
