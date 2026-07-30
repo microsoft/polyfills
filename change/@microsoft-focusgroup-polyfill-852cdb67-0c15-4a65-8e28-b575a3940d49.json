@@ -1,7 +1,0 @@
-{
-  "type": "none",
-  "comment": "hoist common dependencies",
-  "packageName": "@microsoft/focusgroup-polyfill",
-  "email": "machi@microsoft.com",
-  "dependentChangeType": "none"
-}
