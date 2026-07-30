@@ -86,7 +86,7 @@ extends:
             displayName: "Download @microsoft/focusgroup-polyfill release assets"
             condition: and(succeeded(), eq(variables['focusgroupPolyfillNeedsDeployment'], 'true'))
             inputs:
-              connection: polyfills
+              connection: fast
               userRepository: microsoft/polyfills
               defaultVersionType: 'specificTag'
               version: '$(focusgroupPolyfillReleaseTag)'
