@@ -56,7 +56,7 @@ extends:
             displayName: "Install Node.js"
 
           - script: |
-              npm run check-github-releases
+              node build/scripts/download-github-releases.mjs --check-only
             displayName: "Detect releases whose tarballs have not been published"
             name: deploymentCheck
             env:
