@@ -1,0 +1,100 @@
+# Register this YAML in Azure DevOps with the exact pipeline definition name
+# "Polyfills - CD Build". .ado/pipelines/azure-pipelines-cd.yml references that definition name.
+trigger:
+  branches:
+    include:
+    - main
+pr: none
+
+parameters:
+- name: validationMode
+  displayName: Rebuild existing releases for artifact validation
+  type: string
+  default: 'false'
+  values:
+  - 'false'
+  - 'true'
+
+stages:
+- stage: PrepareRelease
+  displayName: Prepare release
+  jobs:
+  - job: SelectRelease
+    displayName: Select releases
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+      clean: true
+      fetchDepth: 0
+      fetchTags: true
+
+    - task: UseNode@1
+      displayName: Install Node.js
+      inputs:
+        version: 24.x
+
+    - script: npm run prepare-release-artifacts -- --check-only
+      name: release
+      displayName: Detect package versions without release tags
+      env:
+        VALIDATION_MODE: ${{ parameters.validationMode }}
+
+- stage: BuildArtifacts
+  displayName: Build release artifacts
+  dependsOn: PrepareRelease
+  condition: |
+    and(
+      succeeded(),
+      eq(dependencies.PrepareRelease.outputs['SelectRelease.release.shouldBuild'], 'true')
+    )
+  variables:
+    npm_config_cache: $(Pipeline.Workspace)/.npm
+    releaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.releaseTags'] ]
+  jobs:
+  - job: BuildAndPack
+    displayName: Build and pack npm packages
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+      clean: true
+      fetchDepth: 0
+      fetchTags: true
+
+    - task: UseNode@1
+      displayName: Install Node.js
+      inputs:
+        version: 24.x
+
+    - task: Cache@2
+      displayName: Cache npm
+      inputs:
+        key: 'npm | "$(Agent.OS)" | package-lock.json'
+        restoreKeys: |
+          npm | "$(Agent.OS)"
+        path: $(npm_config_cache)
+
+    - script: npm ci
+      displayName: Install package dependencies
+
+    - script: npm run build
+      displayName: Build workspaces
+
+    - script: npm run prepare-release-artifacts
+      displayName: Pack release artifacts and metadata
+      env:
+        SELECTED_RELEASE_TAGS: $(releaseTags)
+        VALIDATION_MODE: ${{ parameters.validationMode }}
+
+    - task: PublishPipelineArtifact@1
+      displayName: Upload npm packages
+      inputs:
+        targetPath: $(Build.SourcesDirectory)/publish_artifacts
+        artifactName: npm-packages
+
+    - task: PublishPipelineArtifact@1
+      displayName: Upload release metadata
+      inputs:
+        targetPath: $(Build.SourcesDirectory)/release_metadata
+        artifactName: release-metadata

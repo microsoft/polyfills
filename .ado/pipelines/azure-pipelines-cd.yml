@@ -1,0 +1,259 @@
+# Register this YAML in Azure DevOps with the exact pipeline definition name "Polyfills - CD".
+trigger: none
+pr: none
+
+parameters:
+- name: validationMode
+  displayName: Validate artifacts without external publication
+  type: string
+  default: 'false'
+  values:
+  - 'false'
+  - 'true'
+
+resources:
+  pipelines:
+  - pipeline: releaseBuild
+    source: Polyfills - CD Build
+    # Manual Run Pipeline selection may intentionally override this default.
+    branch: refs/heads/main
+    trigger:
+      branches:
+        include:
+        - main
+      stages:
+      - BuildArtifacts
+  repositories:
+  - repository: polyfillsPipelines
+    type: git
+    name: open-source/PolyfillsPipelineTemplates
+    ref: main
+  - repository: 1esPipelines
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
+  parameters:
+    pool:
+      name: OneESPool
+      image: HostedPoolLinuxImage
+      os: linux
+    sdl:
+      sourceAnalysisPool:
+        name: OneESPool
+        image: HostedPoolWindowsImage
+        os: windows
+    settings:
+      networkIsolationPolicy: Permissive
+      networkIsolationAdditionalDomainAllowList: registry.npmjs.org
+    stages:
+    - stage: ValidateArtifacts
+      displayName: Validate release artifacts
+      jobs:
+      - job: Validate
+        displayName: Validate release artifacts
+        steps:
+        - checkout: self
+          clean: true
+
+        - task: UseNode@1
+          displayName: Install Node.js
+          inputs:
+            version: 24.x
+
+        - download: releaseBuild
+          artifact: release-metadata
+          displayName: Download release metadata
+
+        - download: releaseBuild
+          artifact: npm-packages
+          displayName: Download npm packages
+
+        - task: Bash@3
+          name: release
+          displayName: Validate release metadata and packages
+          inputs:
+            targetType: inline
+            script: node build/scripts/validate-release-artifacts.mjs
+          env:
+            EXPECTED_RELEASE_COMMIT: $(resources.pipeline.releaseBuild.sourceCommit)
+            EXPECTED_VALIDATION_MODE: ${{ parameters.validationMode }}
+            RELEASE_ARTIFACT_DIR: $(Pipeline.Workspace)/releaseBuild/npm-packages
+            RELEASE_METADATA_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/releases.json
+
+    - ${{ if eq(parameters.validationMode, 'false') }}:
+      - stage: TagRelease
+        displayName: Tag releases
+        dependsOn: ValidateArtifacts
+        variables:
+          releaseCommit: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.releaseCommit'] ]
+          releaseTags: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.releaseTags'] ]
+        jobs:
+        - job: Tag
+          displayName: Create release tags
+          steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0
+            persistCredentials: true
+
+          - task: Bash@3
+            displayName: Create annotated release tags
+            inputs:
+              targetType: inline
+              script: |
+                set -euo pipefail
+
+                git fetch --no-tags origin "$RELEASE_COMMIT"
+                git config user.name "Azure Pipelines"
+                git config user.email "azure-pipelines@microsoft.com"
+
+                IFS=',' read -ra tags <<< "$RELEASE_TAGS"
+                for release_tag in "${tags[@]}"; do
+                  [[ -z "$release_tag" ]] && continue
+                  remote_ref="refs/azure-release-tags/${release_tag}"
+
+                  if git fetch --force origin "refs/tags/${release_tag}:${remote_ref}" 2>/dev/null; then
+                    existing_commit=$(git rev-parse "${remote_ref}^{}")
+                    if [[ "$existing_commit" != "$RELEASE_COMMIT" ]]; then
+                      echo "##vso[task.logissue type=error]${release_tag} points to ${existing_commit}, not ${RELEASE_COMMIT}."
+                      exit 1
+                    fi
+                    echo "${release_tag} already points to ${RELEASE_COMMIT}."
+                    continue
+                  fi
+
+                  git tag -a "$release_tag" "$RELEASE_COMMIT" -m "Release ${release_tag}"
+                  if git push origin "refs/tags/${release_tag}"; then
+                    continue
+                  fi
+
+                  git fetch --force origin "refs/tags/${release_tag}:${remote_ref}"
+                  raced_commit=$(git rev-parse "${remote_ref}^{}")
+                  if [[ "$raced_commit" != "$RELEASE_COMMIT" ]]; then
+                    echo "##vso[task.logissue type=error]Concurrent tag ${release_tag} points to ${raced_commit}, not ${RELEASE_COMMIT}."
+                    exit 1
+                  fi
+                  echo "Concurrent release run created ${release_tag} at the expected commit."
+                done
+            env:
+              RELEASE_COMMIT: $(releaseCommit)
+              RELEASE_TAGS: $(releaseTags)
+
+      - stage: PublishRelease
+        displayName: Publish GitHub and npm releases
+        dependsOn:
+        - ValidateArtifacts
+        - TagRelease
+        variables:
+          releaseCommit: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.releaseCommit'] ]
+          releaseTags: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.releaseTags'] ]
+          focusgroupPolyfillIncluded: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillIncluded'] ]
+          focusgroupPolyfillReleaseTag: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillReleaseTag'] ]
+          focusgroupPolyfillReleaseAsset: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillReleaseAsset'] ]
+        jobs:
+        - job: PublishGitHub
+          displayName: Publish GitHub Releases
+          steps:
+          - checkout: self
+            clean: true
+
+          - download: releaseBuild
+            artifact: npm-packages
+            displayName: Download npm packages
+
+          - task: GitHubRelease@1
+            displayName: "Create @microsoft/focusgroup-polyfill GitHub Release"
+            condition: and(succeeded(), eq(variables['focusgroupPolyfillIncluded'], 'true'))
+            inputs:
+              gitHubConnection: fast
+              repositoryName: microsoft/polyfills
+              action: create
+              target: $(releaseCommit)
+              tagSource: userSpecifiedTag
+              tag: $(focusgroupPolyfillReleaseTag)
+              title: $(focusgroupPolyfillReleaseTag)
+              releaseNotesSource: inline
+              releaseNotesInline: 'Release for @microsoft/focusgroup-polyfill. The attached npm tarball is published by this Azure pipeline.'
+              addChangeLog: false
+              assets: |
+                $(Pipeline.Workspace)/releaseBuild/npm-packages/$(focusgroupPolyfillReleaseAsset)
+              assetUploadMode: replace
+              isDraft: false
+              isPreRelease: false
+              makeLatest: legacy
+
+        - job: PublishNpm
+          displayName: Publish npm packages
+          steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0
+            fetchTags: true
+            persistCredentials: true
+
+          - download: releaseBuild
+            artifact: npm-packages
+            displayName: Download npm packages
+
+          - task: CopyFiles@2
+            displayName: Stage npm packages
+            inputs:
+              SourceFolder: $(Pipeline.Workspace)/releaseBuild/npm-packages
+              Contents: '*.tgz'
+              TargetFolder: $(Build.SourcesDirectory)/publish_artifacts
+              CleanTargetFolder: true
+
+          - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines
+
+          - task: Bash@3
+            displayName: Mark releases as deployed
+            inputs:
+              targetType: inline
+              script: |
+                set -euo pipefail
+
+                git config user.name "Microsoft Polyfills Builds"
+                git config user.email "polyfills@microsoft.com"
+
+                IFS=',' read -ra tags <<< "$RELEASE_TAGS"
+                for release_tag in "${tags[@]}"; do
+                  [[ -z "$release_tag" ]] && continue
+                  deployed_tag="deployed/${release_tag}"
+                  remote_ref="refs/azure-deployment-tags/${release_tag}"
+
+                  if git fetch --force origin "refs/tags/${deployed_tag}:${remote_ref}" 2>/dev/null; then
+                    existing_commit=$(git rev-parse "${remote_ref}^{}")
+                    if [[ "$existing_commit" != "$RELEASE_COMMIT" ]]; then
+                      echo "##vso[task.logissue type=error]${deployed_tag} points to ${existing_commit}, not ${RELEASE_COMMIT}."
+                      exit 1
+                    fi
+                    echo "${deployed_tag} already marks the expected release."
+                    continue
+                  fi
+
+                  git fetch --force origin "refs/tags/${release_tag}:refs/tags/${release_tag}"
+                  release_commit=$(git rev-parse "refs/tags/${release_tag}^{}")
+                  if [[ "$release_commit" != "$RELEASE_COMMIT" ]]; then
+                    echo "##vso[task.logissue type=error]${release_tag} points to ${release_commit}, not ${RELEASE_COMMIT}."
+                    exit 1
+                  fi
+
+                  git tag "$deployed_tag" "refs/tags/${release_tag}"
+                  if git push origin "refs/tags/${deployed_tag}"; then
+                    continue
+                  fi
+
+                  git fetch --force origin "refs/tags/${deployed_tag}:${remote_ref}"
+                  raced_commit=$(git rev-parse "${remote_ref}^{}")
+                  if [[ "$raced_commit" != "$RELEASE_COMMIT" ]]; then
+                    echo "##vso[task.logissue type=error]Concurrent marker ${deployed_tag} points to ${raced_commit}, not ${RELEASE_COMMIT}."
+                    exit 1
+                  fi
+                  echo "Concurrent release run created ${deployed_tag} at the expected commit."
+                done
+            env:
+              RELEASE_COMMIT: $(releaseCommit)
+              RELEASE_TAGS: $(releaseTags)

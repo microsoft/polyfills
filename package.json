@@ -15,8 +15,7 @@
     "bump": "beachball bump",
     "checkchange": "node build/scripts/check-publish-pipeline.mjs && node build/scripts/checkchange.mjs",
     "test:scripts": "node --test build/scripts/*.test.mjs",
-    "create-github-releases": "node build/scripts/create-github-releases.mjs",
-    "check-github-releases": "node build/scripts/download-github-releases.mjs --check-only",
+    "prepare-release-artifacts": "node build/scripts/prepare-release-artifacts.mjs",
     "publish": "beachball publish"
   },
   "repository": {
