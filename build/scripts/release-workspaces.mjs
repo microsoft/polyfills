@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function expandWorkspacePattern(pattern, repoRoot) {
   const segments = pattern.split(/[\\/]+/).filter(Boolean);
   let paths = ["."];
@@ -9,7 +13,12 @@ function expandWorkspacePattern(pattern, repoRoot) {
     const nextPaths = [];
     const hasWildcard = segment.includes("*");
     const matcher = hasWildcard
-      ? new RegExp(`^${segment.replace(/\*/g, ".*")}$`)
+      ? new RegExp(
+          `^${segment
+            .split("*")
+            .map(part => escapeRegExp(part))
+            .join(".*")}$`,
+        )
       : null;
 
     for (const currentPath of paths) {

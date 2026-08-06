@@ -68,6 +68,19 @@ test("validateReleaseMetadata accepts matching metadata and artifacts", () => {
   );
 });
 
+test("validateReleaseMetadata reports an unsupported schema version", () => {
+  assert.throws(
+    () =>
+      validateReleaseMetadata(metadata({ schemaVersion: 2 }), {
+        artifactHashes: new Map([[asset, hash]]),
+        expectedCommit: commit,
+        expectedValidationMode: false,
+        workspaces: [workspace],
+      }),
+    /unsupported schema version \(got 2, expected 1\)/,
+  );
+});
+
 test("validateReleaseMetadata rejects a mismatched source commit", () => {
   assert.throws(
     () =>

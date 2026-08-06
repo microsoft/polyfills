@@ -27,7 +27,9 @@ function validateReleaseMetadata(
   },
 ) {
   if (metadata?.schemaVersion !== 1) {
-    throw new Error("Release metadata has an unsupported schema version.");
+    throw new Error(
+      `Release metadata has an unsupported schema version (got ${String(metadata?.schemaVersion)}, expected 1).`,
+    );
   }
   if (!/^[0-9a-f]{40}$/.test(metadata.releaseCommit ?? "")) {
     throw new Error("Release metadata has an invalid release commit.");
@@ -123,13 +125,14 @@ function main() {
     artifactHashes.set(asset, sha256(assetPath));
   }
 
+  const workspaces = listPublishableWorkspaces(repoRoot);
   const metadata = validateReleaseMetadata(
     JSON.parse(readFileSync(metadataPath, "utf8")),
     {
       artifactHashes,
       expectedCommit,
       expectedValidationMode,
-      workspaces: listPublishableWorkspaces(repoRoot),
+      workspaces,
     },
   );
   const releaseByName = new Map(
@@ -142,7 +145,7 @@ function main() {
     metadata.releases.map(release => release.tag).join(","),
   );
 
-  for (const workspace of listPublishableWorkspaces(repoRoot)) {
+  for (const workspace of workspaces) {
     const release = releaseByName.get(workspace.name);
     setAzureOutput(`${workspace.outputPrefix}Included`, release ? "true" : "false");
     setAzureOutput(
