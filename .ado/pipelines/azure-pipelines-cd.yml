@@ -1,4 +1,4 @@
-# Register this YAML in Azure DevOps with the exact pipeline definition name "Polyfills - CD".
+# Azure Pipelines definition name: Polyfills - CD
 trigger: none
 pr: none
 

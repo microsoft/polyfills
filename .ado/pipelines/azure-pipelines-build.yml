@@ -1,5 +1,5 @@
-# Register this YAML in Azure DevOps with the exact pipeline definition name
-# "Polyfills - CD Build". .ado/pipelines/azure-pipelines-cd.yml references that definition name.
+# Azure Pipelines definition name: Polyfills - CD Build
+# Referenced by azure-pipelines-cd.yml through resources.pipelines.source.
 trigger:
   branches:
     include:
