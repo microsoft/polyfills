@@ -191,6 +191,7 @@ export function isKeyboardFocusable(
       element.tabIndex > -1 ||
       (ignorePolyfillTabindex &&
         element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
+        element.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
         Number(element.getAttribute(DatasetName.AUTHOR_TABINDEX)) > -1)) &&
     !(
       // Not disabled
@@ -345,7 +346,7 @@ export function isSegmentor(element, owner) {
  *     When omitted, only `element` itself is checked.
  * @returns {boolean}
  */
-function checkVisibility(element, ancestor) {
+export function checkVisibility(element, ancestor) {
   if ("checkVisibility" in Element.prototype) {
     return element.checkVisibility({
       visibilityProperty: true,

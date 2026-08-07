@@ -47,8 +47,8 @@ export class GridItemCollection {
       return;
     }
     const cells = rows.map((row) =>
-      [...row.children].filter((cell) =>
-        this.#manual ? true : ["TD", "TH"].includes(cell.tagName),
+      [...row.children].filter(
+        (cell) => this.#manual || ["TD", "TH"].includes(cell.tagName),
       ),
     );
     if (
@@ -85,9 +85,16 @@ export class GridItemCollection {
           }
         }
         if (candidates.length !== 1) {
+          this.#entries = [];
           return;
         }
-        this.#entries.push({ element: candidates[0], row: r, col: c, cell });
+        this.#entries.push({
+          element: candidates[0],
+          row: r,
+          col: c,
+          cell,
+          nativelyTabbable: candidates[0].tabIndex > -1,
+        });
       }
     }
     this.#valid = true;
@@ -120,7 +127,14 @@ export class GridItemCollection {
     return this.contains(element);
   }
   #isNavigable(element) {
-    return isKeyboardFocusable(element, this.#owner, true);
+    const entry = this.#entries.find((item) => item.element === element);
+    if (!entry) {
+      return false;
+    }
+    const authorTabindex = element.getAttribute(DatasetName.AUTHOR_TABINDEX);
+    return authorTabindex === "none"
+      ? entry.nativelyTabbable
+      : Number(authorTabindex) > -1;
   }
   sameSegment() {
     return true;
@@ -252,6 +266,8 @@ export class GridItemCollection {
         "disabled",
         "hidden",
         "inert",
+        "rowspan",
+        "colspan",
         "tabindex",
       ],
     });

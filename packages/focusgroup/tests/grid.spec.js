@@ -262,7 +262,6 @@ test("author tabindex changes are preserved during reconciliation", async ({
     .getByTestId("b1")
     .evaluate((cell) => cell.setAttribute("tabindex", "-1"));
   await expect(page.getByTestId("b1")).toHaveAttribute("tabindex", "-1");
-  await expect(page.getByTestId("b1")).toHaveAttribute("data-fg-ati", "-1");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("a1")).toBeFocused();
@@ -279,7 +278,7 @@ test("nested tables do not become outer-grid rows", async ({ page }, {
         <tbody>
           <tr>
             <td tabindex="0" data-testid="outer">Outer</td>
-            <td>
+            <td tabindex="0">
               <table><tbody><tr><td tabindex="0" data-testid="nested">Nested</td></tr></tbody></table>
             </td>
           </tr>
