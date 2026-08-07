@@ -3,6 +3,7 @@
 
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
+import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -109,13 +110,24 @@ export function polyfill(root) {
       if (!elementPolyfillMap.has(element)) {
         return;
       }
-      const items = new TreeWalkerItemCollection(element);
+      const definition = parseDefinition(element);
+      const createItems = (nextDefinition) =>
+        nextDefinition.behavior === "grid"
+          ? new GridItemCollection(element, nextDefinition.manual)
+          : new TreeWalkerItemCollection(element);
+      const items = createItems(definition);
       const fg = new FocusGroup(element, items, {
-        definition: parseDefinition(element),
+        definition,
+        createItems,
+        connectItems: (collection, focusGroup) =>
+          collection.observe?.(focusGroup),
         decorateOwner: (el, behavior) => inferRole(el, behavior, "owner"),
-        decorateItem: (el, behavior) => inferRole(el, behavior, "child"),
+        decorateItem: (el, behavior) => {
+          if (behavior !== "grid") {
+            inferRole(el, behavior, "child");
+          }
+        },
       });
-      items.observe(fg);
       elementPolyfillMap.set(element, fg);
     });
   } while (walker.nextNode());

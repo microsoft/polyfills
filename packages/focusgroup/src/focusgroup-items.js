@@ -3,6 +3,7 @@
 
 /**
  * @import {BehaviorToken} from "./constants.js"
+ * @import {FocusGroup} from "./focusgroup.js"
  * @import {FocusGroupDefinition} from "./utils.js"
  */
 
@@ -28,6 +29,10 @@
  * @property {(element: HTMLElement, behavior: BehaviorToken|null) => void} [decorateItem] -
  *   Optional hook called during item (un)decoration. Receives the behavior
  *   token, or `null` when undecorating.
+ * @property {(definition: FocusGroupDefinition) => FocusGroupItemCollection} [createItems] -
+ *   Optional factory used when the focusgroup behavior changes.
+ * @property {(items: FocusGroupItemCollection, focusGroup: FocusGroup) => void} [connectItems] -
+ *   Optional hook used to connect a newly-created collection.
  */
 
 /**

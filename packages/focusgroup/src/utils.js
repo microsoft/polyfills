@@ -36,6 +36,9 @@ export function supportsFocusGroup() {
  * @property {boolean} [wrap]
  * @property {("inline"|"block"|undefined)} [axis]
  * @property {boolean} [memory]
+ * @property {("none"|"wrap"|"flow")} [rowEdge]
+ * @property {("none"|"wrap"|"flow")} [colEdge]
+ * @property {boolean} [manual]
  */
 
 /**
@@ -47,7 +50,9 @@ export function supportsFocusGroup() {
  * @returns {FocusGroupDefinition}
  */
 export function parseDefinition(owner) {
-  const tokens = (owner.getAttribute("focusgroup") ?? "").split(" ");
+  const tokens = (owner.getAttribute("focusgroup") ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
   const behavior =
     tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ?? null;
   const base = BehaviorMap[behavior];
@@ -67,12 +72,91 @@ export function parseDefinition(owner) {
       : hasInline
         ? "inline"
         : "block";
-  return {
+  const resolveEdge = (wrapToken, flowToken) => {
+    if (
+      tokens.includes("nowrap") ||
+      (tokens.includes(wrapToken) && tokens.includes(flowToken))
+    ) {
+      return "none";
+    }
+    return tokens.includes(wrapToken)
+      ? "wrap"
+      : tokens.includes(flowToken)
+        ? "flow"
+        : "none";
+  };
+  const broadEdge =
+    tokens.includes("nowrap") ||
+    (tokens.includes("wrap") && tokens.includes("flow"))
+      ? "none"
+      : tokens.includes("wrap")
+        ? "wrap"
+        : tokens.includes("flow")
+          ? "flow"
+          : "none";
+  const rowEdge =
+    resolveEdge("rowwrap", "rowflow") === "none"
+      ? broadEdge
+      : resolveEdge("rowwrap", "rowflow");
+  const colEdge =
+    resolveEdge("colwrap", "colflow") === "none"
+      ? broadEdge
+      : resolveEdge("colwrap", "colflow");
+  const definition = {
     behavior,
     wrap,
     axis,
     memory: !tokens.includes("nomemory"),
   };
+  if (behavior === BehaviorToken.GRID) {
+    definition.manual = tokens.includes("manual");
+    definition.rowEdge = rowEdge;
+    definition.colEdge = colEdge;
+  }
+  return definition;
+}
+
+/**
+ * Returns a grid operation for a directional key, accounting for writing mode
+ * and direction.
+ * @param {KeyboardEvent} event
+ * @param {HTMLElement} owner
+ * @returns {string|null}
+ */
+export function getGridNavigationDirection(event, owner) {
+  if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
+    return event.key === "Home"
+      ? "grid-start"
+      : event.key === "End"
+        ? "grid-end"
+        : null;
+  }
+  if (event.shiftKey || event.altKey || event.metaKey) {
+    return null;
+  }
+  const { writingMode, direction } = window.getComputedStyle(owner);
+  const vertical = !writingMode.startsWith("horizontal-");
+  const rtl = direction === "rtl";
+  const inlineReversed = rtl;
+  const blockReversed = vertical && writingMode.endsWith("-rl");
+  const map = {
+    ArrowLeft: [vertical ? "block" : "inline", "backward"],
+    ArrowRight: [vertical ? "block" : "inline", "forward"],
+    ArrowUp: [vertical ? "inline" : "block", "backward"],
+    ArrowDown: [vertical ? "inline" : "block", "forward"],
+  };
+  if (event.key === "Home") {
+    return "row-start";
+  }
+  if (event.key === "End") {
+    return "row-end";
+  }
+  const action = map[event.key];
+  if (!action) {
+    return null;
+  }
+  const reversed = action[0] === "inline" ? inlineReversed : blockReversed;
+  return `${action[0]}-${reversed ? (action[1] === "forward" ? "backward" : "forward") : action[1]}`;
 }
 
 /**
@@ -89,9 +173,14 @@ export function generateUniqueId() {
  *
  * @param {HTMLElement} element
  * @param {HTMLElement=} owner
+ * @param {boolean=} ignorePolyfillTabindex
  * @returns {boolean}
  */
-export function isKeyboardFocusable(element, owner) {
+export function isKeyboardFocusable(
+  element,
+  owner,
+  ignorePolyfillTabindex = false,
+) {
   return (
     // Is content editable
     (element.isContentEditable ||
@@ -99,7 +188,10 @@ export function isKeyboardFocusable(element, owner) {
       // `tabIndex` is `-1` in WebKit in this case
       element.matches(":is(audio, video)[controls]") ||
       // Is tabbable
-      element.tabIndex > -1) &&
+      element.tabIndex > -1 ||
+      (ignorePolyfillTabindex &&
+        element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
+        Number(element.getAttribute(DatasetName.AUTHOR_TABINDEX)) > -1)) &&
     !(
       // Not disabled
       (
@@ -114,7 +206,8 @@ export function isKeyboardFocusable(element, owner) {
         // Not a media element without controls
         element.matches(":is(audio, video):not([controls])") ||
         // Has not been assigned a tabindex by the polyfill
-        element.hasAttribute(DatasetName.AUTHOR_TABINDEX)
+        (!ignorePolyfillTabindex &&
+          element.hasAttribute(DatasetName.AUTHOR_TABINDEX))
       )
     )
   );

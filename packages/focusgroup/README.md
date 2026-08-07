@@ -12,7 +12,12 @@ The polyfill follows these principles:
 - **Updates**: Ship updates as the spec evolves so the latest version of the polyfill implements the latest version of the spec.
 - **Migration**: Make it easy to migrate to new updates if/when the spec evolves.
 
-For more information about focusgroup itself, see: <https://open-ui.org/components/scoped-focusgroup.explainer/>
+For more information about focusgroup itself, see the [V1 explainer](https://open-ui.org/components/scoped-focusgroup.explainer/) and [V2 grid explainer](https://open-ui.org/components/focusgroup-v2.explainer/).
+
+The polyfill supports V2 `focusgroup="grid"` for rectangular native tables and
+`focusgroup="grid manual"` for generic markup whose direct-child rows carry
+`focusgrouprow`. Grid movement supports Arrow keys, Home/End, Ctrl+Home/Ctrl+End,
+and the `wrap`, `flow`, `rowwrap`, `rowflow`, `colwrap`, and `colflow` modifiers.
 
 ## Usage
 
