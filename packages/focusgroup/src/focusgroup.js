@@ -202,7 +202,11 @@ export class FocusGroup {
 
     if (info.definition !== undefined) {
       const behaviorChanged = info.definition.behavior !== this.#behavior;
-      if (behaviorChanged && this.#createItems) {
+      const topologyChanged =
+        this.#behavior === "grid" &&
+        info.definition.behavior === "grid" &&
+        info.definition.manual !== this.#definition.manual;
+      if ((behaviorChanged || topologyChanged) && this.#createItems) {
         this.#undecorateItems();
         this.#items.disconnect?.();
         this.#items = this.#createItems(info.definition);

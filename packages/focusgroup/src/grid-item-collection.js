@@ -3,11 +3,21 @@
 
 import { DatasetName } from "./constants.js";
 import { observers } from "./observer-registry.js";
+import { createTreeWalker, getClosestElement } from "./shadow-utils/index.js";
 import {
   hasGenericRole,
   isKeyboardFocusable,
   parseDefinition,
 } from "./utils.js";
+
+function flatChildren(element) {
+  return [...(element.shadowRoot?.children ?? element.children)].flatMap(
+    (child) =>
+      child.tagName === "SLOT"
+        ? child.assignedElements({ flatten: true })
+        : [child],
+  );
+}
 
 /**
  * Discovers rectangular, spanless grid topology from native tables or
@@ -19,6 +29,8 @@ export class GridItemCollection {
   #entries = [];
   #valid = false;
   #observer;
+  #rowCount = 0;
+  #colCount = 0;
 
   constructor(owner, manual) {
     this.#owner = owner;
@@ -29,11 +41,12 @@ export class GridItemCollection {
   #build() {
     this.#entries = [];
     this.#valid = false;
+    this.#rowCount = 0;
+    this.#colCount = 0;
+    const children = flatChildren(this.#owner);
     const rows = this.#manual
-      ? [...this.#owner.children].filter((el) =>
-          el.hasAttribute("focusgrouprow"),
-        )
-      : [...this.#owner.children].flatMap((child) =>
+      ? children.filter((el) => el.hasAttribute("focusgrouprow"))
+      : children.flatMap((child) =>
           child.tagName === "TR"
             ? [child]
             : ["THEAD", "TBODY", "TFOOT"].includes(child.tagName)
@@ -47,7 +60,7 @@ export class GridItemCollection {
       return;
     }
     const cells = rows.map((row) =>
-      [...row.children].filter(
+      flatChildren(row).filter(
         (cell) => this.#manual || ["TD", "TH"].includes(cell.tagName),
       ),
     );
@@ -72,9 +85,15 @@ export class GridItemCollection {
         if (isKeyboardFocusable(cell, this.#owner, true)) {
           candidates.push(cell);
         }
-        for (const child of cell.querySelectorAll("*")) {
-          const scope = child.closest("[focusgroup]");
-          const table = child.closest("table");
+        const walker = createTreeWalker(
+          this.#owner.ownerDocument,
+          cell,
+          NodeFilter.SHOW_ELEMENT,
+        );
+        while (walker.nextNode()) {
+          const child = walker.currentNode;
+          const scope = getClosestElement(child, "[focusgroup]");
+          const table = getClosestElement(child, "table");
           if (
             isKeyboardFocusable(child, this.#owner, true) &&
             !child.closest('[focusgroup="none"]') &&
@@ -98,6 +117,8 @@ export class GridItemCollection {
       }
     }
     this.#valid = true;
+    this.#rowCount = rows.length;
+    this.#colCount = cells[0].length;
   }
 
   *items() {
@@ -175,8 +196,8 @@ export class GridItemCollection {
     }
     let row = source.row;
     let col = source.col;
-    const rowCount = Math.max(...this.#entries.map((e) => e.row)) + 1;
-    const colCount = Math.max(...this.#entries.map((e) => e.col)) + 1;
+    const rowCount = this.#rowCount;
+    const colCount = this.#colCount;
     if (operation === "row-start") {
       col = 0;
     } else if (operation === "row-end") {

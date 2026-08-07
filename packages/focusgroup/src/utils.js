@@ -73,35 +73,15 @@ export function parseDefinition(owner) {
         ? "inline"
         : "block";
   const resolveEdge = (wrapToken, flowToken) => {
-    if (
-      tokens.includes("nowrap") ||
-      (tokens.includes(wrapToken) && tokens.includes(flowToken))
-    ) {
+    const hasWrap = tokens.includes(wrapToken) || tokens.includes("wrap");
+    const hasFlow = tokens.includes(flowToken) || tokens.includes("flow");
+    if (tokens.includes("nowrap") || (hasWrap && hasFlow)) {
       return "none";
     }
-    return tokens.includes(wrapToken)
-      ? "wrap"
-      : tokens.includes(flowToken)
-        ? "flow"
-        : "none";
+    return hasWrap ? "wrap" : hasFlow ? "flow" : "none";
   };
-  const broadEdge =
-    tokens.includes("nowrap") ||
-    (tokens.includes("wrap") && tokens.includes("flow"))
-      ? "none"
-      : tokens.includes("wrap")
-        ? "wrap"
-        : tokens.includes("flow")
-          ? "flow"
-          : "none";
-  const rowEdge =
-    resolveEdge("rowwrap", "rowflow") === "none"
-      ? broadEdge
-      : resolveEdge("rowwrap", "rowflow");
-  const colEdge =
-    resolveEdge("colwrap", "colflow") === "none"
-      ? broadEdge
-      : resolveEdge("colwrap", "colflow");
+  const rowEdge = resolveEdge("rowwrap", "rowflow");
+  const colEdge = resolveEdge("colwrap", "colflow");
   const definition = {
     behavior,
     wrap,
@@ -124,7 +104,12 @@ export function parseDefinition(owner) {
  * @returns {string|null}
  */
 export function getGridNavigationDirection(event, owner) {
-  if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey) {
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    !event.altKey &&
+    !(event.ctrlKey && event.metaKey)
+  ) {
     return event.key === "Home"
       ? "grid-start"
       : event.key === "End"
