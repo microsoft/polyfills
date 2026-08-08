@@ -4,6 +4,41 @@
 import { test } from "@playwright/test";
 import { expect, setupPage } from "./utils.js";
 
+test("polyfills grid when only base focusgroup support is available", async ({
+  page,
+}, { project }) => {
+  test.skip(
+    project.use.channel === "chrome-canary",
+    "Canary runs with native grid support enabled",
+  );
+
+  await page.goto("/test.html");
+  await page.evaluate(() => {
+    Object.defineProperty(HTMLElement.prototype, "focusgroup", {
+      configurable: true,
+    });
+  });
+  await page.setContent(`
+    <table role="grid" focusgroup="grid">
+      <tbody>
+        <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
+        <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" data-testid="b2">B2</td></tr>
+      </tbody>
+    </table>
+  `);
+  const specifier = project.name.endsWith("Shadowless")
+    ? "/build/index-shadowless.mjs"
+    : "/build/index.mjs";
+  await page.evaluate(async (moduleSpecifier) => {
+    const { polyfill } = await import(moduleSpecifier);
+    polyfill();
+  }, specifier);
+
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("b1")).toBeFocused();
+});
+
 test("native tables support two-dimensional navigation", async ({ page }, {
   project,
 }) => {
@@ -51,6 +86,28 @@ test("manual grids enroll focusgrouprow rows", async ({ page }, {
     "role",
     "row",
   );
+});
+
+test("directional navigation skips disabled grid items", async ({ page }, {
+  project,
+}) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <div focusgrouprow>
+          <button data-testid="a1">A1</button>
+          <button data-testid="a2" disabled>A2</button>
+          <button data-testid="a3">A3</button>
+        </div>
+      </div>
+    `,
+  );
+
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("a3")).toBeFocused();
 });
 
 test.describe("grid edge behavior", () => {

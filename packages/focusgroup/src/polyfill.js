@@ -18,11 +18,7 @@ import {
 
 let elementPolyfillMap;
 
-if (
-  hasDocument() &&
-  typeof MutationObserver !== "undefined" &&
-  !supportsFocusGroup()
-) {
+if (hasDocument() && typeof MutationObserver !== "undefined") {
   /** @type {Map<HTMLElement, FocusGroup>} */
   elementPolyfillMap = state.m ??= new Map();
 
@@ -68,10 +64,11 @@ if (
  * @param {HTMLElement} root - The polyfill target. Defaults to `<body>`.
  */
 export function polyfill(root) {
-  if (supportsFocusGroup() || !hasDocument()) {
+  if (!hasDocument()) {
     return;
   }
 
+  const hasNativeFocusGroup = supportsFocusGroup();
   root ??= document.body;
 
   const walker = createTreeWalker(
@@ -95,6 +92,11 @@ export function polyfill(root) {
       !element.hasAttribute?.("focusgroup") ||
       elementPolyfillMap.has(element)
     ) {
+      continue;
+    }
+
+    const definition = parseDefinition(element);
+    if (hasNativeFocusGroup && definition.behavior !== "grid") {
       continue;
     }
 

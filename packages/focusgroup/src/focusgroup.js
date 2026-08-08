@@ -130,7 +130,11 @@ export class FocusGroup {
    * @param {FocusGroupOptions} [options]
    */
   constructor(owner, items, options = {}) {
-    if (supportsFocusGroup() || !owner) {
+    if (
+      !owner ||
+      (supportsFocusGroup() &&
+        options.definition?.behavior !== BehaviorToken.GRID)
+    ) {
       return;
     }
 

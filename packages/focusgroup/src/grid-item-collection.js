@@ -19,6 +19,10 @@ function flatChildren(element) {
   );
 }
 
+function isDisabledControl(element) {
+  return element.matches(":disabled");
+}
+
 /**
  * Discovers rectangular, spanless grid topology from native tables or
  * explicitly enrolled direct-child rows.
@@ -82,7 +86,10 @@ export class GridItemCollection {
       for (let c = 0; c < cells[r].length; c++) {
         const cell = cells[r][c];
         const candidates = [];
-        if (isKeyboardFocusable(cell, this.#owner, true)) {
+        if (
+          isKeyboardFocusable(cell, this.#owner, true) ||
+          isDisabledControl(cell)
+        ) {
           candidates.push(cell);
         }
         const walker = createTreeWalker(
@@ -95,7 +102,8 @@ export class GridItemCollection {
           const scope = getClosestElement(child, "[focusgroup]");
           const table = getClosestElement(child, "table");
           if (
-            isKeyboardFocusable(child, this.#owner, true) &&
+            (isKeyboardFocusable(child, this.#owner, true) ||
+              isDisabledControl(child)) &&
             !child.closest('[focusgroup="none"]') &&
             (!scope || scope.isSameNode(this.#owner)) &&
             (!table || table.isSameNode(this.#owner))
@@ -112,7 +120,11 @@ export class GridItemCollection {
           row: r,
           col: c,
           cell,
-          nativelyTabbable: candidates[0].tabIndex > -1,
+          nativelyTabbable: isKeyboardFocusable(
+            candidates[0],
+            this.#owner,
+            true,
+          ),
         });
       }
     }
@@ -189,7 +201,12 @@ export class GridItemCollection {
       }
     }
   }
-  gridNext(current, operation, def) {
+  gridNext(current, operation, def, visited = new Set()) {
+    if (visited.has(current)) {
+      return null;
+    }
+    visited.add(current);
+
     const source = this.#entries.find((e) => e.element === current);
     if (!source) {
       return null;
@@ -250,11 +267,14 @@ export class GridItemCollection {
         row += delta;
       }
     }
-    return (
-      this.#entries.find(
-        (e) => e.row === row && e.col === col && this.#isNavigable(e.element),
-      )?.element ?? null
-    );
+    const target = this.#entries.find((e) => e.row === row && e.col === col);
+    if (!target) {
+      return null;
+    }
+    if (!this.#isNavigable(target.element)) {
+      return this.gridNext(target.element, operation, def, visited);
+    }
+    return target.element;
   }
   observe(focusGroup) {
     this.#observer = new MutationObserver((records) => {
