@@ -37,7 +37,7 @@ steps:
   displayName: Upload npm packages
   inputs:
     targetPath: $(Build.SourcesDirectory)/publish_artifacts
-    artifactName: npm-packages
+    artifactName: npm_packages
 
 - task: PublishPipelineArtifact@1
   displayName: Upload release metadata

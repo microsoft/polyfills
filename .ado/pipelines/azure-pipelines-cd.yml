@@ -68,7 +68,7 @@ extends:
           displayName: Download release metadata
 
         - download: releaseBuild
-          artifact: npm-packages
+          artifact: npm_packages
           displayName: Download npm packages
 
         - task: Bash@3
@@ -81,7 +81,7 @@ extends:
             AZURE_BUILD_ID: $(Build.BuildId)
             EXPECTED_RELEASE_COMMIT: $(resources.pipeline.releaseBuild.sourceCommit)
             EXPECTED_VALIDATION_MODE: ${{ parameters.validationMode }}
-            RELEASE_ARTIFACT_DIR: $(Pipeline.Workspace)/releaseBuild/npm-packages
+            RELEASE_ARTIFACT_DIR: $(Pipeline.Workspace)/releaseBuild/npm_packages
             RELEASE_MANIFEST_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json
 
     - ${{ if eq(parameters.validationMode, 'false') }}:
@@ -162,7 +162,7 @@ extends:
             clean: true
 
           - download: releaseBuild
-            artifact: npm-packages
+            artifact: npm_packages
             displayName: Download npm packages
 
           - task: GitHubRelease@1
@@ -180,7 +180,7 @@ extends:
               releaseNotesInline: 'Release for @microsoft/focusgroup-polyfill. The attached npm tarball is published by this Azure pipeline.'
               addChangeLog: false
               assets: |
-                $(Pipeline.Workspace)/releaseBuild/npm-packages/$(focusgroupPolyfillReleaseAsset)
+                $(Pipeline.Workspace)/releaseBuild/npm_packages/$(focusgroupPolyfillReleaseAsset)
               assetUploadMode: replace
               isDraft: false
               isPreRelease: false
@@ -196,13 +196,13 @@ extends:
             persistCredentials: true
 
           - download: releaseBuild
-            artifact: npm-packages
+            artifact: npm_packages
             displayName: Download npm packages
 
           - task: CopyFiles@2
             displayName: Stage npm packages
             inputs:
-              SourceFolder: $(Pipeline.Workspace)/releaseBuild/npm-packages
+              SourceFolder: $(Pipeline.Workspace)/releaseBuild/npm_packages
               Contents: '*.tgz'
               TargetFolder: $(Build.SourcesDirectory)/publish_artifacts
               CleanTargetFolder: true
