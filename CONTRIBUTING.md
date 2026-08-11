@@ -27,8 +27,10 @@ On `publish_<timestamp>` branches only, `npm run checkchange` can skip `beachbal
 1. Check out an up-to-date `main` branch and create a `publish_<Date.now()>` branch.
 2. Run `npm run bump`, then commit and open a pull request for the version and changelog updates.
 3. After review, a repository admin merges the publish PR. The guarded `npm run checkchange` bypass allows this bump PR without requiring another change file.
-4. `Polyfills - CD Build` runs from `main`. When a publishable workspace's `${name}_v${version}` tag is missing, it builds the workspaces and publishes npm tarballs plus release metadata as Azure pipeline artifacts.
+4. `Polyfills - CD Build` runs from `main`. When a publishable workspace's `${name}_v${version}` tag is missing, its normal-mode `BuildArtifacts` stage builds the workspaces and publishes npm tarballs plus release metadata as Azure pipeline artifacts. If every release tag already exists, `PrepareRelease` succeeds and the downstream stage is skipped.
 5. Completion of the build pipeline's `BuildArtifacts` stage triggers `Polyfills - CD`. It validates the artifacts, creates the package-version tags and GitHub Releases, publishes the tarballs to npm, and pushes `deployed/<tag>` marker tags on success.
+
+For artifact validation, manually run `Polyfills - CD Build` with `validationMode: true`. That run contains `ValidateArtifacts` instead of `BuildArtifacts` and therefore cannot trigger CD. Then manually run `Polyfills - CD` with `validationMode: true`, selecting the validation build as its `releaseBuild` resource. The CD validation stage verifies the artifacts and selected build commit without publishing externally.
 
 Release environment assumptions:
 

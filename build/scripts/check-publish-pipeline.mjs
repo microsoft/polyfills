@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Guardrail for Azure CD coverage.
+ * Guardrail for Azure release pipeline safety and CD coverage.
  *
  * The release build discovers and packs publishable workspaces dynamically, but
  * Azure Pipelines cannot create GitHubRelease tasks from runtime metadata. The
@@ -30,6 +30,19 @@ const pipelinePath = join(
   ".ado",
   "pipelines",
   "azure-pipelines-cd.yml",
+);
+const buildPipelinePath = join(
+  repoRoot,
+  ".ado",
+  "pipelines",
+  "azure-pipelines-build.yml",
+);
+const packTemplatePath = join(
+  repoRoot,
+  ".ado",
+  "pipelines",
+  "templates",
+  "pack-release-steps.yml",
 );
 
 function getStepBlocks(pipeline, stepHeader) {
@@ -80,21 +93,111 @@ function validateUniquePrefixes(workspaces) {
   return failures;
 }
 
+function countOccurrences(value, search) {
+  return value.split(search).length - 1;
+}
+
+function checkBuildPipeline(pipeline, packTemplate) {
+  const failures = [];
+  const normalHeader = "- ${{ if eq(parameters.validationMode, 'false') }}:";
+  const validationHeader = "- ${{ if eq(parameters.validationMode, 'true') }}:";
+  const [normalBlock] = getStepBlocks(pipeline, normalHeader);
+  const [validationBlock] = getStepBlocks(pipeline, validationHeader);
+  const sharedStageRequirements = [
+    "dependsOn: PrepareRelease",
+    "eq(dependencies.PrepareRelease.outputs['SelectRelease.release.shouldBuild'], 'true')",
+    "releaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.releaseTags'] ]",
+    "- template: templates/pack-release-steps.yml",
+    "validationMode: ${{ parameters.validationMode }}",
+  ];
+
+  if (countOccurrences(pipeline, normalHeader) !== 1) {
+    failures.push("Normal mode must declare exactly one compile-time stage branch.");
+  }
+  if (countOccurrences(pipeline, validationHeader) !== 1) {
+    failures.push("Validation mode must declare exactly one compile-time stage branch.");
+  }
+  if (
+    countOccurrences(pipeline, "- stage: BuildArtifacts") !== 1 ||
+    !normalBlock?.includes("- stage: BuildArtifacts") ||
+    normalBlock.includes("- stage: ValidateArtifacts")
+  ) {
+    failures.push("BuildArtifacts must exist only in the normal-mode branch.");
+  }
+  if (
+    countOccurrences(pipeline, "- stage: ValidateArtifacts") !== 1 ||
+    !validationBlock?.includes("- stage: ValidateArtifacts") ||
+    validationBlock.includes("- stage: BuildArtifacts")
+  ) {
+    failures.push("ValidateArtifacts must exist only in the validation-mode branch.");
+  }
+
+  for (const [mode, block] of [
+    ["normal", normalBlock],
+    ["validation", validationBlock],
+  ]) {
+    for (const requirement of sharedStageRequirements) {
+      if (!block?.includes(requirement)) {
+        failures.push(
+          `The ${mode}-mode artifact stage is missing: ${requirement}`,
+        );
+      }
+    }
+  }
+
+  const templateRequirements = [
+    "- name: validationMode",
+    "- script: npm ci",
+    "- script: npm run build",
+    "- script: npm run prepare-release-artifacts",
+    "SELECTED_RELEASE_TAGS: $(releaseTags)",
+    "VALIDATION_MODE: ${{ parameters.validationMode }}",
+    "artifactName: npm-packages",
+    "artifactName: release-metadata",
+  ];
+  for (const requirement of templateRequirements) {
+    if (!packTemplate.includes(requirement)) {
+      failures.push(`Shared pack template is missing: ${requirement}`);
+    }
+  }
+
+  return failures;
+}
+
 function checkPublishPipeline(pipeline, publishable) {
   const releaseBlocks = getStepBlocks(pipeline, "- task: GitHubRelease@1");
   const failures = validateUniquePrefixes(publishable);
+  const [releaseBuildResource] = getStepBlocks(
+    pipeline,
+    "- pipeline: releaseBuild",
+  );
+  const triggerStageBlock = releaseBuildResource?.match(
+    /^\s+stages:\s*\n((?:\s+- [^\n]+\n?)+)/m,
+  )?.[1];
+  const triggerStages = Array.from(
+    triggerStageBlock?.matchAll(/^\s+- ([^\s#]+)\s*$/gm) ?? [],
+    match => match[1],
+  );
   const architectureRequirements = [
     "source: Polyfills - CD Build",
-    "- BuildArtifacts",
+    "- stage: ValidateArtifacts",
     "- job: PublishGitHub",
     "- job: PublishNpm",
     "template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines",
+    "EXPECTED_RELEASE_COMMIT: $(resources.pipeline.releaseBuild.sourceCommit)",
+    "EXPECTED_VALIDATION_MODE: ${{ parameters.validationMode }}",
   ];
 
   for (const requirement of architectureRequirements) {
     if (!pipeline.includes(requirement)) {
       failures.push(`Missing Azure CD architecture requirement: ${requirement}`);
     }
+  }
+
+  if (triggerStages.length !== 1 || triggerStages[0] !== "BuildArtifacts") {
+    failures.push(
+      "The releaseBuild pipeline trigger must include only BuildArtifacts and never ValidateArtifacts.",
+    );
   }
 
   for (const { name, outputPrefix } of publishable) {
@@ -156,11 +259,16 @@ function checkPublishPipeline(pipeline, publishable) {
 
 function main() {
   const pipeline = readFileSync(pipelinePath, "utf8");
+  const buildPipeline = readFileSync(buildPipelinePath, "utf8");
+  const packTemplate = readFileSync(packTemplatePath, "utf8");
   const publishable = listPublishableWorkspaces(repoRoot);
-  const failures = checkPublishPipeline(pipeline, publishable);
+  const failures = [
+    ...checkBuildPipeline(buildPipeline, packTemplate),
+    ...checkPublishPipeline(pipeline, publishable),
+  ];
 
   if (failures.length > 0) {
-    console.error("[check-publish-pipeline] Azure CD publish coverage is incomplete.");
+    console.error("[check-publish-pipeline] Azure release pipeline checks failed.");
     console.error(
       "Every non-private workspace must be represented in .ado/pipelines/azure-pipelines-cd.yml. See .ado/pipelines/README.md > Adding a publishable package.",
     );
@@ -171,7 +279,7 @@ function main() {
   }
 
   console.log(
-    `[check-publish-pipeline] Verified Azure CD coverage for ${publishable.length} publishable workspace(s).`,
+    `[check-publish-pipeline] Verified Azure release safety and CD coverage for ${publishable.length} publishable workspace(s).`,
   );
 }
 
@@ -183,6 +291,7 @@ if (invokedDirectly) {
 }
 
 export {
+  checkBuildPipeline,
   checkPublishPipeline,
   getStepBlocks,
   npmNameToOutputPrefix,

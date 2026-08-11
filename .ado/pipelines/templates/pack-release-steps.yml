@@ -1,0 +1,46 @@
+parameters:
+- name: validationMode
+  type: string
+
+steps:
+- checkout: self
+  clean: true
+  fetchDepth: 0
+  fetchTags: true
+
+- task: UseNode@1
+  displayName: Install Node.js
+  inputs:
+    version: 24.x
+
+- task: Cache@2
+  displayName: Cache npm
+  inputs:
+    key: 'npm | "$(Agent.OS)" | package-lock.json'
+    restoreKeys: |
+      npm | "$(Agent.OS)"
+    path: $(npm_config_cache)
+
+- script: npm ci
+  displayName: Install package dependencies
+
+- script: npm run build
+  displayName: Build workspaces
+
+- script: npm run prepare-release-artifacts
+  displayName: Pack release artifacts and metadata
+  env:
+    SELECTED_RELEASE_TAGS: $(releaseTags)
+    VALIDATION_MODE: ${{ parameters.validationMode }}
+
+- task: PublishPipelineArtifact@1
+  displayName: Upload npm packages
+  inputs:
+    targetPath: $(Build.SourcesDirectory)/publish_artifacts
+    artifactName: npm-packages
+
+- task: PublishPipelineArtifact@1
+  displayName: Upload release metadata
+  inputs:
+    targetPath: $(Build.SourcesDirectory)/release_metadata
+    artifactName: release-metadata
