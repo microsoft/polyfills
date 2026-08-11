@@ -3,9 +3,13 @@ import { test } from "node:test";
 
 import { formatAzureBuildNumber } from "./azure-build-number.mjs";
 import {
+  createOriginTagChecker,
+  parseSelectedReleaseTags,
+  recheckSelectedReleaseTags,
   selectReleases,
   selectRequestedReleases,
   updateBuildNumberAfterSelection,
+  validateSelectedReleases,
 } from "./prepare-release-artifacts.mjs";
 import { validateReleaseManifest } from "./validate-release-artifacts.mjs";
 
@@ -15,6 +19,12 @@ const workspace = {
   outputPrefix: "focusgroupPolyfill",
   tag: "@microsoft/focusgroup-polyfill_v1.6.0",
   version: "1.6.0",
+};
+const secondWorkspace = {
+  name: "@microsoft/second-polyfill",
+  outputPrefix: "secondPolyfill",
+  tag: "@microsoft/second-polyfill_v2.0.0",
+  version: "2.0.0",
 };
 const asset = "microsoft-focusgroup-polyfill-1.6.0.tgz";
 const hash = "a".repeat(64);
@@ -110,14 +120,147 @@ test("selectReleases includes existing tags in validation mode", () => {
   ]);
 });
 
-test("selectRequestedReleases preserves the build-stage selection", () => {
-  assert.deepEqual(selectRequestedReleases([workspace], [workspace.tag]), [
-    workspace,
-  ]);
+test("selectRequestedReleases exactly preserves build-stage selection and order", () => {
+  assert.deepEqual(
+    selectRequestedReleases(
+      [workspace, secondWorkspace],
+      [secondWorkspace.tag, workspace.tag],
+    ),
+    [secondWorkspace, workspace],
+  );
   assert.throws(
     () => selectRequestedReleases([workspace], ["@microsoft/unknown_v1.0.0"]),
-    /Unknown requested release tags/,
+    /Invalid SELECTED_RELEASE_TAGS: unknown or non-publishable tags: @microsoft\/unknown_v1\.0\.0/,
   );
+  assert.throws(
+    () => selectRequestedReleases([workspace], [workspace.tag, workspace.tag]),
+    /Invalid SELECTED_RELEASE_TAGS: duplicate selected tags/,
+  );
+});
+
+test("parseSelectedReleaseTags rejects missing or altered selections", () => {
+  assert.deepEqual(
+    parseSelectedReleaseTags(`${secondWorkspace.tag},${workspace.tag}`),
+    [secondWorkspace.tag, workspace.tag],
+  );
+  assert.throws(
+    () => parseSelectedReleaseTags(undefined),
+    /SELECTED_RELEASE_TAGS is required/,
+  );
+  assert.throws(
+    () => parseSelectedReleaseTags(`${workspace.tag}, ${secondWorkspace.tag}`),
+    /tags must be non-empty and contain no surrounding whitespace/,
+  );
+});
+
+test("recheckSelectedReleaseTags preserves an unchanged selection", () => {
+  const checkedTags = [];
+  let fetched = false;
+  const releases = [secondWorkspace, workspace];
+
+  assert.equal(
+    recheckSelectedReleaseTags(releases, false, {
+      fetch() {
+        fetched = true;
+      },
+      exists(tag) {
+        assert.equal(fetched, true);
+        checkedTags.push(tag);
+        return false;
+      },
+    }),
+    releases,
+  );
+  assert.deepEqual(checkedTags, [secondWorkspace.tag, workspace.tag]);
+});
+
+test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
+  assert.throws(
+    () =>
+      recheckSelectedReleaseTags([secondWorkspace, workspace], false, {
+        fetch() {},
+        exists(tag) {
+          return tag === workspace.tag;
+        },
+      }),
+    new RegExp(
+      `Concurrent release detected: selected release tags now exist on origin: ${workspace.tag.replaceAll(
+        ".",
+        "\\.",
+      )}`,
+    ),
+  );
+  assert.throws(
+    () =>
+      recheckSelectedReleaseTags([secondWorkspace, workspace], false, {
+        fetch() {},
+        exists() {
+          return true;
+        },
+      }),
+    error =>
+      error.message ===
+      `Concurrent release detected: selected release tags now exist on origin: ${secondWorkspace.tag}, ${workspace.tag}`,
+  );
+});
+
+test("recheckSelectedReleaseTags allows existing tags in validation mode", () => {
+  assert.doesNotThrow(() =>
+    recheckSelectedReleaseTags([workspace], true, {
+      fetch() {},
+      exists() {
+        return true;
+      },
+    }),
+  );
+});
+
+test("validateSelectedReleases rejects a known but unselected tag", () => {
+  assert.throws(
+    () =>
+      validateSelectedReleases(
+        [secondWorkspace, workspace],
+        new Set([workspace.tag]),
+        false,
+      ),
+    new RegExp(
+      `Invalid SELECTED_RELEASE_TAGS: tags were not selected for release: ${workspace.tag.replaceAll(
+        ".",
+        "\\.",
+      )}`,
+    ),
+  );
+  assert.doesNotThrow(() =>
+    validateSelectedReleases([workspace], new Set([workspace.tag]), true),
+  );
+});
+
+test("origin tag checker uses non-interactive exact git operations", () => {
+  const commands = [];
+  const checker = createOriginTagChecker(args => {
+    commands.push(args);
+    return { status: args[0] === "ls-remote" ? 2 : 0, stderr: "", stdout: "" };
+  });
+
+  checker.fetch();
+  assert.equal(checker.exists(workspace.tag), false);
+  assert.deepEqual(commands, [
+    [
+      "fetch",
+      "--force",
+      "--tags",
+      "--no-recurse-submodules",
+      "origin",
+    ],
+    [
+      "ls-remote",
+      "--exit-code",
+      "--refs",
+      "--tags",
+      "origin",
+      `refs/tags/${workspace.tag}`,
+    ],
+  ]);
 });
 
 test("validateReleaseManifest accepts matching metadata and artifacts", () => {

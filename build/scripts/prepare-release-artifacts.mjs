@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   mkdirSync,
@@ -39,6 +39,23 @@ function listGitTags() {
   );
 }
 
+function parseSelectedReleaseTags(value) {
+  if (value === undefined || value === "") {
+    throw new Error(
+      "SELECTED_RELEASE_TAGS is required when packing release artifacts.",
+    );
+  }
+
+  const tags = value.split(",");
+  const invalidTags = tags.filter(tag => tag.length === 0 || tag !== tag.trim());
+  if (invalidTags.length > 0) {
+    throw new Error(
+      "Invalid SELECTED_RELEASE_TAGS: tags must be non-empty and contain no surrounding whitespace.",
+    );
+  }
+  return tags;
+}
+
 function selectReleases(workspaces, existingTags, includeExisting) {
   return workspaces.filter(
     workspace => includeExisting || !existingTags.has(workspace.tag),
@@ -46,13 +63,106 @@ function selectReleases(workspaces, existingTags, includeExisting) {
 }
 
 function selectRequestedReleases(workspaces, requestedTags) {
+  const duplicateTags = requestedTags.filter(
+    (tag, index) => requestedTags.indexOf(tag) !== index,
+  );
+  if (duplicateTags.length > 0) {
+    throw new Error(
+      `Invalid SELECTED_RELEASE_TAGS: duplicate selected tags: ${[
+        ...new Set(duplicateTags),
+      ].join(", ")}`,
+    );
+  }
+
   const workspaceByTag = new Map(
     workspaces.map(workspace => [workspace.tag, workspace]),
   );
   const releases = requestedTags.map(tag => workspaceByTag.get(tag));
   const unknownTags = requestedTags.filter((_, index) => !releases[index]);
   if (unknownTags.length > 0) {
-    throw new Error(`Unknown requested release tags: ${unknownTags.join(", ")}`);
+    throw new Error(
+      `Invalid SELECTED_RELEASE_TAGS: unknown or non-publishable tags: ${unknownTags.join(", ")}`,
+    );
+  }
+  return releases;
+}
+
+function gitResult(args) {
+  return spawnSync(command("git"), args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+function gitFailure(action, result) {
+  const detail = (result.stderr || result.stdout || result.error?.message || "")
+    .trim()
+    .replaceAll("\n", " ");
+  return new Error(`Unable to ${action}${detail ? `: ${detail}` : "."}`);
+}
+
+function createOriginTagChecker(execute = gitResult) {
+  return {
+    fetch() {
+      const result = execute([
+        "fetch",
+        "--force",
+        "--tags",
+        "--no-recurse-submodules",
+        "origin",
+      ]);
+      if (result.status !== 0) {
+        throw gitFailure("fetch release tags from origin", result);
+      }
+    },
+    exists(tag) {
+      const result = execute([
+        "ls-remote",
+        "--exit-code",
+        "--refs",
+        "--tags",
+        "origin",
+        `refs/tags/${tag}`,
+      ]);
+      if (result.status === 0) return true;
+      if (result.status === 2) return false;
+      throw gitFailure(`check release tag ${tag} on origin`, result);
+    },
+  };
+}
+
+function recheckSelectedReleaseTags(
+  releases,
+  validationMode,
+  originTags = createOriginTagChecker(),
+) {
+  originTags.fetch();
+  const conflictingTags = releases
+    .filter(release => originTags.exists(release.tag))
+    .map(release => release.tag);
+  if (!validationMode && conflictingTags.length > 0) {
+    throw new Error(
+      `Concurrent release detected: selected release tags now exist on origin: ${conflictingTags.join(", ")}`,
+    );
+  }
+  return releases;
+}
+
+function validateSelectedReleases(releases, existingTags, validationMode) {
+  if (validationMode) return releases;
+
+  const unselectedTags = releases
+    .filter(release => existingTags.has(release.tag))
+    .map(release => release.tag);
+  if (unselectedTags.length > 0) {
+    throw new Error(
+      `Invalid SELECTED_RELEASE_TAGS: tags were not selected for release: ${unselectedTags.join(", ")}`,
+    );
   }
   return releases;
 }
@@ -89,14 +199,12 @@ function main() {
   const checkOnly = process.argv.includes("--check-only");
   const validationMode = process.env.VALIDATION_MODE === "true";
   const workspaces = listPublishableWorkspaces(repoRoot);
-  const requestedTags = (process.env.SELECTED_RELEASE_TAGS ?? "")
-    .split(",")
-    .map(tag => tag.trim())
-    .filter(Boolean);
-  const releases =
-    requestedTags.length > 0
-      ? selectRequestedReleases(workspaces, requestedTags)
-      : selectReleases(workspaces, listGitTags(), validationMode);
+  const releases = checkOnly
+    ? selectReleases(workspaces, listGitTags(), validationMode)
+    : selectRequestedReleases(
+        workspaces,
+        parseSelectedReleaseTags(process.env.SELECTED_RELEASE_TAGS),
+      );
 
   console.log(`Publishable workspaces: ${workspaces.length}`);
   console.log(`Packages selected for the manifest: ${releases.length}`);
@@ -118,6 +226,9 @@ function main() {
   if (checkOnly || releases.length === 0) {
     return;
   }
+
+  recheckSelectedReleaseTags(releases, validationMode);
+  validateSelectedReleases(releases, listGitTags(), validationMode);
 
   const releaseCommit = (
     process.env.BUILD_SOURCEVERSION || run("git", ["rev-parse", "HEAD"])
@@ -183,8 +294,12 @@ if (invokedDirectly) {
 }
 
 export {
+  createOriginTagChecker,
+  parseSelectedReleaseTags,
   parsePackOutput,
+  recheckSelectedReleaseTags,
   selectReleases,
   selectRequestedReleases,
   updateBuildNumberAfterSelection,
+  validateSelectedReleases,
 };
