@@ -11,6 +11,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { updateAzureBuildNumber } from "./azure-build-number.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -74,6 +75,16 @@ function setAzureOutput(name, value) {
   }
 }
 
+function updateBuildNumberAfterSelection(
+  packageCount,
+  checkOnly,
+  updateBuildNumber = updateAzureBuildNumber,
+) {
+  if (checkOnly) {
+    updateBuildNumber(packageCount, "build");
+  }
+}
+
 function main() {
   const checkOnly = process.argv.includes("--check-only");
   const validationMode = process.env.VALIDATION_MODE === "true";
@@ -88,7 +99,7 @@ function main() {
       : selectReleases(workspaces, listGitTags(), validationMode);
 
   console.log(`Publishable workspaces: ${workspaces.length}`);
-  console.log(`Release artifacts needed: ${releases.length}`);
+  console.log(`Packages selected for the manifest: ${releases.length}`);
   if (validationMode) {
     console.log("Validation mode: packaging existing releases is enabled.");
   }
@@ -97,11 +108,12 @@ function main() {
   }
 
   setAzureOutput("shouldBuild", releases.length > 0 ? "true" : "false");
-  setAzureOutput("releaseCount", String(releases.length));
+  setAzureOutput("packageCount", String(releases.length));
   setAzureOutput(
     "releaseTags",
     releases.map(release => release.tag).join(","),
   );
+  updateBuildNumberAfterSelection(releases.length, checkOnly);
 
   if (checkOnly || releases.length === 0) {
     return;
@@ -119,7 +131,7 @@ function main() {
   mkdirSync(artifactDir, { recursive: true });
   mkdirSync(metadataDir, { recursive: true });
 
-  const releaseMetadata = [];
+  const manifestPackages = [];
   for (const release of releases) {
     console.log(`Packing ${release.name}@${release.version}...`);
     const packOutput = run(
@@ -136,7 +148,7 @@ function main() {
     const asset = parsePackOutput(packOutput);
     const assetPath = join(artifactDir, asset);
 
-    releaseMetadata.push({
+    manifestPackages.push({
       asset,
       name: release.name,
       sha256: sha256(assetPath),
@@ -145,17 +157,17 @@ function main() {
     });
   }
 
-  const metadata = {
+  const manifest = {
     releaseCommit,
-    releases: releaseMetadata,
+    packages: manifestPackages,
     schemaVersion: 1,
     validationMode,
   };
   writeFileSync(
-    join(metadataDir, "releases.json"),
-    `${JSON.stringify(metadata, null, 2)}\n`,
+    join(metadataDir, "release-manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
   );
-  console.log(`Prepared ${releaseMetadata.length} release artifact(s).`);
+  console.log(`Prepared release manifest for ${manifestPackages.length} package(s).`);
 }
 
 const invokedDirectly =
@@ -170,4 +182,9 @@ if (invokedDirectly) {
   }
 }
 
-export { parsePackOutput, selectReleases, selectRequestedReleases };
+export {
+  parsePackOutput,
+  selectReleases,
+  selectRequestedReleases,
+  updateBuildNumberAfterSelection,
+};

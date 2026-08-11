@@ -38,6 +38,7 @@ stages:
       name: release
       displayName: Detect package versions without release tags
       env:
+        AZURE_BUILD_ID: $(Build.BuildId)
         VALIDATION_MODE: ${{ parameters.validationMode }}
 
 - ${{ if eq(parameters.validationMode, 'false') }}:

@@ -78,10 +78,11 @@ extends:
             targetType: inline
             script: node build/scripts/validate-release-artifacts.mjs
           env:
+            AZURE_BUILD_ID: $(Build.BuildId)
             EXPECTED_RELEASE_COMMIT: $(resources.pipeline.releaseBuild.sourceCommit)
             EXPECTED_VALIDATION_MODE: ${{ parameters.validationMode }}
             RELEASE_ARTIFACT_DIR: $(Pipeline.Workspace)/releaseBuild/npm-packages
-            RELEASE_METADATA_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/releases.json
+            RELEASE_MANIFEST_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json
 
     - ${{ if eq(parameters.validationMode, 'false') }}:
       - stage: TagRelease

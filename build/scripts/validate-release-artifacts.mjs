@@ -9,6 +9,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { updateAzureBuildNumber } from "./azure-build-number.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -17,8 +18,8 @@ function sha256(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
-function validateReleaseMetadata(
-  metadata,
+function validateReleaseManifest(
+  manifest,
   {
     artifactHashes,
     expectedCommit,
@@ -26,24 +27,24 @@ function validateReleaseMetadata(
     workspaces,
   },
 ) {
-  if (metadata?.schemaVersion !== 1) {
+  if (manifest?.schemaVersion !== 1) {
     throw new Error(
-      `Release metadata has an unsupported schema version (got ${String(metadata?.schemaVersion)}, expected 1).`,
+      `Release manifest has an unsupported schema version (got ${String(manifest?.schemaVersion)}, expected 1).`,
     );
   }
-  if (!/^[0-9a-f]{40}$/.test(metadata.releaseCommit ?? "")) {
-    throw new Error("Release metadata has an invalid release commit.");
+  if (!/^[0-9a-f]{40}$/.test(manifest.releaseCommit ?? "")) {
+    throw new Error("Release manifest has an invalid release commit.");
   }
-  if (metadata.releaseCommit !== expectedCommit) {
+  if (manifest.releaseCommit !== expectedCommit) {
     throw new Error(
-      `Release commit ${metadata.releaseCommit} does not match build resource commit ${expectedCommit}.`,
+      `Release commit in manifest ${manifest.releaseCommit} does not match build resource commit ${expectedCommit}.`,
     );
   }
-  if (metadata.validationMode !== expectedValidationMode) {
-    throw new Error("Release metadata does not match the requested validation mode.");
+  if (manifest.validationMode !== expectedValidationMode) {
+    throw new Error("Release manifest does not match the requested validation mode.");
   }
-  if (!Array.isArray(metadata.releases) || metadata.releases.length === 0) {
-    throw new Error("Release metadata contains no releases.");
+  if (!Array.isArray(manifest.packages) || manifest.packages.length === 0) {
+    throw new Error("Release manifest contains no packages.");
   }
 
   const workspaceByName = new Map(workspaces.map(workspace => [workspace.name, workspace]));
@@ -51,43 +52,43 @@ function validateReleaseMetadata(
   const tags = new Set();
   const assets = new Set();
 
-  for (const release of metadata.releases) {
-    const workspace = workspaceByName.get(release?.name);
+  for (const pkg of manifest.packages) {
+    const workspace = workspaceByName.get(pkg?.name);
     if (!workspace) {
-      throw new Error(`Release metadata references unknown package ${release?.name}.`);
+      throw new Error(`Release manifest references unknown package ${pkg?.name}.`);
     }
-    if (release.version !== workspace.version || release.tag !== workspace.tag) {
+    if (pkg.version !== workspace.version || pkg.tag !== workspace.tag) {
       throw new Error(
-        `Release metadata for ${workspace.name} does not match package.json.`,
+        `Release manifest for ${workspace.name} does not match package.json.`,
       );
     }
     if (
-      typeof release.asset !== "string" ||
-      release.asset.length === 0 ||
-      release.asset.includes("/") ||
-      release.asset.includes("\\") ||
-      !release.asset.endsWith(".tgz")
+      typeof pkg.asset !== "string" ||
+      pkg.asset.length === 0 ||
+      pkg.asset.includes("/") ||
+      pkg.asset.includes("\\") ||
+      !pkg.asset.endsWith(".tgz")
     ) {
-      throw new Error(`Release metadata for ${workspace.name} has an invalid asset.`);
+      throw new Error(`Release manifest for ${workspace.name} has an invalid asset.`);
     }
-    if (!/^[0-9a-f]{64}$/.test(release.sha256 ?? "")) {
-      throw new Error(`Release metadata for ${workspace.name} has an invalid SHA-256.`);
+    if (!/^[0-9a-f]{64}$/.test(pkg.sha256 ?? "")) {
+      throw new Error(`Release manifest for ${workspace.name} has an invalid SHA-256.`);
     }
-    if (names.has(release.name) || tags.has(release.tag) || assets.has(release.asset)) {
-      throw new Error("Release metadata contains duplicate packages, tags, or assets.");
+    if (names.has(pkg.name) || tags.has(pkg.tag) || assets.has(pkg.asset)) {
+      throw new Error("Release manifest contains duplicate packages, tags, or assets.");
     }
 
-    const actualHash = artifactHashes.get(release.asset);
+    const actualHash = artifactHashes.get(pkg.asset);
     if (!actualHash) {
-      throw new Error(`Release asset ${release.asset} is missing.`);
+      throw new Error(`Release asset ${pkg.asset} is missing.`);
     }
-    if (actualHash !== release.sha256) {
-      throw new Error(`Release asset ${release.asset} failed SHA-256 validation.`);
+    if (actualHash !== pkg.sha256) {
+      throw new Error(`Release asset ${pkg.asset} failed SHA-256 validation.`);
     }
 
-    names.add(release.name);
-    tags.add(release.tag);
-    assets.add(release.asset);
+    names.add(pkg.name);
+    tags.add(pkg.tag);
+    assets.add(pkg.asset);
   }
 
   const unexpectedAssets = [...artifactHashes.keys()].filter(asset => !assets.has(asset));
@@ -95,7 +96,7 @@ function validateReleaseMetadata(
     throw new Error(`Unexpected release assets: ${unexpectedAssets.join(", ")}`);
   }
 
-  return metadata;
+  return manifest;
 }
 
 function setAzureOutput(name, value) {
@@ -105,14 +106,14 @@ function setAzureOutput(name, value) {
 }
 
 function main() {
-  const metadataPath = process.env.RELEASE_METADATA_PATH;
+  const manifestPath = process.env.RELEASE_MANIFEST_PATH;
   const artifactDir = process.env.RELEASE_ARTIFACT_DIR;
   const expectedCommit = process.env.EXPECTED_RELEASE_COMMIT?.trim();
   const expectedValidationMode = process.env.EXPECTED_VALIDATION_MODE === "true";
 
-  if (!metadataPath || !artifactDir || !expectedCommit) {
+  if (!manifestPath || !artifactDir || !expectedCommit) {
     throw new Error(
-      "RELEASE_METADATA_PATH, RELEASE_ARTIFACT_DIR, and EXPECTED_RELEASE_COMMIT are required.",
+      "RELEASE_MANIFEST_PATH, RELEASE_ARTIFACT_DIR, and EXPECTED_RELEASE_COMMIT are required.",
     );
   }
 
@@ -126,8 +127,8 @@ function main() {
   }
 
   const workspaces = listPublishableWorkspaces(repoRoot);
-  const metadata = validateReleaseMetadata(
-    JSON.parse(readFileSync(metadataPath, "utf8")),
+  const manifest = validateReleaseManifest(
+    JSON.parse(readFileSync(manifestPath, "utf8")),
     {
       artifactHashes,
       expectedCommit,
@@ -135,38 +136,29 @@ function main() {
       workspaces,
     },
   );
-  const releaseByName = new Map(
-    metadata.releases.map(release => [release.name, release]),
+  const packageByName = new Map(
+    manifest.packages.map(pkg => [pkg.name, pkg]),
   );
 
-  setAzureOutput("releaseCommit", metadata.releaseCommit);
+  setAzureOutput("releaseCommit", manifest.releaseCommit);
   setAzureOutput(
     "releaseTags",
-    metadata.releases.map(release => release.tag).join(","),
+    manifest.packages.map(pkg => pkg.tag).join(","),
   );
+  setAzureOutput("packageCount", String(manifest.packages.length));
 
   for (const workspace of workspaces) {
-    const release = releaseByName.get(workspace.name);
-    setAzureOutput(`${workspace.outputPrefix}Included`, release ? "true" : "false");
+    const pkg = packageByName.get(workspace.name);
+    setAzureOutput(`${workspace.outputPrefix}Included`, pkg ? "true" : "false");
     setAzureOutput(
       `${workspace.outputPrefix}ReleaseTag`,
-      release?.tag ?? workspace.tag,
+      pkg?.tag ?? workspace.tag,
     );
-    setAzureOutput(`${workspace.outputPrefix}ReleaseAsset`, release?.asset ?? "");
+    setAzureOutput(`${workspace.outputPrefix}ReleaseAsset`, pkg?.asset ?? "");
   }
 
-  const buildLabel =
-    metadata.releases.length === 1
-      ? `${metadata.releases[0].name
-          .replace(/^@/, "")
-          .replace(/[^a-zA-Z0-9.-]+/g, "-")}-${metadata.releases[0].version}`
-      : `polyfills-${metadata.releases.length}-releases`;
-  if (process.env.TF_BUILD) {
-    console.log(
-      `##vso[build.updatebuildnumber]${buildLabel}-cd-${process.env.BUILD_BUILDID}`,
-    );
-  }
-  console.log(`Validated ${metadata.releases.length} release artifact(s).`);
+  updateAzureBuildNumber(manifest.packages.length, "cd");
+  console.log(`Validated release manifest for ${manifest.packages.length} package(s).`);
 }
 
 const invokedDirectly =
@@ -181,4 +173,4 @@ if (invokedDirectly) {
   }
 }
 
-export { validateReleaseMetadata };
+export { validateReleaseManifest };
