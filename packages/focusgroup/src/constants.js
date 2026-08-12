@@ -28,8 +28,11 @@ export const BehaviorToken = {
   LISTBOX: "listbox",
   MENU: "menu",
   MENUBAR: "menubar",
+  FEED: "feed",
   GRID: "grid",
   NONE: "none",
+  ITEMCONTROLS: "itemcontrols",
+  NOITEMCONTROLS: "noitemcontrols",
 };
 export const BEHAVIOR_TOKENS = [
   BehaviorToken.TOOLBAR,
@@ -38,6 +41,7 @@ export const BEHAVIOR_TOKENS = [
   BehaviorToken.LISTBOX,
   BehaviorToken.MENU,
   BehaviorToken.MENUBAR,
+  BehaviorToken.FEED,
   BehaviorToken.GRID,
   BehaviorToken.NONE,
 ];
@@ -87,6 +91,12 @@ export const BehaviorMap = {
     childRole: "menuitem",
     wrap: true,
     axis: "inline",
+  },
+  feed: {
+    ownerRole: "feed",
+    childRole: "article",
+    wrap: false,
+    axis: "block",
   },
   grid: {
     ownerRole: "grid",
