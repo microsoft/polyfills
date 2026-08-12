@@ -82,12 +82,30 @@ function createOriginTagChecker(execute = gitResult) {
   };
 }
 
-function parsePackOutput(output) {
-  const packages = JSON.parse(output);
-  if (!Array.isArray(packages) || packages.length === 0 || !packages[0].filename) {
-    throw new Error(`Unexpected npm pack output: ${output}`);
+function parsePackOutput(output, release) {
+  let packages;
+  try {
+    packages = JSON.parse(output);
+  } catch {
+    throw new Error("Unexpected npm pack output: invalid JSON.");
   }
-  return packages[0].filename;
+
+  if (
+    !Array.isArray(packages) ||
+    packages.length !== 1 ||
+    packages[0] === null ||
+    typeof packages[0] !== "object" ||
+    Array.isArray(packages[0])
+  ) {
+    throw new Error("Unexpected npm pack output: expected one package object.");
+  }
+
+  const [{ filename, name, version }] = packages;
+  const safeFileName = validateNpmAssetFileName(filename);
+  if (name !== release.name || version !== release.version) {
+    throw new Error("Unexpected npm pack output: package identity mismatch.");
+  }
+  return safeFileName;
 }
 
 function setAzureOutput(name, value) {
@@ -226,6 +244,7 @@ function main() {
           ],
           { stdio: ["ignore", "pipe", "inherit"] },
         ),
+        release,
       );
     },
     releases,

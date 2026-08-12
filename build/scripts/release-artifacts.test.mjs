@@ -11,6 +11,7 @@ import {
 import {
   createOriginTagChecker,
   packSelectedReleases,
+  parsePackOutput,
   selectReleases,
   updateBuildNumberAfterSelection,
 } from "./prepare-release-artifacts.mjs";
@@ -458,7 +459,7 @@ test("release manifest structure rejects unsafe files, invalid hashes, and dupli
           ],
         }),
       ),
-    /unsafe npm asset fileName/,
+    /unsafe npm asset fileName/i,
   );
   assert.throws(
     () =>
@@ -595,6 +596,87 @@ test("packing rejects an unsafe npm filename before hashing it", () => {
   assert.deepEqual(written.packages, []);
 });
 
+test("npm pack output binds exactly one safe package to the selected workspace", () => {
+  assert.equal(
+    parsePackOutput(
+      JSON.stringify([
+        {
+          filename: asset,
+          name: workspace.name,
+          version: workspace.version,
+        },
+      ]),
+      workspace,
+    ),
+    asset,
+  );
+  assert.throws(
+    () => parsePackOutput("not JSON", workspace),
+    /invalid JSON/,
+  );
+  assert.throws(
+    () => parsePackOutput(JSON.stringify({}), workspace),
+    /expected one package object/,
+  );
+  assert.throws(
+    () => parsePackOutput(JSON.stringify([]), workspace),
+    /expected one package object/,
+  );
+  assert.throws(
+    () =>
+      parsePackOutput(
+        JSON.stringify([
+          { filename: asset, name: workspace.name, version: workspace.version },
+          { filename: "second.tgz", name: "second", version: "1.0.0" },
+        ]),
+        workspace,
+      ),
+    /expected one package object/,
+  );
+  assert.throws(
+    () =>
+      parsePackOutput(
+        JSON.stringify([
+          {
+            filename: "../unsafe.tgz",
+            name: workspace.name,
+            version: workspace.version,
+          },
+        ]),
+        workspace,
+      ),
+    /unsafe npm asset fileName/i,
+  );
+  assert.throws(
+    () =>
+      parsePackOutput(
+        JSON.stringify([
+          {
+            filename: asset,
+            name: secondWorkspace.name,
+            version: workspace.version,
+          },
+        ]),
+        workspace,
+      ),
+    /package identity mismatch/,
+  );
+  assert.throws(
+    () =>
+      parsePackOutput(
+        JSON.stringify([
+          {
+            filename: asset,
+            name: workspace.name,
+            version: secondWorkspace.version,
+          },
+        ]),
+        workspace,
+      ),
+    /package identity mismatch/,
+  );
+});
+
 test("GitHub release checks map selected manifest packages to workspace prefixes", () => {
   assert.deepEqual(
     selectedReleaseChecks(
@@ -614,11 +696,13 @@ test("GitHub release checks map selected manifest packages to workspace prefixes
     ),
     [
       {
+        assetFileNames: [asset],
         name: workspace.name,
         outputName: "focusgroupPolyfillGitHubReleaseExists",
         tag: workspace.tag,
       },
       {
+        assetFileNames: ["second.tgz"],
         name: secondWorkspace.name,
         outputName: "secondPolyfillGitHubReleaseExists",
         tag: secondWorkspace.tag,
@@ -693,43 +777,76 @@ test("GitHub release checks reject stale manifest tags before API queries", asyn
   assert.equal(queried, false);
 });
 
-test("GitHub release API distinguishes existing and missing releases", async () => {
+test("GitHub release API distinguishes complete and missing releases", async () => {
   assert.equal(
-    await githubReleaseExists(workspace.tag, {
+    await githubReleaseExists(workspace.tag, [asset], {
       fetchImpl: async () => ({
-        json: async () => ({ tag_name: workspace.tag }),
+        json: async () => ({
+          assets: [{ name: asset }],
+          tag_name: workspace.tag,
+        }),
         status: 200,
       }),
     }),
     true,
   );
   assert.equal(
-    await githubReleaseExists(workspace.tag, {
+    await githubReleaseExists(workspace.tag, [asset], {
       fetchImpl: async () => ({ status: 404 }),
     }),
     false,
   );
 });
 
-test("GitHub release API failures fail explicitly", async () => {
+test("GitHub release API rejects incomplete and malformed releases", async () => {
   await assert.rejects(
-    githubReleaseExists(workspace.tag, {
+    githubReleaseExists(workspace.tag, [asset], {
       fetchImpl: async () => ({
-        status: 403,
-        statusText: "Forbidden",
-        text: async () => "rate limited",
+        json: async () => ({ assets: [] }),
+        status: 200,
       }),
     }),
-    /Failed to query GitHub Release.*HTTP 403 Forbidden: rate limited/,
+    /incomplete.*missing expected assets/,
   );
   await assert.rejects(
-    githubReleaseExists(workspace.tag, {
+    githubReleaseExists(workspace.tag, [asset], {
+      fetchImpl: async () => ({
+        json: async () => ({ assets: "invalid" }),
+        status: 200,
+      }),
+    }),
+    /not a GitHub Release with assets/,
+  );
+});
+
+test("GitHub release API failures fail closed without retries", async () => {
+  let calls = 0;
+  await assert.rejects(
+    githubReleaseExists(workspace.tag, [asset], {
       fetchImpl: async () => {
+        calls++;
         throw new Error("network down");
       },
     }),
     /Failed to query GitHub Release.*network down/,
   );
+  assert.equal(calls, 1);
+
+  calls = 0;
+  await assert.rejects(
+    githubReleaseExists(workspace.tag, [asset], {
+      fetchImpl: async () => {
+        calls++;
+        return {
+          status: 503,
+          statusText: "Service Unavailable",
+          text: async () => "unavailable",
+        };
+      },
+    }),
+    /HTTP 503 Service Unavailable: unavailable/,
+  );
+  assert.equal(calls, 1);
 });
 
 test("PublishRelease orders npm, deployment markers, and GitHub publication", () => {

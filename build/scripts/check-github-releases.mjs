@@ -16,6 +16,7 @@ function selectedReleaseChecks(manifest, workspaces) {
 
   return manifest.packages.map(pkg => {
     return {
+      assetFileNames: [pkg.npmAsset.fileName],
       name: pkg.name,
       outputName: `${pkg.outputPrefix}GitHubReleaseExists`,
       tag: pkg.tag,
@@ -25,13 +26,21 @@ function selectedReleaseChecks(manifest, workspaces) {
 
 async function githubReleaseExists(
   tag,
+  expectedAssetFileNames,
   {
     fetchImpl = globalThis.fetch,
     repository = defaultRepository,
-    token = process.env.GITHUB_TOKEN?.trim() || process.env.GH_TOKEN?.trim(),
     timeoutMs = apiTimeoutMs,
   } = {},
 ) {
+  if (
+    !Array.isArray(expectedAssetFileNames) ||
+    expectedAssetFileNames.length === 0 ||
+    expectedAssetFileNames.some(name => typeof name !== "string" || !name)
+  ) {
+    throw new Error("Expected GitHub Release asset filenames are required.");
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const headers = {
@@ -39,9 +48,6 @@ async function githubReleaseExists(
     "User-Agent": "polyfills-cd-pipeline",
     "X-GitHub-Api-Version": "2022-11-28",
   };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   try {
     const response = await fetchImpl(
@@ -54,9 +60,36 @@ async function githubReleaseExists(
     );
 
     if (response.status === 200) {
-      const release = await response.json();
-      if (!release || typeof release !== "object") {
-        throw new Error("response was not a GitHub Release object");
+      let release;
+      try {
+        release = await response.json();
+      } catch {
+        throw new Error("response was not valid JSON");
+      }
+      if (
+        release === null ||
+        typeof release !== "object" ||
+        Array.isArray(release) ||
+        !Array.isArray(release.assets) ||
+        release.assets.some(
+          asset =>
+            asset === null ||
+            typeof asset !== "object" ||
+            Array.isArray(asset) ||
+            typeof asset.name !== "string",
+        )
+      ) {
+        throw new Error("response was not a GitHub Release with assets");
+      }
+
+      const actualAssets = new Set(release.assets.map(asset => asset.name));
+      const missingAssets = expectedAssetFileNames.filter(
+        fileName => !actualAssets.has(fileName),
+      );
+      if (missingAssets.length > 0) {
+        throw new Error(
+          `GitHub Release is incomplete; missing expected assets: ${missingAssets.join(", ")}`,
+        );
       }
       return true;
     }
@@ -93,10 +126,10 @@ async function checkGitHubReleases(
 ) {
   const results = [];
   for (const release of selectedReleaseChecks(manifest, workspaces)) {
-    const exists = await releaseExists(release.tag);
+    const exists = await releaseExists(release.tag, release.assetFileNames);
     emitOutput(release.outputName, exists ? "true" : "false");
     log(
-      `${release.name}: ${release.tag} ${exists ? "already has a GitHub Release" : "does not have a GitHub Release"}.`,
+      `${release.name}: ${release.tag} ${exists ? "already has a complete GitHub Release" : "does not have a GitHub Release"}.`,
     );
     results.push({ ...release, exists });
   }
