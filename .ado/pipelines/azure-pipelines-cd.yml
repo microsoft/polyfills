@@ -221,7 +221,9 @@ extends:
               targetType: inline
               # Query current existence independently of the earlier Included
               # outputs, so partial retries skip releases already created.
-              script: node build/scripts/check-github-releases.mjs
+              script: |
+                set -euo pipefail
+                node build/scripts/check-github-releases.mjs
             env:
               RELEASE_MANIFEST_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json
 

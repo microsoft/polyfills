@@ -137,10 +137,25 @@ function flattenStages(stages) {
   });
 }
 
+function validateUniqueOutputPrefixes(workspaces) {
+  const workspaceByPrefix = new Map();
+  for (const workspace of workspaces) {
+    const conflictingWorkspace = workspaceByPrefix.get(workspace.outputPrefix);
+    if (conflictingWorkspace) {
+      throw new Error(
+        `Duplicate outputPrefix ${workspace.outputPrefix} for publishable workspaces ${conflictingWorkspace.name} and ${workspace.name}.`,
+      );
+    }
+    workspaceByPrefix.set(workspace.outputPrefix, workspace);
+  }
+}
+
 function validateStaticGitHubReleaseCoverage(workspaces, pipeline) {
   if (typeof pipeline === "string") {
     pipeline = parsePipelineYaml(pipeline);
   }
+  validateUniqueOutputPrefixes(workspaces);
+
   const stages = flattenStages(pipeline?.extends?.parameters?.stages ?? []);
   const publishStage = stages.find(stage => stage.stage === "PublishRelease");
   if (!publishStage) {
@@ -175,6 +190,38 @@ function validateStaticGitHubReleaseCoverage(workspaces, pipeline) {
   }
 
   const publishJob = publishStage.jobs?.find(job => job.job === "PublishGitHub");
+  const releaseCheckTasks = (publishJob?.steps ?? []).filter(
+    step => step.name === "releaseCheck",
+  );
+  if (releaseCheckTasks.length !== 1) {
+    throw new Error(
+      `PublishGitHub must contain exactly one task named releaseCheck; found ${releaseCheckTasks.length}.`,
+    );
+  }
+  const releaseCheckTask = releaseCheckTasks[0];
+  if (releaseCheckTask.task !== "Bash@3") {
+    throw new Error("PublishGitHub releaseCheck must use Bash@3.");
+  }
+  if (releaseCheckTask.inputs?.targetType !== "inline") {
+    throw new Error("PublishGitHub releaseCheck targetType must be inline.");
+  }
+  const expectedReleaseCheckScript =
+    "set -euo pipefail\nnode build/scripts/check-github-releases.mjs";
+  if (releaseCheckTask.inputs?.script?.trim() !== expectedReleaseCheckScript) {
+    throw new Error(
+      "PublishGitHub releaseCheck script must run check-github-releases.mjs under strict shell mode.",
+    );
+  }
+  const expectedManifestPath =
+    "$(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json";
+  if (
+    releaseCheckTask.env?.RELEASE_MANIFEST_PATH !== expectedManifestPath
+  ) {
+    throw new Error(
+      "PublishGitHub releaseCheck RELEASE_MANIFEST_PATH is missing or invalid.",
+    );
+  }
+
   const tasks = (publishJob?.steps ?? []).filter(
     step => step.task === "GitHubRelease@1",
   );
