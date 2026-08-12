@@ -3,6 +3,7 @@
 parameters:
 - name: validationMode
   type: string
+  default: 'false'
 - name: selectedReleaseTags
   type: string
 
