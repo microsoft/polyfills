@@ -62,6 +62,36 @@ test.describe("behavior tokens comprehensive", () => {
     item3 = page.getByTestId("item3");
   });
 
+  test.describe("feed: block-axis navigation and default itemcontrols", () => {
+    test.beforeEach(async ({ page }, { project }) => {
+      await setupPage(
+        page,
+        project,
+        `
+        <div focusgroup="feed">
+          <article data-testid="item1" tabindex="0">item1</article>
+          <article data-testid="item2" tabindex="0">item2</article>
+          <article data-testid="item3" tabindex="0">item3</article>
+        </div>
+      `,
+      );
+    });
+
+    test.test("feed: ArrowDown navigates (block)", async ({ page }) => {
+      await page.getByTestId("item1").focus();
+      await page.keyboard.press("ArrowDown");
+
+      await expect(page.getByTestId("item2")).toBeFocused();
+    });
+
+    test.test("feed: ArrowRight blocked (block-only)", async ({ page }) => {
+      await page.getByTestId("item1").focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(page.getByTestId("item1")).toBeFocused();
+    });
+  });
+
   test.describe("toolbar: inline only, no wrap", () => {
     test.beforeEach(async ({ page }, { project }) => {
       await setupPage(

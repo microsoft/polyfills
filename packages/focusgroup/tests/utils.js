@@ -18,6 +18,7 @@ export async function setupPage(page, project, html) {
   await page.evaluate(async (specifier) => {
     const { polyfill } = await import(specifier);
     polyfill();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   }, specifier);
 }
 

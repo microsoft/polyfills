@@ -36,6 +36,8 @@ export function supportsFocusGroup() {
  * @property {boolean} [wrap]
  * @property {("inline"|"block"|undefined)} [axis]
  * @property {boolean} [memory]
+ * @property {boolean} [itemcontrols]
+ * @property {boolean} [noitemcontrols]
  * @property {("none"|"wrap"|"flow")} [rowEdge]
  * @property {("none"|"wrap"|"flow")} [colEdge]
  * @property {boolean} [manual]
@@ -56,6 +58,10 @@ export function parseDefinition(owner) {
   const behavior =
     tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ?? null;
   const base = BehaviorMap[behavior];
+  const hasItemControls = tokens.includes(BehaviorToken.ITEMCONTROLS);
+  const hasNoItemControls = tokens.includes(BehaviorToken.NOITEMCONTROLS);
+  const defaultItemControls =
+    behavior === BehaviorToken.FEED || behavior === BehaviorToken.GRID;
   let wrap = base?.wrap ?? false;
   if (tokens.includes("wrap")) {
     wrap = true;
@@ -87,6 +93,9 @@ export function parseDefinition(owner) {
     wrap,
     axis,
     memory: !tokens.includes("nomemory"),
+    itemcontrols:
+      !hasNoItemControls && (hasItemControls || defaultItemControls),
+    noitemcontrols: hasNoItemControls,
   };
   if (behavior === BehaviorToken.GRID) {
     definition.manual = tokens.includes("manual");

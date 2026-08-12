@@ -133,7 +133,9 @@ export class FocusGroup {
     if (
       !owner ||
       (supportsFocusGroup() &&
-        options.definition?.behavior !== BehaviorToken.GRID)
+        ![BehaviorToken.GRID, BehaviorToken.FEED].includes(
+          options.definition?.behavior,
+        ))
     ) {
       return;
     }
