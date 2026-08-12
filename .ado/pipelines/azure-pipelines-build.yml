@@ -28,6 +28,7 @@ stages:
       clean: true
       fetchDepth: 1
       fetchTags: false
+      # Selection explicitly queries release tags on origin.
       persistCredentials: true
 
     - task: UseNode@1
@@ -42,6 +43,10 @@ stages:
         AZURE_BUILD_ID: $(Build.BuildId)
         VALIDATION_MODE: ${{ parameters.validationMode }}
 
+# Compile-time stage selection keeps validation runs under a different name:
+# CD listens only for a completed `BuildArtifacts`, so validation and no-op
+# runs cannot trigger publication. PrepareRelease hands each selected
+# package tag to the chosen stage through `selectedReleaseTags`.
 - ${{ if eq(parameters.validationMode, 'false') }}:
   - stage: BuildArtifacts
     displayName: Build release artifacts

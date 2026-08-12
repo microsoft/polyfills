@@ -1,3 +1,5 @@
+# Both build stages share these steps so production and validation packing
+# cannot drift while retaining the distinct stage names required by CD.
 parameters:
 - name: validationMode
   type: string
@@ -9,6 +11,8 @@ steps:
   clean: true
   fetchDepth: 1
   fetchTags: false
+  # Packing immediately rechecks selected tags on origin for concurrent
+  # releases, so the explicit remote queries need checkout credentials.
   persistCredentials: true
 
 - task: UseNode@1

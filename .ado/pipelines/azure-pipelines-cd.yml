@@ -21,6 +21,8 @@ resources:
       branches:
         include:
         - main
+      # Only a completed `BuildArtifacts` stage triggers CD; validation uses
+      # `ValidateArtifacts`, and a no-op build skips this stage entirely.
       stages:
       - BuildArtifacts
   repositories:
@@ -34,6 +36,7 @@ resources:
     ref: refs/tags/release
 
 extends:
+  # The 1ES Official template supplies the required SDL and compliance tasks.
   template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
   parameters:
     pool:
@@ -78,6 +81,9 @@ extends:
           displayName: Validate release metadata and packages
           inputs:
             targetType: inline
+            # The manifest is authoritative: bind releaseCommit to the
+            # selected build's sourceCommit, verify each SHA-256 with no
+            # unexpected assets, and emit the validated releaseTags.
             script: node build/scripts/validate-release-artifacts.mjs
           env:
             AZURE_BUILD_ID: $(Build.BuildId)
@@ -112,6 +118,8 @@ extends:
             displayName: Create annotated release tags
             inputs:
               targetType: inline
+              # Existing or concurrently-created tags are accepted only at
+              # releaseCommit; targeted remote refs avoid full tag history.
               script: node build/scripts/manage-release-tags.mjs create
             env:
               RELEASE_COMMIT: $(releaseCommit)
@@ -125,6 +133,8 @@ extends:
         variables:
           releaseCommit: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.releaseCommit'] ]
           releaseTags: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.releaseTags'] ]
+          # A new publishable package also needs matching variables here and
+          # a conditioned GitHubRelease@1 task below.
           focusgroupPolyfillIncluded: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillIncluded'] ]
           focusgroupPolyfillReleaseTag: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillReleaseTag'] ]
           focusgroupPolyfillReleaseAsset: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillReleaseAsset'] ]
@@ -149,8 +159,12 @@ extends:
               TargetFolder: $(Build.SourcesDirectory)/publish_artifacts_npm
               CleanTargetFolder: true
 
+          # One npm publication invocation must succeed before deployment
+          # markers and GitHub Releases are allowed to proceed.
           - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines
 
+        # Keeping markers in a separate dependent job allows a failed marker
+        # step to be retried after npm succeeds without republishing npm.
         - job: MarkDeployed
           displayName: Mark npm publication complete
           dependsOn: PublishNpm
@@ -204,10 +218,14 @@ extends:
             displayName: Check existing GitHub Releases
             inputs:
               targetType: inline
+              # Query current existence independently of the earlier Included
+              # outputs, so partial retries skip releases already created.
               script: node build/scripts/check-github-releases.mjs
             env:
               RELEASE_MANIFEST_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json
 
+          # TagRelease already created the tag; this task only creates the
+          # GitHub Release when the package is included and still absent.
           - task: GitHubRelease@1
             displayName: "Create @microsoft/focusgroup-polyfill GitHub Release"
             condition: and(succeeded(), eq(variables['focusgroupPolyfillIncluded'], 'true'), eq(variables['releaseCheck.focusgroupPolyfillGitHubReleaseExists'], 'false'))
