@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   mkdirSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -13,11 +11,17 @@ import { fileURLToPath } from "node:url";
 
 import { updateAzureBuildNumber } from "./azure-build-number.mjs";
 import {
-  formatReleaseTagCsv,
-  parseReleaseTagCsv,
-  releaseTagPattern,
-} from "./release-tag-csv.mjs";
+  createReleaseManifest,
+  sha256File,
+  validateNpmAssetFileName,
+} from "./release-manifest.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
+import {
+  assertSelectedReleaseTagsNotOnOrigin,
+  formatSelectedReleaseTags,
+  parseSelectedReleaseTags,
+  resolveSelectedReleases,
+} from "./selected-release-tags.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const artifactDir = join(repoRoot, "publish_artifacts_npm");
@@ -35,60 +39,10 @@ function run(file, args, options = {}) {
   });
 }
 
-function parseSelectedReleaseTags(value) {
-  return parseReleaseTagCsv(value, "SELECTED_RELEASE_TAGS");
-}
-
-function formatSelectedReleaseTags(releases) {
-  return formatReleaseTagCsv(
-    releases.map(release => release.tag),
-    "release tags",
-  );
-}
-
 function selectReleases(workspaces, existingTags, includeExisting) {
   return workspaces.filter(
     workspace => includeExisting || !existingTags.has(workspace.tag),
   );
-}
-
-function selectRequestedReleases(workspaces, requestedTags) {
-  const malformedTags = requestedTags.filter(
-    tag => !releaseTagPattern.test(tag),
-  );
-  if (malformedTags.length > 0) {
-    throw new Error(
-      `Invalid SELECTED_RELEASE_TAGS: malformed release tags: ${malformedTags.join(", ")}`,
-    );
-  }
-
-  const duplicateTags = requestedTags.filter(
-    (tag, index) => requestedTags.indexOf(tag) !== index,
-  );
-  if (duplicateTags.length > 0) {
-    throw new Error(
-      `Invalid SELECTED_RELEASE_TAGS: duplicate selected tags: ${[
-        ...new Set(duplicateTags),
-      ].join(", ")}`,
-    );
-  }
-
-  const commaTag = workspaces.find(workspace => workspace.tag.includes(","))?.tag;
-  if (commaTag !== undefined) {
-    throw new Error(`Release tags cannot contain commas: ${commaTag}.`);
-  }
-
-  const workspaceByTag = new Map(
-    workspaces.map(workspace => [workspace.tag, workspace]),
-  );
-  const releases = requestedTags.map(tag => workspaceByTag.get(tag));
-  const unknownTags = requestedTags.filter((_, index) => !releases[index]);
-  if (unknownTags.length > 0) {
-    throw new Error(
-      `Invalid SELECTED_RELEASE_TAGS: unknown or non-publishable tags: ${unknownTags.join(", ")}`,
-    );
-  }
-  return releases;
 }
 
 function gitResult(args) {
@@ -128,34 +82,12 @@ function createOriginTagChecker(execute = gitResult) {
   };
 }
 
-function recheckSelectedReleaseTags(
-  releases,
-  validationMode,
-  originTags = createOriginTagChecker(),
-) {
-  const conflictingTags = releases
-    .filter(release => originTags.exists(release.tag))
-    .map(release => release.tag);
-  if (!validationMode && conflictingTags.length > 0) {
-    throw new Error(
-      "Concurrent release detected: selected release tags appeared on origin " +
-        `after selection: ${conflictingTags.join(", ")}. ` +
-        "Refusing to shrink or alter the selected release batch.",
-    );
-  }
-  return releases;
-}
-
 function parsePackOutput(output) {
   const packages = JSON.parse(output);
   if (!Array.isArray(packages) || packages.length === 0 || !packages[0].filename) {
     throw new Error(`Unexpected npm pack output: ${output}`);
   }
   return packages[0].filename;
-}
-
-function sha256(filePath) {
-  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
 function setAzureOutput(name, value) {
@@ -174,6 +106,54 @@ function updateBuildNumberAfterSelection(
   }
 }
 
+function packSelectedReleases({
+  artifactDir,
+  log = console.log,
+  logError = console.error,
+  metadataPath,
+  packRelease,
+  releases,
+  sourceBranch,
+  sourceCommit,
+  validationMode,
+  hashFile = sha256File,
+  writeManifest = (path, manifest) =>
+    writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`),
+}) {
+  const packages = [];
+  const failures = [];
+  for (const release of releases) {
+    log(`Packing ${release.name}@${release.version}...`);
+    try {
+      const fileName = validateNpmAssetFileName(packRelease(release));
+      packages.push({
+        name: release.name,
+        npmAsset: {
+          fileName,
+          sha256: hashFile(join(artifactDir, fileName)),
+        },
+        outputPrefix: release.outputPrefix,
+        tag: release.tag,
+        version: release.version,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push({ error, release });
+      logError(`Failed to pack ${release.name}@${release.version}: ${message}`);
+    }
+  }
+
+  const manifest = createReleaseManifest({
+    packages,
+    sourceBranch,
+    sourceCommit,
+    validationMode,
+  });
+  writeManifest(metadataPath, manifest);
+  log(`Prepared diagnostic release manifest for ${packages.length} package(s).`);
+  return { failures, manifest };
+}
+
 function main() {
   const checkOnly = process.argv.includes("--check-only");
   const validationMode = process.env.VALIDATION_MODE === "true";
@@ -189,7 +169,7 @@ function main() {
         ),
         validationMode,
       )
-    : selectRequestedReleases(
+    : resolveSelectedReleases(
         workspaces,
         parseSelectedReleaseTags(process.env.SELECTED_RELEASE_TAGS),
       );
@@ -215,57 +195,49 @@ function main() {
     return;
   }
 
-  recheckSelectedReleaseTags(releases, validationMode, originTags);
+  assertSelectedReleaseTagsNotOnOrigin(releases, validationMode, originTags);
 
-  const releaseCommit = (
+  const sourceCommit = (
     process.env.BUILD_SOURCEVERSION || run("git", ["rev-parse", "HEAD"])
   ).trim();
-  if (!/^[0-9a-f]{40}$/.test(releaseCommit)) {
-    throw new Error(`Invalid release commit: ${releaseCommit}`);
-  }
+  const sourceBranch = (
+    process.env.BUILD_SOURCEBRANCH ||
+    run("git", ["rev-parse", "--symbolic-full-name", "HEAD"])
+  ).trim();
 
   rmSync(artifactDir, { force: true, recursive: true });
   rmSync(metadataDir, { force: true, recursive: true });
   mkdirSync(artifactDir, { recursive: true });
   mkdirSync(metadataDir, { recursive: true });
 
-  const manifestPackages = [];
-  for (const release of releases) {
-    console.log(`Packing ${release.name}@${release.version}...`);
-    const packOutput = run(
-      "npm",
-      [
-        "pack",
-        "--silent",
-        "--json",
-        `--workspace=${release.name}`,
-        `--pack-destination=${artifactDir}`,
-      ],
-      { stdio: ["ignore", "pipe", "inherit"] },
-    );
-    const asset = parsePackOutput(packOutput);
-    const assetPath = join(artifactDir, asset);
-
-    manifestPackages.push({
-      asset,
-      name: release.name,
-      sha256: sha256(assetPath),
-      tag: release.tag,
-      version: release.version,
-    });
-  }
-
-  const manifest = {
-    releaseCommit,
-    packages: manifestPackages,
-    schemaVersion: 1,
+  const { failures } = packSelectedReleases({
+    artifactDir,
+    metadataPath: join(metadataDir, "release-manifest.json"),
+    packRelease(release) {
+      return parsePackOutput(
+        run(
+          "npm",
+          [
+            "pack",
+            "--silent",
+            "--json",
+            `--workspace=${release.name}`,
+            `--pack-destination=${artifactDir}`,
+          ],
+          { stdio: ["ignore", "pipe", "inherit"] },
+        ),
+      );
+    },
+    releases,
+    sourceBranch,
+    sourceCommit,
     validationMode,
-  };
-  writeFileSync(
-    join(metadataDir, "release-manifest.json"),
-    `${JSON.stringify(manifest, null, 2)}\n`,
-  );
-  console.log(`Prepared release manifest for ${manifestPackages.length} package(s).`);
+  });
+  if (failures.length > 0) {
+    throw new Error(
+      `Failed to pack ${failures.length} of ${releases.length} selected package(s).`,
+    );
+  }
 }
 
 const invokedDirectly =
@@ -282,11 +254,8 @@ if (invokedDirectly) {
 
 export {
   createOriginTagChecker,
-  formatSelectedReleaseTags,
-  parseSelectedReleaseTags,
+  packSelectedReleases,
   parsePackOutput,
-  recheckSelectedReleaseTags,
   selectReleases,
-  selectRequestedReleases,
   updateBuildNumberAfterSelection,
 };

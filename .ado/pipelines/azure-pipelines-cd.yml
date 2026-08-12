@@ -81,13 +81,14 @@ extends:
           displayName: Validate release metadata and packages
           inputs:
             targetType: inline
-            # The manifest is authoritative: bind releaseCommit to the
-            # selected build's sourceCommit, verify each SHA-256 with no
-            # unexpected assets, and emit the validated releaseTags.
+            # The manifest is authoritative: bind provenance to the selected
+            # build resource, verify each SHA-256 with no unexpected assets,
+            # and emit outputs only from validated package prefixes.
             script: node build/scripts/validate-release-artifacts.mjs
           env:
             AZURE_BUILD_ID: $(Build.BuildId)
-            EXPECTED_RELEASE_COMMIT: $(resources.pipeline.releaseBuild.sourceCommit)
+            EXPECTED_SOURCE_BRANCH: $(resources.pipeline.releaseBuild.sourceBranch)
+            EXPECTED_SOURCE_COMMIT: $(resources.pipeline.releaseBuild.sourceCommit)
             EXPECTED_VALIDATION_MODE: ${{ parameters.validationMode }}
             RELEASE_ARTIFACT_DIR: $(Pipeline.Workspace)/releaseBuild/npm_packages
             RELEASE_MANIFEST_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json

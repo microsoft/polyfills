@@ -1,103 +1,21 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import {
   lstatSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { updateAzureBuildNumber } from "./azure-build-number.mjs";
+import {
+  sha256File,
+  validateReleaseManifest,
+} from "./release-manifest.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-function sha256(filePath) {
-  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
-}
-
-function validateReleaseManifest(
-  manifest,
-  {
-    artifactHashes,
-    expectedCommit,
-    expectedValidationMode,
-    workspaces,
-  },
-) {
-  if (manifest?.schemaVersion !== 1) {
-    throw new Error(
-      `Release manifest has an unsupported schema version (got ${String(manifest?.schemaVersion)}, expected 1).`,
-    );
-  }
-  if (!/^[0-9a-f]{40}$/.test(manifest.releaseCommit ?? "")) {
-    throw new Error("Release manifest has an invalid release commit.");
-  }
-  if (manifest.releaseCommit !== expectedCommit) {
-    throw new Error(
-      `Release commit in manifest ${manifest.releaseCommit} does not match build resource commit ${expectedCommit}.`,
-    );
-  }
-  if (manifest.validationMode !== expectedValidationMode) {
-    throw new Error("Release manifest does not match the requested validation mode.");
-  }
-  if (!Array.isArray(manifest.packages) || manifest.packages.length === 0) {
-    throw new Error("Release manifest contains no packages.");
-  }
-
-  const workspaceByName = new Map(workspaces.map(workspace => [workspace.name, workspace]));
-  const names = new Set();
-  const tags = new Set();
-  const assets = new Set();
-
-  for (const pkg of manifest.packages) {
-    const workspace = workspaceByName.get(pkg?.name);
-    if (!workspace) {
-      throw new Error(`Release manifest references unknown package ${pkg?.name}.`);
-    }
-    if (pkg.version !== workspace.version || pkg.tag !== workspace.tag) {
-      throw new Error(
-        `Release manifest for ${workspace.name} does not match package.json.`,
-      );
-    }
-    if (
-      typeof pkg.asset !== "string" ||
-      pkg.asset.length === 0 ||
-      pkg.asset.includes("/") ||
-      pkg.asset.includes("\\") ||
-      !pkg.asset.endsWith(".tgz")
-    ) {
-      throw new Error(`Release manifest for ${workspace.name} has an invalid asset.`);
-    }
-    if (!/^[0-9a-f]{64}$/.test(pkg.sha256 ?? "")) {
-      throw new Error(`Release manifest for ${workspace.name} has an invalid SHA-256.`);
-    }
-    if (names.has(pkg.name) || tags.has(pkg.tag) || assets.has(pkg.asset)) {
-      throw new Error("Release manifest contains duplicate packages, tags, or assets.");
-    }
-
-    const actualHash = artifactHashes.get(pkg.asset);
-    if (!actualHash) {
-      throw new Error(`Release asset ${pkg.asset} is missing.`);
-    }
-    if (actualHash !== pkg.sha256) {
-      throw new Error(`Release asset ${pkg.asset} failed SHA-256 validation.`);
-    }
-
-    names.add(pkg.name);
-    tags.add(pkg.tag);
-    assets.add(pkg.asset);
-  }
-
-  const unexpectedAssets = [...artifactHashes.keys()].filter(asset => !assets.has(asset));
-  if (unexpectedAssets.length > 0) {
-    throw new Error(`Unexpected release assets: ${unexpectedAssets.join(", ")}`);
-  }
-
-  return manifest;
-}
 
 function setAzureOutput(name, value) {
   if (process.env.TF_BUILD) {
@@ -108,12 +26,18 @@ function setAzureOutput(name, value) {
 function main() {
   const manifestPath = process.env.RELEASE_MANIFEST_PATH;
   const artifactDir = process.env.RELEASE_ARTIFACT_DIR;
-  const expectedCommit = process.env.EXPECTED_RELEASE_COMMIT?.trim();
+  const expectedSourceCommit = process.env.EXPECTED_SOURCE_COMMIT?.trim();
+  const expectedSourceBranch = process.env.EXPECTED_SOURCE_BRANCH?.trim();
   const expectedValidationMode = process.env.EXPECTED_VALIDATION_MODE === "true";
 
-  if (!manifestPath || !artifactDir || !expectedCommit) {
+  if (
+    !manifestPath ||
+    !artifactDir ||
+    !expectedSourceCommit ||
+    !expectedSourceBranch
+  ) {
     throw new Error(
-      "RELEASE_MANIFEST_PATH, RELEASE_ARTIFACT_DIR, and EXPECTED_RELEASE_COMMIT are required.",
+      "RELEASE_MANIFEST_PATH, RELEASE_ARTIFACT_DIR, EXPECTED_SOURCE_COMMIT, and EXPECTED_SOURCE_BRANCH are required.",
     );
   }
 
@@ -123,7 +47,7 @@ function main() {
     if (!lstatSync(assetPath).isFile()) {
       throw new Error(`Unexpected non-file release artifact: ${asset}`);
     }
-    artifactHashes.set(asset, sha256(assetPath));
+    artifactHashes.set(asset, sha256File(assetPath));
   }
 
   const workspaces = listPublishableWorkspaces(repoRoot);
@@ -131,30 +55,26 @@ function main() {
     JSON.parse(readFileSync(manifestPath, "utf8")),
     {
       artifactHashes,
-      expectedCommit,
+      expectedSourceBranch,
+      expectedSourceCommit,
       expectedValidationMode,
       workspaces,
     },
   );
-  const packageByName = new Map(
-    manifest.packages.map(pkg => [pkg.name, pkg]),
-  );
-
-  setAzureOutput("releaseCommit", manifest.releaseCommit);
+  setAzureOutput("releaseCommit", manifest.sourceCommit);
   setAzureOutput(
     "releaseTags",
     manifest.packages.map(pkg => pkg.tag).join(","),
   );
   setAzureOutput("packageCount", String(manifest.packages.length));
 
-  for (const workspace of workspaces) {
-    const pkg = packageByName.get(workspace.name);
-    setAzureOutput(`${workspace.outputPrefix}Included`, pkg ? "true" : "false");
+  for (const pkg of manifest.packages) {
+    setAzureOutput(`${pkg.outputPrefix}Included`, "true");
+    setAzureOutput(`${pkg.outputPrefix}ReleaseTag`, pkg.tag);
     setAzureOutput(
-      `${workspace.outputPrefix}ReleaseTag`,
-      pkg?.tag ?? workspace.tag,
+      `${pkg.outputPrefix}ReleaseAsset`,
+      pkg.npmAsset.fileName,
     );
-    setAzureOutput(`${workspace.outputPrefix}ReleaseAsset`, pkg?.asset ?? "");
   }
 
   updateAzureBuildNumber(manifest.packages.length, "cd");
@@ -172,5 +92,3 @@ if (invokedDirectly) {
     process.exit(1);
   }
 }
-
-export { validateReleaseManifest };

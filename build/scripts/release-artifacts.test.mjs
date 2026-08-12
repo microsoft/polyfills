@@ -10,14 +10,20 @@ import {
 } from "./check-github-releases.mjs";
 import {
   createOriginTagChecker,
-  formatSelectedReleaseTags,
-  parseSelectedReleaseTags,
-  recheckSelectedReleaseTags,
+  packSelectedReleases,
   selectReleases,
-  selectRequestedReleases,
   updateBuildNumberAfterSelection,
 } from "./prepare-release-artifacts.mjs";
-import { validateReleaseManifest } from "./validate-release-artifacts.mjs";
+import {
+  validateReleaseManifest,
+  validateReleaseManifestStructure,
+} from "./release-manifest.mjs";
+import {
+  assertSelectedReleaseTagsNotOnOrigin,
+  formatSelectedReleaseTags,
+  parseSelectedReleaseTags,
+  resolveSelectedReleases,
+} from "./selected-release-tags.mjs";
 
 const commit = "0123456789abcdef0123456789abcdef01234567";
 const workspace = {
@@ -99,17 +105,18 @@ test("check-only selection updates and validates the Azure build number", () => 
 
 function metadata(overrides = {}) {
   return {
-    releaseCommit: commit,
     packages: [
       {
-        asset,
         name: workspace.name,
-        sha256: hash,
+        npmAsset: { fileName: asset, sha256: hash },
+        outputPrefix: workspace.outputPrefix,
         tag: workspace.tag,
         version: workspace.version,
       },
     ],
     schemaVersion: 1,
+    sourceBranch: "refs/heads/main",
+    sourceCommit: commit,
     validationMode: false,
     ...overrides,
   };
@@ -132,19 +139,19 @@ test("formats and resolves the exact build-stage selection and order", () => {
     `${secondWorkspace.tag},${workspace.tag}`,
   );
   assert.deepEqual(
-    selectRequestedReleases(
+    resolveSelectedReleases(
       [workspace, secondWorkspace],
       [secondWorkspace.tag, workspace.tag],
     ),
     [secondWorkspace, workspace],
   );
   assert.throws(
-    () => selectRequestedReleases([workspace], ["@microsoft/unknown_v1.0.0"]),
+    () => resolveSelectedReleases([workspace], ["@microsoft/unknown_v1.0.0"]),
     /Invalid SELECTED_RELEASE_TAGS: unknown or non-publishable tags: @microsoft\/unknown_v1\.0\.0/,
   );
   assert.throws(
-    () => selectRequestedReleases([workspace], [workspace.tag, workspace.tag]),
-    /Invalid SELECTED_RELEASE_TAGS: duplicate selected tags/,
+    () => resolveSelectedReleases([workspace], [workspace.tag, workspace.tag]),
+    /duplicate release tags/,
   );
   assert.throws(
     () => formatSelectedReleaseTags([{ tag: `${workspace.tag},bad` }]),
@@ -152,10 +159,11 @@ test("formats and resolves the exact build-stage selection and order", () => {
   );
   assert.throws(
     () =>
-      selectRequestedReleases([workspace, { tag: `${workspace.tag},bad` }], [
-        workspace.tag,
-      ]),
-    /Release tags cannot contain commas/,
+      resolveSelectedReleases(
+        [workspace, { ...secondWorkspace, tag: workspace.tag }],
+        [workspace.tag],
+      ),
+    /duplicate release tags/,
   );
 });
 
@@ -195,23 +203,23 @@ test("parseSelectedReleaseTags rejects missing, empty, or altered selections", (
   );
 });
 
-test("selectRequestedReleases rejects malformed and unknown tags", () => {
+test("selected release parsing rejects malformed and resolution rejects unknown tags", () => {
   assert.throws(
-    () => selectRequestedReleases([workspace], ["not-a-release-tag"]),
+    () => parseSelectedReleaseTags("not-a-release-tag"),
     /malformed release tags: not-a-release-tag/,
   );
   assert.throws(
-    () => selectRequestedReleases([workspace], ["@microsoft/unknown_v1.0.0"]),
+    () => resolveSelectedReleases([workspace], ["@microsoft/unknown_v1.0.0"]),
     /unknown or non-publishable tags: @microsoft\/unknown_v1\.0\.0/,
   );
 });
 
-test("recheckSelectedReleaseTags preserves an unchanged selection", () => {
+test("selected release origin assertion preserves an unchanged selection", () => {
   const checkedTags = [];
   const releases = [secondWorkspace, workspace];
 
   assert.equal(
-    recheckSelectedReleaseTags(releases, false, {
+    assertSelectedReleaseTagsNotOnOrigin(releases, false, {
       exists(tag) {
         checkedTags.push(tag);
         return false;
@@ -222,10 +230,10 @@ test("recheckSelectedReleaseTags preserves an unchanged selection", () => {
   assert.deepEqual(checkedTags, [secondWorkspace.tag, workspace.tag]);
 });
 
-test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
+test("selected release origin assertion reports every concurrent release tag", () => {
   assert.throws(
     () =>
-      recheckSelectedReleaseTags([secondWorkspace, workspace], false, {
+      assertSelectedReleaseTagsNotOnOrigin([secondWorkspace, workspace], false, {
         exists(tag) {
           return tag === workspace.tag;
         },
@@ -239,7 +247,7 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
   );
   assert.throws(
     () =>
-      recheckSelectedReleaseTags([secondWorkspace, workspace], false, {
+      assertSelectedReleaseTagsNotOnOrigin([secondWorkspace, workspace], false, {
         exists() {
           return true;
         },
@@ -250,9 +258,9 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
   );
 });
 
-test("recheckSelectedReleaseTags allows existing tags in validation mode", () => {
+test("selected release origin assertion allows existing tags in validation mode", () => {
   assert.doesNotThrow(() =>
-    recheckSelectedReleaseTags([workspace], true, {
+    assertSelectedReleaseTagsNotOnOrigin([workspace], true, {
       exists() {
         return true;
       },
@@ -284,10 +292,11 @@ test("validateReleaseManifest accepts matching metadata and artifacts", () => {
   assert.equal(
     validateReleaseManifest(metadata(), {
       artifactHashes: new Map([[asset, hash]]),
-      expectedCommit: commit,
+      expectedSourceBranch: "refs/heads/main",
+      expectedSourceCommit: commit,
       expectedValidationMode: false,
       workspaces: [workspace],
-    }).releaseCommit,
+    }).sourceCommit,
     commit,
   );
 });
@@ -296,16 +305,12 @@ test("validateReleaseManifest requires the multi-package manifest shape", () => 
   const legacyRelease = metadata().packages[0];
   assert.throws(
     () =>
-      validateReleaseManifest(
-        metadata({ packages: undefined, releases: [legacyRelease] }),
-        {
-          artifactHashes: new Map([[asset, hash]]),
-          expectedCommit: commit,
-          expectedValidationMode: false,
-          workspaces: [workspace],
-        },
-      ),
-    /manifest contains no packages/,
+      validateReleaseManifestStructure({
+        ...metadata(),
+        packages: undefined,
+        releases: [legacyRelease],
+      }),
+    /must contain exactly/,
   );
 });
 
@@ -314,7 +319,8 @@ test("validateReleaseManifest reports an unsupported schema version", () => {
     () =>
       validateReleaseManifest(metadata({ schemaVersion: 2 }), {
         artifactHashes: new Map([[asset, hash]]),
-        expectedCommit: commit,
+        expectedSourceBranch: "refs/heads/main",
+        expectedSourceCommit: commit,
         expectedValidationMode: false,
         workspaces: [workspace],
       }),
@@ -327,7 +333,8 @@ test("validateReleaseManifest rejects a mismatched source commit", () => {
     () =>
       validateReleaseManifest(metadata(), {
         artifactHashes: new Map([[asset, hash]]),
-        expectedCommit: "f".repeat(40),
+        expectedSourceBranch: "refs/heads/main",
+        expectedSourceCommit: "f".repeat(40),
         expectedValidationMode: false,
         workspaces: [workspace],
       }),
@@ -340,12 +347,252 @@ test("validateReleaseManifest rejects a tampered artifact", () => {
     () =>
       validateReleaseManifest(metadata(), {
         artifactHashes: new Map([[asset, "b".repeat(64)]]),
-        expectedCommit: commit,
+        expectedSourceBranch: "refs/heads/main",
+        expectedSourceCommit: commit,
         expectedValidationMode: false,
         workspaces: [workspace],
       }),
     /failed SHA-256 validation/,
   );
+  assert.throws(
+    () =>
+      validateReleaseManifest(metadata(), {
+        artifactHashes: new Map(),
+        expectedSourceBranch: "refs/heads/main",
+        expectedSourceCommit: commit,
+        expectedValidationMode: false,
+        workspaces: [workspace],
+      }),
+    /Release asset .* is missing/,
+  );
+});
+
+test("validateReleaseManifest enforces trusted branch and production main", () => {
+  assert.throws(
+    () =>
+      validateReleaseManifest(metadata(), {
+        artifactHashes: new Map([[asset, hash]]),
+        expectedSourceBranch: "refs/heads/release",
+        expectedSourceCommit: commit,
+        expectedValidationMode: false,
+        workspaces: [workspace],
+      }),
+    /does not match build resource branch/,
+  );
+  assert.throws(
+    () =>
+      validateReleaseManifest(metadata({ sourceBranch: "refs/heads/release" }), {
+        artifactHashes: new Map([[asset, hash]]),
+        expectedSourceBranch: "refs/heads/release",
+        expectedSourceCommit: commit,
+        expectedValidationMode: false,
+        workspaces: [workspace],
+      }),
+    /Production release artifacts must come from refs\/heads\/main/,
+  );
+  assert.doesNotThrow(() =>
+    validateReleaseManifest(
+      metadata({
+        sourceBranch: "refs/heads/release",
+        validationMode: true,
+      }),
+      {
+        artifactHashes: new Map([[asset, hash]]),
+        expectedSourceBranch: "refs/heads/release",
+        expectedSourceCommit: commit,
+        expectedValidationMode: true,
+        workspaces: [workspace],
+      },
+    ),
+  );
+});
+
+test("validateReleaseManifest rejects outputPrefix drift and exact artifact drift", () => {
+  assert.throws(
+    () =>
+      validateReleaseManifest(
+        metadata({
+          packages: [
+            {
+              ...metadata().packages[0],
+              outputPrefix: "tamperedPrefix",
+            },
+          ],
+        }),
+        {
+          artifactHashes: new Map([[asset, hash]]),
+          expectedSourceBranch: "refs/heads/main",
+          expectedSourceCommit: commit,
+          expectedValidationMode: false,
+          workspaces: [workspace],
+        },
+      ),
+    /outputPrefix.*does not match the workspace/,
+  );
+  assert.throws(
+    () =>
+      validateReleaseManifest(metadata(), {
+        artifactHashes: new Map([
+          [asset, hash],
+          ["unexpected.tgz", hash],
+        ]),
+        expectedSourceBranch: "refs/heads/main",
+        expectedSourceCommit: commit,
+        expectedValidationMode: false,
+        workspaces: [workspace],
+      }),
+    /Unexpected release assets: unexpected\.tgz/,
+  );
+});
+
+test("release manifest structure rejects unsafe files, invalid hashes, and duplicates", () => {
+  assert.throws(
+    () =>
+      validateReleaseManifestStructure(
+        metadata({
+          packages: [
+            {
+              ...metadata().packages[0],
+              npmAsset: { fileName: "../unsafe.tgz", sha256: hash },
+            },
+          ],
+        }),
+      ),
+    /unsafe npm asset fileName/,
+  );
+  assert.throws(
+    () =>
+      validateReleaseManifestStructure(
+        metadata({
+          packages: [
+            {
+              ...metadata().packages[0],
+              npmAsset: { fileName: asset, sha256: "invalid" },
+            },
+          ],
+        }),
+      ),
+    /invalid npm asset SHA-256/,
+  );
+  assert.throws(
+    () =>
+      validateReleaseManifestStructure(
+        metadata({
+          packages: [
+            metadata().packages[0],
+            {
+              ...metadata().packages[0],
+              name: secondWorkspace.name,
+              tag: secondWorkspace.tag,
+            },
+          ],
+        }),
+      ),
+    /duplicate package names, tags, output prefixes, or npm asset file names/,
+  );
+});
+
+test("packing attempts and aggregates multiple failures with a partial manifest", () => {
+  const attempted = [];
+  const errors = [];
+  let written;
+  const thirdWorkspace = {
+    ...secondWorkspace,
+    name: "@microsoft/third-polyfill",
+    outputPrefix: "thirdPolyfill",
+    tag: "@microsoft/third-polyfill_v3.0.0",
+    version: "3.0.0",
+  };
+  const result = packSelectedReleases({
+    artifactDir: "artifacts",
+    hashFile: filePath => {
+      assert.match(filePath, /second\.tgz$/);
+      return hash;
+    },
+    log() {},
+    logError: message => errors.push(message),
+    metadataPath: "manifest.json",
+    packRelease(release) {
+      attempted.push(release.name);
+      if (release === secondWorkspace) return "second.tgz";
+      throw new Error(`pack failed for ${release.name}`);
+    },
+    releases: [workspace, secondWorkspace, thirdWorkspace],
+    sourceBranch: "refs/heads/main",
+    sourceCommit: commit,
+    validationMode: false,
+    writeManifest: (_path, manifest) => {
+      written = manifest;
+    },
+  });
+
+  assert.deepEqual(attempted, [
+    workspace.name,
+    secondWorkspace.name,
+    thirdWorkspace.name,
+  ]);
+  assert.equal(result.failures.length, 2);
+  assert.equal(errors.length, 2);
+  assert.deepEqual(written.packages, [
+    {
+      name: secondWorkspace.name,
+      npmAsset: { fileName: "second.tgz", sha256: hash },
+      outputPrefix: secondWorkspace.outputPrefix,
+      tag: secondWorkspace.tag,
+      version: secondWorkspace.version,
+    },
+  ]);
+});
+
+test("packing writes an empty diagnostic manifest when every package fails", () => {
+  let written;
+  const result = packSelectedReleases({
+    artifactDir: "artifacts",
+    log() {},
+    logError() {},
+    metadataPath: "manifest.json",
+    packRelease() {
+      throw new Error("pack failed");
+    },
+    releases: [workspace, secondWorkspace],
+    sourceBranch: "refs/heads/feature",
+    sourceCommit: commit,
+    validationMode: true,
+    writeManifest: (_path, manifest) => {
+      written = manifest;
+    },
+  });
+  assert.equal(result.failures.length, 2);
+  assert.deepEqual(written.packages, []);
+  assert.equal(written.sourceBranch, "refs/heads/feature");
+});
+
+test("packing rejects an unsafe npm filename before hashing it", () => {
+  let hashed = false;
+  let written;
+  const result = packSelectedReleases({
+    artifactDir: "artifacts",
+    hashFile() {
+      hashed = true;
+      return hash;
+    },
+    log() {},
+    logError() {},
+    metadataPath: "manifest.json",
+    packRelease() {
+      return "../outside.tgz";
+    },
+    releases: [workspace],
+    sourceBranch: "refs/heads/main",
+    sourceCommit: commit,
+    validationMode: false,
+    writeManifest: (_path, manifest) => {
+      written = manifest;
+    },
+  });
+  assert.equal(hashed, false);
+  assert.equal(result.failures.length, 1);
+  assert.deepEqual(written.packages, []);
 });
 
 test("GitHub release checks map selected manifest packages to workspace prefixes", () => {
@@ -355,9 +602,9 @@ test("GitHub release checks map selected manifest packages to workspace prefixes
         packages: [
           metadata().packages[0],
           {
-            asset: "second.tgz",
             name: secondWorkspace.name,
-            sha256: hash,
+            npmAsset: { fileName: "second.tgz", sha256: hash },
+            outputPrefix: secondWorkspace.outputPrefix,
             tag: secondWorkspace.tag,
             version: secondWorkspace.version,
           },
@@ -388,9 +635,9 @@ test("GitHub release checks emit existing and missing outputs for selected packa
       packages: [
         metadata().packages[0],
         {
-          asset: "second.tgz",
           name: secondWorkspace.name,
-          sha256: hash,
+          npmAsset: { fileName: "second.tgz", sha256: hash },
+          outputPrefix: secondWorkspace.outputPrefix,
           tag: secondWorkspace.tag,
           version: secondWorkspace.version,
         },
@@ -441,7 +688,7 @@ test("GitHub release checks reject stale manifest tags before API queries", asyn
         },
       },
     ),
-    /does not match current workspace tag/,
+    /tag.*does not match the workspace/,
   );
   assert.equal(queried, false);
 });
@@ -552,7 +799,19 @@ test("pipelines use selected build tags, renamed local directories, and narrow c
   assert.doesNotMatch(preparationScript, /"releaseTags"/);
   assert.match(packTemplate, /publish_artifacts_npm/);
   assert.match(packTemplate, /publish_artifacts_meta/);
+  assert.match(packTemplate, /BUILD_SOURCEBRANCH: \$\(Build\.SourceBranch\)/);
+  assert.match(packTemplate, /BUILD_SOURCEVERSION: \$\(Build\.SourceVersion\)/);
+  assert.doesNotMatch(packTemplate, /continueOnError/);
   assert.match(cdPipeline, /publish_artifacts_npm/);
+  assert.match(
+    cdPipeline,
+    /EXPECTED_SOURCE_BRANCH: \$\(resources\.pipeline\.releaseBuild\.sourceBranch\)/,
+  );
+  assert.match(
+    cdPipeline,
+    /EXPECTED_SOURCE_COMMIT: \$\(resources\.pipeline\.releaseBuild\.sourceCommit\)/,
+  );
+  assert.doesNotMatch(cdPipeline, /EXPECTED_RELEASE_COMMIT/);
   assert.match(beachballConfig, /publish_artifacts_npm/);
   assert.match(gitignore, /publish_artifacts_npm/);
   assert.match(gitignore, /publish_artifacts_meta/);
