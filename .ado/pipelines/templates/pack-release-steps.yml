@@ -1,0 +1,62 @@
+# Both build stages share these steps so production and validation packing
+# cannot drift while retaining the distinct stage names required by CD.
+parameters:
+- name: validationMode
+  type: string
+  default: 'false'
+- name: selectedReleaseTags
+  type: string
+
+steps:
+- checkout: self
+  clean: true
+  fetchDepth: 1
+  fetchTags: false
+  # Packing immediately rechecks selected tags on origin for concurrent
+  # releases, so the explicit remote queries need checkout credentials.
+  persistCredentials: true
+
+- task: UseNode@1
+  displayName: Install Node.js
+  inputs:
+    version: 24.x
+
+- task: Cache@2
+  displayName: Cache npm
+  inputs:
+    key: 'npm | "$(Agent.OS)" | package-lock.json'
+    restoreKeys: |
+      npm | "$(Agent.OS)"
+    path: $(npm_config_cache)
+
+- script: npm ci
+  displayName: Install package dependencies
+
+- script: npm run build
+  displayName: Build workspaces
+
+- task: Bash@3
+  displayName: Pack release artifacts and metadata
+  inputs:
+    targetType: inline
+    script: |
+      set -euo pipefail
+      node build/scripts/prepare-release-artifacts.mjs
+  env:
+    SELECTED_RELEASE_TAGS: ${{ parameters.selectedReleaseTags }}
+    VALIDATION_MODE: ${{ parameters.validationMode }}
+
+# Both artifact uploads retain their default succeeded() conditions. Any
+# packing failure writes available diagnostic metadata, then fails this step,
+# preventing both pipeline artifact uploads.
+- task: PublishPipelineArtifact@1
+  displayName: Upload npm packages
+  inputs:
+    targetPath: $(Build.SourcesDirectory)/publish_artifacts_npm
+    artifactName: npm_packages
+
+- task: PublishPipelineArtifact@1
+  displayName: Upload release metadata
+  inputs:
+    targetPath: $(Build.SourcesDirectory)/publish_artifacts_meta
+    artifactName: release-metadata

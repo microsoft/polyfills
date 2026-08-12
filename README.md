@@ -16,7 +16,7 @@ This project welcomes contributions and suggestions. Please see [CONTRIBUTING.md
 
 ## Publishing
 
-Maintainer publishing is documented in [CONTRIBUTING.md](CONTRIBUTING.md#maintainer-publishing-flow). GitHub Releases are created with the default GitHub Actions `GITHUB_TOKEN`, and Azure Pipelines downloads release tarballs and publishes them to npm. Currently, `@microsoft/focusgroup-polyfill` is publishable; `@microsoft/shadowrootadoptedstylesheets-ponyfill` is private.
+Maintainer publishing is documented in [CONTRIBUTING.md](CONTRIBUTING.md#maintainer-publishing-flow). The two [Azure pipeline definitions](.ado/pipelines/README.md) build and validate npm tarballs, create package-version tags, publish packages to npm, record successful deployments with `deployed/<release-tag>` tags, and create missing GitHub Releases last. GitHub Actions is used only for repository CI, not releases. Currently, `@microsoft/focusgroup-polyfill` is publishable; `@microsoft/shadowrootadoptedstylesheets-ponyfill` is private.
 
 ## Security
 

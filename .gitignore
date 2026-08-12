@@ -20,4 +20,5 @@ build/
 dist/
 
 # Pack directory
-publish_artifacts/
+publish_artifacts_npm/
+publish_artifacts_meta/

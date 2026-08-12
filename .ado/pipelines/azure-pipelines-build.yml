@@ -1,0 +1,99 @@
+# Azure Pipelines definition name: Polyfills - CD Build
+# Referenced by azure-pipelines-cd.yml through resources.pipelines.source.
+trigger:
+  branches:
+    include:
+    - main
+pr: none
+
+parameters:
+- name: validationMode
+  displayName: Rebuild existing releases for artifact validation
+  type: string
+  default: 'false'
+  values:
+  - 'false'
+  - 'true'
+
+stages:
+- stage: PrepareRelease
+  displayName: Prepare release
+  jobs:
+  - job: SelectRelease
+    displayName: Select releases
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - checkout: self
+      clean: true
+      fetchDepth: 1
+      fetchTags: false
+      # Selection explicitly queries release tags on origin.
+      persistCredentials: true
+
+    - task: UseNode@1
+      displayName: Install Node.js
+      inputs:
+        version: 24.x
+
+    - task: Bash@3
+      name: release
+      displayName: Detect package versions without release tags
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          node build/scripts/prepare-release-artifacts.mjs --check-only
+      env:
+        AZURE_BUILD_ID: $(Build.BuildId)
+        VALIDATION_MODE: ${{ parameters.validationMode }}
+
+# Compile-time stage selection keeps validation runs under a different name:
+# CD listens only for a completed `BuildArtifacts`, so validation and no-op
+# runs cannot trigger publication. PrepareRelease hands each selected
+# package tag to the chosen stage through `selectedReleaseTags`.
+- ${{ if eq(parameters.validationMode, 'false') }}:
+  - stage: BuildArtifacts
+    displayName: Build release artifacts
+    dependsOn: PrepareRelease
+    condition: |
+      and(
+        succeeded(),
+        eq(dependencies.PrepareRelease.outputs['SelectRelease.release.shouldBuild'], 'true')
+      )
+    variables:
+      npm_config_cache: $(Pipeline.Workspace)/.npm
+      selectedReleaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.selectedReleaseTags'] ]
+    jobs:
+    - job: BuildAndPack
+      displayName: Build and pack npm packages
+      pool:
+        vmImage: ubuntu-latest
+      steps:
+      - template: templates/pack-release-steps.yml
+        parameters:
+          selectedReleaseTags: $(selectedReleaseTags)
+          validationMode: ${{ parameters.validationMode }}
+
+- ${{ if eq(parameters.validationMode, 'true') }}:
+  - stage: ValidateArtifacts
+    displayName: Build artifacts for validation
+    dependsOn: PrepareRelease
+    condition: |
+      and(
+        succeeded(),
+        eq(dependencies.PrepareRelease.outputs['SelectRelease.release.shouldBuild'], 'true')
+      )
+    variables:
+      npm_config_cache: $(Pipeline.Workspace)/.npm
+      selectedReleaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.selectedReleaseTags'] ]
+    jobs:
+    - job: BuildAndPack
+      displayName: Build and pack npm packages for validation
+      pool:
+        vmImage: ubuntu-latest
+      steps:
+      - template: templates/pack-release-steps.yml
+        parameters:
+          selectedReleaseTags: $(selectedReleaseTags)
+          validationMode: ${{ parameters.validationMode }}

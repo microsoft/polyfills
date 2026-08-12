@@ -1,0 +1,34 @@
+# Azure Pipelines
+
+Release publishing uses two pipeline definitions:
+
+- **`Polyfills - CD Build`** uses `azure-pipelines-build.yml`. A `main` build checks every non-private npm workspace for its `${name}_v${version}` tag. If any tag is missing, the normal-mode `BuildArtifacts` stage installs dependencies, builds the workspaces, packs the corresponding npm tarballs, and publishes both the packages and release metadata. If no release is needed, `PrepareRelease` succeeds and the downstream stage is skipped.
+- **`Polyfills - CD`** uses `azure-pipelines-cd.yml`. It has no git trigger; completion of the build pipeline's `BuildArtifacts` stage starts it. The official 1ES pipeline validates the metadata and package hashes and binds both `sourceCommit` and `sourceBranch` provenance to the trusted build resource, creates the package-version tags, publishes the tarballs to npm through `Polyfills.Release.PipelineTemplate.yml`, pushes `deployed/<release-tag>` marker tags, and then creates missing GitHub Releases.
+
+Release metadata uses schema version 1 with build provenance and package entries shaped as `{ name, version, tag, outputPrefix, npmAsset: { fileName, sha256 } }`. CD requires `sourceCommit` and `sourceBranch` to exactly match the trusted build-resource values. Production rejects artifacts not built from `refs/heads/main`; validation mode permits another branch. Package identity and `outputPrefix` must exactly match the current workspace, filenames must be safe, and the npm artifact set and SHA-256 hashes must match exactly. Run-number `<count>` is the number of validated package entries: `<count>-build-<Build.BuildId>` for the build pipeline and `<count>-cd-<Build.BuildId>` for CD.
+
+The build pipeline's `validationMode` can rebuild already-tagged package versions. Compile-time selection creates `BuildArtifacts` in normal mode or `ValidateArtifacts` in validation mode, never both. Only `BuildArtifacts` triggers CD automatically, so a validation build cannot start publication.
+
+`PrepareRelease` is the authoritative source of the package tag list for a build run. Its build-stage output and packing handoff are named `selectedReleaseTags`. CD does not consume that variable directly: after validating the manifest, `ValidateArtifacts` emits `releaseTags` for downstream CD tag and publication operations. Packing validates and preserves the exact comma-separated selection and order rather than recalculating or shrinking it. Immediately before packing, every selected tag is rechecked on `origin`. If any selected tag appeared after preparation, a production run fails before packing any package and refuses to alter the batch; retry the build so `PrepareRelease` can create a new authoritative selection. Validation mode intentionally permits already-existing tags so maintainers can rebuild artifacts. Packing attempts every selected package and reports all failures. A diagnostic manifest includes only fully packed and hashed packages, even when all fail, but the packing step then fails so normal Azure conditions prevent both artifact uploads.
+
+Local package staging uses `publish_artifacts_npm`, and local manifest staging uses `publish_artifacts_meta`. The published Azure artifact names remain `npm_packages` and `release-metadata`.
+
+End-to-end validation requires manually queueing both pipelines: first queue the build with `validationMode: true`, then queue CD with `validationMode: true` and select that validation build as the `releaseBuild` resource. CD retains its own `ValidateArtifacts` stage and checks the metadata `sourceCommit` and `sourceBranch` against the selected build resource, but does not create tags, releases, or npm publications.
+
+## Adding a publishable package
+
+Artifact discovery is automatic, but Azure Pipelines cannot generate `GitHubRelease@1` tasks from runtime metadata. For each new non-private workspace:
+
+1. Add the package to the root `package.json` workspaces.
+2. In the CD pipeline's `PublishRelease` stage, consume the package's `<prefix>Included`, `<prefix>ReleaseTag`, and `<prefix>ReleaseAsset` outputs from `ValidateArtifacts`.
+3. Add a `GitHubRelease@1` task using the `fast` GitHub service connection, conditioned on package inclusion and `releaseCheck.<prefix>GitHubReleaseExists == false`.
+
+`PublishRelease` is deliberately serialized: `PublishNpm`, then `MarkDeployed`, then `PublishGitHub`. GitHub Release existence is queried from the validated manifest immediately before creation. A retry therefore skips GitHub Releases already created by an earlier partial attempt while still failing closed if GitHub cannot be queried.
+
+Pipeline checkouts are clean and shallow with automatic tag fetching disabled. Credentials persist only in selection, packing, release-tag creation, and deployment-marker jobs that query or push remote refs. Tag management uses exact `ls-remote` queries, targeted `fetch --no-tags` operations, isolated local refs, and peeled-commit verification so retries and same-commit push races are idempotent without downloading full tag history.
+
+The pipeline definitions require:
+
+- An Azure GitHub service connection named `fast` with permission to create releases in `microsoft/polyfills`.
+- Pipeline checkout credentials that can push package-version and `deployed/` tags.
+- The Azure pipeline definitions to use the exact names documented above.
