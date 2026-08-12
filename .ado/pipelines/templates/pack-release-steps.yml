@@ -35,11 +35,14 @@ steps:
 - script: npm run build
   displayName: Build workspaces
 
-- script: npm run prepare-release-artifacts
+- task: Bash@3
   displayName: Pack release artifacts and metadata
+  inputs:
+    targetType: inline
+    script: |
+      set -euo pipefail
+      node build/scripts/prepare-release-artifacts.mjs
   env:
-    BUILD_SOURCEBRANCH: $(Build.SourceBranch)
-    BUILD_SOURCEVERSION: $(Build.SourceVersion)
     SELECTED_RELEASE_TAGS: ${{ parameters.selectedReleaseTags }}
     VALIDATION_MODE: ${{ parameters.validationMode }}
 

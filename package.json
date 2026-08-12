@@ -15,7 +15,6 @@
     "bump": "beachball bump",
     "checkchange": "node build/scripts/checkchange.mjs",
     "test:scripts": "node --test build/scripts/*.test.mjs",
-    "prepare-release-artifacts": "node build/scripts/prepare-release-artifacts.mjs",
     "publish": "beachball publish"
   },
   "repository": {

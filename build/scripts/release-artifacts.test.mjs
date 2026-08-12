@@ -799,8 +799,22 @@ test("pipelines use selected build tags, renamed local directories, and narrow c
   assert.doesNotMatch(preparationScript, /"releaseTags"/);
   assert.match(packTemplate, /publish_artifacts_npm/);
   assert.match(packTemplate, /publish_artifacts_meta/);
-  assert.match(packTemplate, /BUILD_SOURCEBRANCH: \$\(Build\.SourceBranch\)/);
-  assert.match(packTemplate, /BUILD_SOURCEVERSION: \$\(Build\.SourceVersion\)/);
+  assert.match(
+    buildPipeline,
+    /- task: Bash@3[\s\S]*?name: release[\s\S]*?targetType: inline[\s\S]*?set -euo pipefail\n\s+node build\/scripts\/prepare-release-artifacts\.mjs --check-only[\s\S]*?AZURE_BUILD_ID: \$\(Build\.BuildId\)[\s\S]*?VALIDATION_MODE:/,
+  );
+  assert.match(
+    packTemplate,
+    /- task: Bash@3[\s\S]*?targetType: inline[\s\S]*?set -euo pipefail\n\s+node build\/scripts\/prepare-release-artifacts\.mjs[\s\S]*?SELECTED_RELEASE_TAGS:[\s\S]*?VALIDATION_MODE:/,
+  );
+  assert.doesNotMatch(
+    `${buildPipeline}\n${packTemplate}`,
+    /npm run prepare-release-artifacts/,
+  );
+  assert.doesNotMatch(
+    packTemplate,
+    /BUILD_SOURCEBRANCH:|BUILD_SOURCEVERSION:/,
+  );
   assert.doesNotMatch(packTemplate, /continueOnError/);
   assert.match(cdPipeline, /publish_artifacts_npm/);
   assert.match(

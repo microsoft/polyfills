@@ -36,9 +36,14 @@ stages:
       inputs:
         version: 24.x
 
-    - script: npm run prepare-release-artifacts -- --check-only
+    - task: Bash@3
       name: release
       displayName: Detect package versions without release tags
+      inputs:
+        targetType: inline
+        script: |
+          set -euo pipefail
+          node build/scripts/prepare-release-artifacts.mjs --check-only
       env:
         AZURE_BUILD_ID: $(Build.BuildId)
         VALIDATION_MODE: ${{ parameters.validationMode }}
