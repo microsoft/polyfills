@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { BehaviorToken } from "./constants.js";
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
 import { GridItemCollection } from "./grid-item-collection.js";
