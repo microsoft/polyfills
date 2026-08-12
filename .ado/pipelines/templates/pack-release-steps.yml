@@ -1,6 +1,8 @@
 parameters:
 - name: validationMode
   type: string
+- name: selectedReleaseTags
+  type: string
 
 steps:
 - checkout: self
@@ -30,7 +32,7 @@ steps:
 - script: npm run prepare-release-artifacts
   displayName: Pack release artifacts and metadata
   env:
-    SELECTED_RELEASE_TAGS: $(releaseTags)
+    SELECTED_RELEASE_TAGS: ${{ parameters.selectedReleaseTags }}
     VALIDATION_MODE: ${{ parameters.validationMode }}
 
 - task: PublishPipelineArtifact@1

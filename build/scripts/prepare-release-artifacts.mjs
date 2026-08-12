@@ -40,20 +40,35 @@ function listGitTags() {
 }
 
 function parseSelectedReleaseTags(value) {
-  if (value === undefined || value === "") {
+  if (typeof value !== "string" || value === "") {
     throw new Error(
-      "SELECTED_RELEASE_TAGS is required when packing release artifacts.",
+      "SELECTED_RELEASE_TAGS is required when packing release artifacts and must be a non-empty string.",
     );
   }
 
   const tags = value.split(",");
-  const invalidTags = tags.filter(tag => tag.length === 0 || tag !== tag.trim());
-  if (invalidTags.length > 0) {
+  const invalidIndexes = [];
+  for (const [index, tag] of tags.entries()) {
+    if (tag.length === 0 || tag !== tag.trim()) {
+      invalidIndexes.push(index);
+    }
+  }
+  if (invalidIndexes.length > 0) {
     throw new Error(
-      "Invalid SELECTED_RELEASE_TAGS: tags must be non-empty and contain no surrounding whitespace.",
+      "Invalid SELECTED_RELEASE_TAGS: empty tags or surrounding whitespace " +
+        `at indexes: ${invalidIndexes.join(", ")}.`,
     );
   }
   return tags;
+}
+
+function formatSelectedReleaseTags(releases) {
+  const tags = releases.map(release => release.tag);
+  const commaTag = tags.find(tag => tag.includes(","));
+  if (commaTag !== undefined) {
+    throw new Error(`Release tags cannot contain commas: ${commaTag}.`);
+  }
+  return tags.join(",");
 }
 
 function selectReleases(workspaces, existingTags, includeExisting) {
@@ -63,6 +78,18 @@ function selectReleases(workspaces, existingTags, includeExisting) {
 }
 
 function selectRequestedReleases(workspaces, requestedTags) {
+  const malformedTags = requestedTags.filter(
+    tag =>
+      !/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*_v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
+        tag,
+      ),
+  );
+  if (malformedTags.length > 0) {
+    throw new Error(
+      `Invalid SELECTED_RELEASE_TAGS: malformed release tags: ${malformedTags.join(", ")}`,
+    );
+  }
+
   const duplicateTags = requestedTags.filter(
     (tag, index) => requestedTags.indexOf(tag) !== index,
   );
@@ -72,6 +99,11 @@ function selectRequestedReleases(workspaces, requestedTags) {
         ...new Set(duplicateTags),
       ].join(", ")}`,
     );
+  }
+
+  const commaTag = workspaces.find(workspace => workspace.tag.includes(","))?.tag;
+  if (commaTag !== undefined) {
+    throw new Error(`Release tags cannot contain commas: ${commaTag}.`);
   }
 
   const workspaceByTag = new Map(
@@ -147,21 +179,9 @@ function recheckSelectedReleaseTags(
     .map(release => release.tag);
   if (!validationMode && conflictingTags.length > 0) {
     throw new Error(
-      `Concurrent release detected: selected release tags now exist on origin: ${conflictingTags.join(", ")}`,
-    );
-  }
-  return releases;
-}
-
-function validateSelectedReleases(releases, existingTags, validationMode) {
-  if (validationMode) return releases;
-
-  const unselectedTags = releases
-    .filter(release => existingTags.has(release.tag))
-    .map(release => release.tag);
-  if (unselectedTags.length > 0) {
-    throw new Error(
-      `Invalid SELECTED_RELEASE_TAGS: tags were not selected for release: ${unselectedTags.join(", ")}`,
+      "Concurrent release detected: selected release tags appeared on origin " +
+        `after selection: ${conflictingTags.join(", ")}. ` +
+        "Refusing to shrink or alter the selected release batch.",
     );
   }
   return releases;
@@ -219,7 +239,7 @@ function main() {
   setAzureOutput("packageCount", String(releases.length));
   setAzureOutput(
     "releaseTags",
-    releases.map(release => release.tag).join(","),
+    formatSelectedReleaseTags(releases),
   );
   updateBuildNumberAfterSelection(releases.length, checkOnly);
 
@@ -228,7 +248,6 @@ function main() {
   }
 
   recheckSelectedReleaseTags(releases, validationMode);
-  validateSelectedReleases(releases, listGitTags(), validationMode);
 
   const releaseCommit = (
     process.env.BUILD_SOURCEVERSION || run("git", ["rev-parse", "HEAD"])
@@ -295,11 +314,11 @@ if (invokedDirectly) {
 
 export {
   createOriginTagChecker,
+  formatSelectedReleaseTags,
   parseSelectedReleaseTags,
   parsePackOutput,
   recheckSelectedReleaseTags,
   selectReleases,
   selectRequestedReleases,
   updateBuildNumberAfterSelection,
-  validateSelectedReleases,
 };

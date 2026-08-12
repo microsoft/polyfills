@@ -9,6 +9,8 @@ Release metadata follows the multi-package manifest shape `{ releaseCommit, pack
 
 The build pipeline's `validationMode` can rebuild already-tagged package versions. Compile-time selection creates `BuildArtifacts` in normal mode or `ValidateArtifacts` in validation mode, never both. Only `BuildArtifacts` triggers CD automatically, so a validation build cannot start publication.
 
+`PrepareRelease` is the authoritative source of the package tag list for a run. It passes the selected `${name}_v${version}` tags to the packing stage as a comma-separated value, and packing validates and preserves that exact list and order rather than recalculating or shrinking it. Immediately before packing, every selected tag is rechecked on `origin`. If any selected tag appeared after preparation, a production run fails before packing any package and refuses to alter the batch; retry the build so `PrepareRelease` can create a new authoritative selection. Validation mode intentionally permits already-existing tags so maintainers can rebuild artifacts.
+
 To validate end to end, first run the build pipeline manually with `validationMode: true`. Then run the CD pipeline manually with `validationMode: true` and select that build as the `releaseBuild` resource. CD retains its own `ValidateArtifacts` stage and checks the metadata commit against the selected build's source commit, but does not create tags, releases, or npm publications.
 
 ## Adding a publishable package

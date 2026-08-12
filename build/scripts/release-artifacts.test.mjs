@@ -4,12 +4,12 @@ import { test } from "node:test";
 import { formatAzureBuildNumber } from "./azure-build-number.mjs";
 import {
   createOriginTagChecker,
+  formatSelectedReleaseTags,
   parseSelectedReleaseTags,
   recheckSelectedReleaseTags,
   selectReleases,
   selectRequestedReleases,
   updateBuildNumberAfterSelection,
-  validateSelectedReleases,
 } from "./prepare-release-artifacts.mjs";
 import { validateReleaseManifest } from "./validate-release-artifacts.mjs";
 
@@ -120,7 +120,11 @@ test("selectReleases includes existing tags in validation mode", () => {
   ]);
 });
 
-test("selectRequestedReleases exactly preserves build-stage selection and order", () => {
+test("formats and resolves the exact build-stage selection and order", () => {
+  assert.equal(
+    formatSelectedReleaseTags([secondWorkspace, workspace]),
+    `${secondWorkspace.tag},${workspace.tag}`,
+  );
   assert.deepEqual(
     selectRequestedReleases(
       [workspace, secondWorkspace],
@@ -136,9 +140,20 @@ test("selectRequestedReleases exactly preserves build-stage selection and order"
     () => selectRequestedReleases([workspace], [workspace.tag, workspace.tag]),
     /Invalid SELECTED_RELEASE_TAGS: duplicate selected tags/,
   );
+  assert.throws(
+    () => formatSelectedReleaseTags([{ tag: `${workspace.tag},bad` }]),
+    /Release tags cannot contain commas/,
+  );
+  assert.throws(
+    () =>
+      selectRequestedReleases([workspace, { tag: `${workspace.tag},bad` }], [
+        workspace.tag,
+      ]),
+    /Release tags cannot contain commas/,
+  );
 });
 
-test("parseSelectedReleaseTags rejects missing or altered selections", () => {
+test("parseSelectedReleaseTags rejects missing, empty, or altered selections", () => {
   assert.deepEqual(
     parseSelectedReleaseTags(`${secondWorkspace.tag},${workspace.tag}`),
     [secondWorkspace.tag, workspace.tag],
@@ -148,8 +163,40 @@ test("parseSelectedReleaseTags rejects missing or altered selections", () => {
     /SELECTED_RELEASE_TAGS is required/,
   );
   assert.throws(
+    () => parseSelectedReleaseTags(null),
+    /SELECTED_RELEASE_TAGS is required/,
+  );
+  assert.throws(
+    () => parseSelectedReleaseTags([]),
+    /SELECTED_RELEASE_TAGS is required/,
+  );
+  assert.throws(() => parseSelectedReleaseTags(""), /non-empty string/);
+  assert.throws(
     () => parseSelectedReleaseTags(`${workspace.tag}, ${secondWorkspace.tag}`),
-    /tags must be non-empty and contain no surrounding whitespace/,
+    /surrounding whitespace at indexes: 1/,
+  );
+  assert.throws(
+    () => parseSelectedReleaseTags(` ${workspace.tag},${secondWorkspace.tag} `),
+    /surrounding whitespace at indexes: 0, 1/,
+  );
+  assert.throws(
+    () => parseSelectedReleaseTags(`${workspace.tag},`),
+    /empty tags.*indexes: 1/,
+  );
+  assert.throws(
+    () => parseSelectedReleaseTags(`,${workspace.tag}`),
+    /empty tags.*indexes: 0/,
+  );
+});
+
+test("selectRequestedReleases rejects malformed and unknown tags", () => {
+  assert.throws(
+    () => selectRequestedReleases([workspace], ["not-a-release-tag"]),
+    /malformed release tags: not-a-release-tag/,
+  );
+  assert.throws(
+    () => selectRequestedReleases([workspace], ["@microsoft/unknown_v1.0.0"]),
+    /unknown or non-publishable tags: @microsoft\/unknown_v1\.0\.0/,
   );
 });
 
@@ -184,10 +231,10 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
         },
       }),
     new RegExp(
-      `Concurrent release detected: selected release tags now exist on origin: ${workspace.tag.replaceAll(
+      `Concurrent release detected: selected release tags appeared on origin after selection: ${workspace.tag.replaceAll(
         ".",
         "\\.",
-      )}`,
+      )}\\. Refusing to shrink or alter the selected release batch\\.`,
     ),
   );
   assert.throws(
@@ -200,7 +247,7 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
       }),
     error =>
       error.message ===
-      `Concurrent release detected: selected release tags now exist on origin: ${secondWorkspace.tag}, ${workspace.tag}`,
+      `Concurrent release detected: selected release tags appeared on origin after selection: ${secondWorkspace.tag}, ${workspace.tag}. Refusing to shrink or alter the selected release batch.`,
   );
 });
 
@@ -212,26 +259,6 @@ test("recheckSelectedReleaseTags allows existing tags in validation mode", () =>
         return true;
       },
     }),
-  );
-});
-
-test("validateSelectedReleases rejects a known but unselected tag", () => {
-  assert.throws(
-    () =>
-      validateSelectedReleases(
-        [secondWorkspace, workspace],
-        new Set([workspace.tag]),
-        false,
-      ),
-    new RegExp(
-      `Invalid SELECTED_RELEASE_TAGS: tags were not selected for release: ${workspace.tag.replaceAll(
-        ".",
-        "\\.",
-      )}`,
-    ),
-  );
-  assert.doesNotThrow(() =>
-    validateSelectedReleases([workspace], new Set([workspace.tag]), true),
   );
 });
 

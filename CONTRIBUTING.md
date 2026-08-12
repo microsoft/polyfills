@@ -30,6 +30,8 @@ On `publish_<timestamp>` branches only, `npm run checkchange` can skip `beachbal
 4. `Polyfills - CD Build` runs from `main`. When a publishable workspace's `${name}_v${version}` tag is missing, its normal-mode `BuildArtifacts` stage builds the workspaces and publishes npm tarballs plus release metadata as Azure pipeline artifacts. If every release tag already exists, `PrepareRelease` succeeds and the downstream stage is skipped.
 5. Completion of the build pipeline's `BuildArtifacts` stage triggers `Polyfills - CD`. It validates the artifacts, creates the package-version tags and GitHub Releases, publishes the tarballs to npm, and pushes `deployed/<tag>` marker tags on success.
 
+The tag list emitted by `PrepareRelease` is authoritative for that build. The packing stage preserves the exact selected tags and order, then immediately rechecks every tag on `origin`. If a tag appeared concurrently, production fails before packing anything rather than shrinking or changing the batch; retry the build to generate a fresh selection. Validation mode intentionally allows existing tags for reproducible artifact rebuilds.
+
 For artifact validation, manually run `Polyfills - CD Build` with `validationMode: true`. That run contains `ValidateArtifacts` instead of `BuildArtifacts` and therefore cannot trigger CD. Then manually run `Polyfills - CD` with `validationMode: true`, selecting the validation build as its `releaseBuild` resource. The CD validation stage verifies the artifacts and selected build commit without publishing externally.
 
 Release environment assumptions:

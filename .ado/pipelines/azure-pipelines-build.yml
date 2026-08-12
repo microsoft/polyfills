@@ -61,6 +61,7 @@ stages:
       steps:
       - template: templates/pack-release-steps.yml
         parameters:
+          selectedReleaseTags: $(releaseTags)
           validationMode: ${{ parameters.validationMode }}
 
 - ${{ if eq(parameters.validationMode, 'true') }}:
@@ -83,4 +84,5 @@ stages:
       steps:
       - template: templates/pack-release-steps.yml
         parameters:
+          selectedReleaseTags: $(releaseTags)
           validationMode: ${{ parameters.validationMode }}
