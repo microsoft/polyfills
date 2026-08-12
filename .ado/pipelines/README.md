@@ -3,7 +3,7 @@
 Release publishing uses two pipeline definitions:
 
 - **`Polyfills - CD Build`** uses `azure-pipelines-build.yml`. A `main` build checks every non-private npm workspace for its `${name}_v${version}` tag. If any tag is missing, the normal-mode `BuildArtifacts` stage installs dependencies, builds the workspaces, packs the corresponding npm tarballs, and publishes both the packages and release metadata. If no release is needed, `PrepareRelease` succeeds and the downstream stage is skipped.
-- **`Polyfills - CD`** uses `azure-pipelines-cd.yml`. It has no git trigger; completion of the build pipeline's `BuildArtifacts` stage starts it. The official 1ES pipeline validates the metadata and package hashes against the triggering commit, creates the package-version tags and GitHub Releases, publishes the tarballs to npm through `Polyfills.Release.PipelineTemplate.yml`, and finally pushes `deployed/<release-tag>` marker tags.
+- **`Polyfills - CD`** uses `azure-pipelines-cd.yml`. It has no git trigger; completion of the build pipeline's `BuildArtifacts` stage starts it. The official 1ES pipeline validates the metadata and package hashes against the triggering commit, creates the package-version tags, publishes the tarballs to npm through `Polyfills.Release.PipelineTemplate.yml`, pushes `deployed/<release-tag>` marker tags, and then creates missing GitHub Releases.
 
 Release metadata follows the multi-package manifest shape `{ releaseCommit, packages }`, extended with its schema and validation mode. CD requires the manifest's `releaseCommit` to be a full commit hash and to exactly match `$(resources.pipeline.releaseBuild.sourceCommit)`. Run-number `<count>` is the number of package entries, not the number of tarballs or other assets: `<count>-build-<Build.BuildId>` for the build pipeline and `<count>-cd-<Build.BuildId>` for CD. The build pipeline sets its number after package selection, including zero-package and validation runs. CD sets its number from the manifest only after commit, validation-mode, package, and hash validation succeeds.
 
@@ -19,7 +19,9 @@ Artifact discovery is automatic, but Azure Pipelines cannot generate `GitHubRele
 
 1. Add the package to the root `package.json` workspaces.
 2. In the CD pipeline's `PublishRelease` stage, consume the package's `<prefix>Included`, `<prefix>ReleaseTag`, and `<prefix>ReleaseAsset` outputs from `ValidateArtifacts`.
-3. Add a conditional `GitHubRelease@1` task using the `fast` GitHub service connection.
+3. Add a `GitHubRelease@1` task using the `fast` GitHub service connection, conditioned on package inclusion and `releaseCheck.<prefix>GitHubReleaseExists == false`.
+
+`PublishRelease` is deliberately serialized: `PublishNpm`, then `MarkDeployed`, then `PublishGitHub`. GitHub Release existence is queried from the validated manifest immediately before creation. A retry therefore skips GitHub Releases already created by an earlier partial attempt while still failing closed if GitHub cannot be queried.
 
 The pipeline definitions require:
 

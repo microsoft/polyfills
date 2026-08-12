@@ -144,7 +144,7 @@ extends:
               RELEASE_TAGS: $(releaseTags)
 
       - stage: PublishRelease
-        displayName: Publish GitHub and npm releases
+        displayName: Publish npm and GitHub releases
         dependsOn:
         - ValidateArtifacts
         - TagRelease
@@ -155,37 +155,6 @@ extends:
           focusgroupPolyfillReleaseTag: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillReleaseTag'] ]
           focusgroupPolyfillReleaseAsset: $[ stageDependencies.ValidateArtifacts.Validate.outputs['release.focusgroupPolyfillReleaseAsset'] ]
         jobs:
-        - job: PublishGitHub
-          displayName: Publish GitHub Releases
-          steps:
-          - checkout: self
-            clean: true
-
-          - download: releaseBuild
-            artifact: npm_packages
-            displayName: Download npm packages
-
-          - task: GitHubRelease@1
-            displayName: "Create @microsoft/focusgroup-polyfill GitHub Release"
-            condition: and(succeeded(), eq(variables['focusgroupPolyfillIncluded'], 'true'))
-            inputs:
-              gitHubConnection: fast
-              repositoryName: microsoft/polyfills
-              action: create
-              target: $(releaseCommit)
-              tagSource: userSpecifiedTag
-              tag: $(focusgroupPolyfillReleaseTag)
-              title: $(focusgroupPolyfillReleaseTag)
-              releaseNotesSource: inline
-              releaseNotesInline: 'Release for @microsoft/focusgroup-polyfill. The attached npm tarball is published by this Azure pipeline.'
-              addChangeLog: false
-              assets: |
-                $(Pipeline.Workspace)/releaseBuild/npm_packages/$(focusgroupPolyfillReleaseAsset)
-              assetUploadMode: replace
-              isDraft: false
-              isPreRelease: false
-              makeLatest: legacy
-
         - job: PublishNpm
           displayName: Publish npm packages
           steps:
@@ -208,6 +177,17 @@ extends:
               CleanTargetFolder: true
 
           - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines
+
+        - job: MarkDeployed
+          displayName: Mark npm publication complete
+          dependsOn: PublishNpm
+          condition: succeeded()
+          steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0
+            fetchTags: true
+            persistCredentials: true
 
           - task: Bash@3
             displayName: Mark releases as deployed
@@ -258,3 +238,54 @@ extends:
             env:
               RELEASE_COMMIT: $(releaseCommit)
               RELEASE_TAGS: $(releaseTags)
+
+        - job: PublishGitHub
+          displayName: Publish GitHub Releases
+          dependsOn: MarkDeployed
+          condition: succeeded()
+          steps:
+          - checkout: self
+            clean: true
+
+          - download: releaseBuild
+            artifact: npm_packages
+            displayName: Download npm packages
+
+          - download: releaseBuild
+            artifact: release-metadata
+            displayName: Download release metadata
+
+          - task: UseNode@1
+            displayName: Install Node.js
+            inputs:
+              version: 24.x
+
+          - task: Bash@3
+            name: releaseCheck
+            displayName: Check existing GitHub Releases
+            inputs:
+              targetType: inline
+              script: node build/scripts/check-github-releases.mjs
+            env:
+              RELEASE_MANIFEST_PATH: $(Pipeline.Workspace)/releaseBuild/release-metadata/release-manifest.json
+
+          - task: GitHubRelease@1
+            displayName: "Create @microsoft/focusgroup-polyfill GitHub Release"
+            condition: and(succeeded(), eq(variables['focusgroupPolyfillIncluded'], 'true'), eq(variables['releaseCheck.focusgroupPolyfillGitHubReleaseExists'], 'false'))
+            inputs:
+              gitHubConnection: fast
+              repositoryName: microsoft/polyfills
+              action: create
+              target: $(releaseCommit)
+              tagSource: userSpecifiedTag
+              tag: $(focusgroupPolyfillReleaseTag)
+              title: $(focusgroupPolyfillReleaseTag)
+              releaseNotesSource: inline
+              releaseNotesInline: 'Release for @microsoft/focusgroup-polyfill. The attached npm tarball is published by this Azure pipeline.'
+              addChangeLog: false
+              assets: |
+                $(Pipeline.Workspace)/releaseBuild/npm_packages/$(focusgroupPolyfillReleaseAsset)
+              assetUploadMode: replace
+              isDraft: false
+              isPreRelease: false
+              makeLatest: legacy

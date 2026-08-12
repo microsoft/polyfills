@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { formatAzureBuildNumber } from "./azure-build-number.mjs";
+import {
+  checkGitHubReleases,
+  githubReleaseExists,
+  selectedReleaseChecks,
+} from "./check-github-releases.mjs";
 import {
   createOriginTagChecker,
   formatSelectedReleaseTags,
@@ -356,4 +362,144 @@ test("validateReleaseManifest rejects a tampered artifact", () => {
       }),
     /failed SHA-256 validation/,
   );
+});
+
+test("GitHub release checks map selected manifest packages to workspace prefixes", () => {
+  assert.deepEqual(
+    selectedReleaseChecks(
+      metadata({
+        packages: [
+          metadata().packages[0],
+          {
+            asset: "second.tgz",
+            name: secondWorkspace.name,
+            sha256: hash,
+            tag: secondWorkspace.tag,
+            version: secondWorkspace.version,
+          },
+        ],
+      }),
+      [workspace, secondWorkspace],
+    ),
+    [
+      {
+        name: workspace.name,
+        outputName: "focusgroupPolyfillGitHubReleaseExists",
+        tag: workspace.tag,
+      },
+      {
+        name: secondWorkspace.name,
+        outputName: "secondPolyfillGitHubReleaseExists",
+        tag: secondWorkspace.tag,
+      },
+    ],
+  );
+});
+
+test("GitHub release checks emit existing and missing outputs for selected packages", async () => {
+  const outputs = [];
+  const queried = [];
+  const results = await checkGitHubReleases(
+    metadata({
+      packages: [
+        metadata().packages[0],
+        {
+          asset: "second.tgz",
+          name: secondWorkspace.name,
+          sha256: hash,
+          tag: secondWorkspace.tag,
+          version: secondWorkspace.version,
+        },
+      ],
+    }),
+    {
+      workspaces: [workspace, secondWorkspace],
+      releaseExists: async tag => {
+        queried.push(tag);
+        return tag === workspace.tag;
+      },
+      emitOutput: (name, value) => outputs.push([name, value]),
+      log() {},
+    },
+  );
+
+  assert.deepEqual(queried, [workspace.tag, secondWorkspace.tag]);
+  assert.deepEqual(outputs, [
+    ["focusgroupPolyfillGitHubReleaseExists", "true"],
+    ["secondPolyfillGitHubReleaseExists", "false"],
+  ]);
+  assert.deepEqual(
+    results.map(({ tag, exists }) => ({ tag, exists })),
+    [
+      { tag: workspace.tag, exists: true },
+      { tag: secondWorkspace.tag, exists: false },
+    ],
+  );
+});
+
+test("GitHub release API distinguishes existing and missing releases", async () => {
+  assert.equal(
+    await githubReleaseExists(workspace.tag, {
+      fetchImpl: async () => ({
+        json: async () => ({ tag_name: workspace.tag }),
+        status: 200,
+      }),
+    }),
+    true,
+  );
+  assert.equal(
+    await githubReleaseExists(workspace.tag, {
+      fetchImpl: async () => ({ status: 404 }),
+    }),
+    false,
+  );
+});
+
+test("GitHub release API failures fail explicitly", async () => {
+  await assert.rejects(
+    githubReleaseExists(workspace.tag, {
+      fetchImpl: async () => ({
+        status: 403,
+        statusText: "Forbidden",
+        text: async () => "rate limited",
+      }),
+    }),
+    /Failed to query GitHub Release.*HTTP 403 Forbidden: rate limited/,
+  );
+  await assert.rejects(
+    githubReleaseExists(workspace.tag, {
+      fetchImpl: async () => {
+        throw new Error("network down");
+      },
+    }),
+    /Failed to query GitHub Release.*network down/,
+  );
+});
+
+test("PublishRelease orders npm, deployment markers, and GitHub publication", () => {
+  const pipeline = readFileSync(
+    new URL("../../.ado/pipelines/azure-pipelines-cd.yml", import.meta.url),
+    "utf8",
+  );
+  const publishNpm = pipeline.indexOf("- job: PublishNpm");
+  const markDeployed = pipeline.indexOf("- job: MarkDeployed");
+  const publishGitHub = pipeline.indexOf("- job: PublishGitHub");
+
+  assert.ok(publishNpm > 0);
+  assert.ok(publishNpm < markDeployed);
+  assert.ok(markDeployed < publishGitHub);
+  assert.match(
+    pipeline,
+    /- job: MarkDeployed[\s\S]*?dependsOn: PublishNpm\n\s+condition: succeeded\(\)/,
+  );
+  assert.match(
+    pipeline,
+    /- job: PublishGitHub[\s\S]*?dependsOn: MarkDeployed\n\s+condition: succeeded\(\)/,
+  );
+  assert.match(
+    pipeline,
+    /condition: and\(succeeded\(\), eq\(variables\['focusgroupPolyfillIncluded'\], 'true'\), eq\(variables\['releaseCheck\.focusgroupPolyfillGitHubReleaseExists'\], 'false'\)\)/,
+  );
+  assert.match(pipeline, /artifact: npm_packages/);
+  assert.match(pipeline, /artifact: release-metadata/);
 });
