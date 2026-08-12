@@ -26,8 +26,9 @@ stages:
     steps:
     - checkout: self
       clean: true
-      fetchDepth: 0
-      fetchTags: true
+      fetchDepth: 1
+      fetchTags: false
+      persistCredentials: true
 
     - task: UseNode@1
       displayName: Install Node.js
@@ -52,7 +53,7 @@ stages:
       )
     variables:
       npm_config_cache: $(Pipeline.Workspace)/.npm
-      releaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.releaseTags'] ]
+      selectedReleaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.selectedReleaseTags'] ]
     jobs:
     - job: BuildAndPack
       displayName: Build and pack npm packages
@@ -61,7 +62,7 @@ stages:
       steps:
       - template: templates/pack-release-steps.yml
         parameters:
-          selectedReleaseTags: $(releaseTags)
+          selectedReleaseTags: $(selectedReleaseTags)
           validationMode: ${{ parameters.validationMode }}
 
 - ${{ if eq(parameters.validationMode, 'true') }}:
@@ -75,7 +76,7 @@ stages:
       )
     variables:
       npm_config_cache: $(Pipeline.Workspace)/.npm
-      releaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.releaseTags'] ]
+      selectedReleaseTags: $[ stageDependencies.PrepareRelease.SelectRelease.outputs['release.selectedReleaseTags'] ]
     jobs:
     - job: BuildAndPack
       displayName: Build and pack npm packages for validation
@@ -84,5 +85,5 @@ stages:
       steps:
       - template: templates/pack-release-steps.yml
         parameters:
-          selectedReleaseTags: $(releaseTags)
+          selectedReleaseTags: $(selectedReleaseTags)
           validationMode: ${{ parameters.validationMode }}

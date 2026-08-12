@@ -9,7 +9,9 @@ Release metadata follows the multi-package manifest shape `{ releaseCommit, pack
 
 The build pipeline's `validationMode` can rebuild already-tagged package versions. Compile-time selection creates `BuildArtifacts` in normal mode or `ValidateArtifacts` in validation mode, never both. Only `BuildArtifacts` triggers CD automatically, so a validation build cannot start publication.
 
-`PrepareRelease` is the authoritative source of the package tag list for a run. It passes the selected `${name}_v${version}` tags to the packing stage as a comma-separated value, and packing validates and preserves that exact list and order rather than recalculating or shrinking it. Immediately before packing, every selected tag is rechecked on `origin`. If any selected tag appeared after preparation, a production run fails before packing any package and refuses to alter the batch; retry the build so `PrepareRelease` can create a new authoritative selection. Validation mode intentionally permits already-existing tags so maintainers can rebuild artifacts.
+`PrepareRelease` is the authoritative source of the package tag list for a run. Its build handoff is named `selectedReleaseTags`; `releaseTags` is reserved for the validated CD manifest output and downstream tag operations. Packing validates and preserves the exact comma-separated selection and order rather than recalculating or shrinking it. Immediately before packing, every selected tag is rechecked on `origin`. If any selected tag appeared after preparation, a production run fails before packing any package and refuses to alter the batch; retry the build so `PrepareRelease` can create a new authoritative selection. Validation mode intentionally permits already-existing tags so maintainers can rebuild artifacts.
+
+Local package staging uses `publish_artifacts_npm`, and local manifest staging uses `publish_artifacts_meta`. The published Azure artifact names remain `npm_packages` and `release-metadata`.
 
 To validate end to end, first run the build pipeline manually with `validationMode: true`. Then run the CD pipeline manually with `validationMode: true` and select that build as the `releaseBuild` resource. CD retains its own `ValidateArtifacts` stage and checks the metadata commit against the selected build's source commit, but does not create tags, releases, or npm publications.
 
@@ -22,6 +24,8 @@ Artifact discovery is automatic, but Azure Pipelines cannot generate `GitHubRele
 3. Add a `GitHubRelease@1` task using the `fast` GitHub service connection, conditioned on package inclusion and `releaseCheck.<prefix>GitHubReleaseExists == false`.
 
 `PublishRelease` is deliberately serialized: `PublishNpm`, then `MarkDeployed`, then `PublishGitHub`. GitHub Release existence is queried from the validated manifest immediately before creation. A retry therefore skips GitHub Releases already created by an earlier partial attempt while still failing closed if GitHub cannot be queried.
+
+Pipeline checkouts are clean and shallow with automatic tag fetching disabled. Credentials persist only in selection, packing, release-tag creation, and deployment-marker jobs that query or push remote refs. Tag management uses exact `ls-remote` queries, targeted `fetch --no-tags` operations, isolated local refs, and peeled-commit verification so retries and same-commit push races are idempotent without downloading full tag history.
 
 The pipeline definitions require:
 

@@ -148,7 +148,7 @@ test("formats and resolves the exact build-stage selection and order", () => {
   );
   assert.throws(
     () => formatSelectedReleaseTags([{ tag: `${workspace.tag},bad` }]),
-    /Release tags cannot contain commas/,
+    /Invalid release tags/,
   );
   assert.throws(
     () =>
@@ -208,16 +208,11 @@ test("selectRequestedReleases rejects malformed and unknown tags", () => {
 
 test("recheckSelectedReleaseTags preserves an unchanged selection", () => {
   const checkedTags = [];
-  let fetched = false;
   const releases = [secondWorkspace, workspace];
 
   assert.equal(
     recheckSelectedReleaseTags(releases, false, {
-      fetch() {
-        fetched = true;
-      },
       exists(tag) {
-        assert.equal(fetched, true);
         checkedTags.push(tag);
         return false;
       },
@@ -231,7 +226,6 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
   assert.throws(
     () =>
       recheckSelectedReleaseTags([secondWorkspace, workspace], false, {
-        fetch() {},
         exists(tag) {
           return tag === workspace.tag;
         },
@@ -246,7 +240,6 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
   assert.throws(
     () =>
       recheckSelectedReleaseTags([secondWorkspace, workspace], false, {
-        fetch() {},
         exists() {
           return true;
         },
@@ -260,7 +253,6 @@ test("recheckSelectedReleaseTags reports every concurrent release tag", () => {
 test("recheckSelectedReleaseTags allows existing tags in validation mode", () => {
   assert.doesNotThrow(() =>
     recheckSelectedReleaseTags([workspace], true, {
-      fetch() {},
       exists() {
         return true;
       },
@@ -272,19 +264,11 @@ test("origin tag checker uses non-interactive exact git operations", () => {
   const commands = [];
   const checker = createOriginTagChecker(args => {
     commands.push(args);
-    return { status: args[0] === "ls-remote" ? 2 : 0, stderr: "", stdout: "" };
+    return { status: 2, stderr: "", stdout: "" };
   });
 
-  checker.fetch();
   assert.equal(checker.exists(workspace.tag), false);
   assert.deepEqual(commands, [
-    [
-      "fetch",
-      "--force",
-      "--tags",
-      "--no-recurse-submodules",
-      "origin",
-    ],
     [
       "ls-remote",
       "--exit-code",
@@ -437,6 +421,31 @@ test("GitHub release checks emit existing and missing outputs for selected packa
   );
 });
 
+test("GitHub release checks reject stale manifest tags before API queries", async () => {
+  let queried = false;
+  await assert.rejects(
+    checkGitHubReleases(
+      metadata({
+        packages: [
+          {
+            ...metadata().packages[0],
+            tag: "@microsoft/focusgroup-polyfill_v1.5.0",
+          },
+        ],
+      }),
+      {
+        workspaces: [workspace],
+        releaseExists: async () => {
+          queried = true;
+          return false;
+        },
+      },
+    ),
+    /does not match current workspace tag/,
+  );
+  assert.equal(queried, false);
+});
+
 test("GitHub release API distinguishes existing and missing releases", async () => {
   assert.equal(
     await githubReleaseExists(workspace.tag, {
@@ -502,4 +511,92 @@ test("PublishRelease orders npm, deployment markers, and GitHub publication", ()
   );
   assert.match(pipeline, /artifact: npm_packages/);
   assert.match(pipeline, /artifact: release-metadata/);
+});
+
+test("pipelines use selected build tags, renamed local directories, and narrow checkouts", () => {
+  const buildPipeline = readFileSync(
+    new URL("../../.ado/pipelines/azure-pipelines-build.yml", import.meta.url),
+    "utf8",
+  );
+  const packTemplate = readFileSync(
+    new URL(
+      "../../.ado/pipelines/templates/pack-release-steps.yml",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const cdPipeline = readFileSync(
+    new URL("../../.ado/pipelines/azure-pipelines-cd.yml", import.meta.url),
+    "utf8",
+  );
+  const tagManager = readFileSync(
+    new URL("./manage-release-tags.mjs", import.meta.url),
+    "utf8",
+  );
+  const preparationScript = readFileSync(
+    new URL("./prepare-release-artifacts.mjs", import.meta.url),
+    "utf8",
+  );
+  const beachballConfig = readFileSync(
+    new URL("../../beachball.config.js", import.meta.url),
+    "utf8",
+  );
+  const gitignore = readFileSync(
+    new URL("../../.gitignore", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(buildPipeline, /release\.selectedReleaseTags/);
+  assert.doesNotMatch(buildPipeline, /release\.releaseTags/);
+  assert.match(preparationScript, /"selectedReleaseTags"/);
+  assert.doesNotMatch(preparationScript, /"releaseTags"/);
+  assert.match(packTemplate, /publish_artifacts_npm/);
+  assert.match(packTemplate, /publish_artifacts_meta/);
+  assert.match(cdPipeline, /publish_artifacts_npm/);
+  assert.match(beachballConfig, /publish_artifacts_npm/);
+  assert.match(gitignore, /publish_artifacts_npm/);
+  assert.match(gitignore, /publish_artifacts_meta/);
+  assert.doesNotMatch(
+    `${packTemplate}\n${cdPipeline}\n${preparationScript}\n${beachballConfig}\n${gitignore}`,
+    /publish_artifacts\/|release_metadata/,
+  );
+  assert.doesNotMatch(
+    `${buildPipeline}\n${packTemplate}\n${cdPipeline}`,
+    /fetchDepth:\s*0|fetchTags:\s*true/,
+  );
+  assert.equal(
+    (
+      `${buildPipeline}\n${packTemplate}\n${cdPipeline}`.match(
+        /checkout: self/g,
+      ) ?? []
+    ).length,
+    (
+      `${buildPipeline}\n${packTemplate}\n${cdPipeline}`.match(
+        /fetchDepth: 1/g,
+      ) ?? []
+    ).length,
+  );
+  assert.doesNotMatch(
+    `${tagManager}\n${preparationScript}`,
+    /"fetch",[\s\S]{0,100}"--tags"/,
+  );
+  assert.match(tagManager, /"ls-remote"/);
+  assert.match(tagManager, /"--no-tags"/);
+
+  assert.equal(
+    (
+      `${buildPipeline}\n${packTemplate}\n${cdPipeline}`.match(
+        /persistCredentials: true/g,
+      ) ?? []
+    ).length,
+    4,
+  );
+  assert.match(
+    cdPipeline,
+    /- job: PublishNpm[\s\S]*?- checkout: self\n\s+clean: true\n\s+fetchDepth: 1\n\s+fetchTags: false\n\n/,
+  );
+  assert.match(
+    cdPipeline,
+    /- job: PublishGitHub[\s\S]*?- checkout: self\n\s+clean: true\n\s+fetchDepth: 1\n\s+fetchTags: false\n\n/,
+  );
 });

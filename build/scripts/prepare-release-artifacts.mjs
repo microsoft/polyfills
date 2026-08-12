@@ -12,11 +12,16 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { updateAzureBuildNumber } from "./azure-build-number.mjs";
+import {
+  formatReleaseTagCsv,
+  parseReleaseTagCsv,
+  releaseTagPattern,
+} from "./release-tag-csv.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const artifactDir = join(repoRoot, "publish_artifacts");
-const metadataDir = join(repoRoot, "release_metadata");
+const artifactDir = join(repoRoot, "publish_artifacts_npm");
+const metadataDir = join(repoRoot, "publish_artifacts_meta");
 
 function command(name) {
   return process.platform === "win32" && name === "npm" ? "npm.cmd" : name;
@@ -30,45 +35,15 @@ function run(file, args, options = {}) {
   });
 }
 
-function listGitTags() {
-  return new Set(
-    run("git", ["tag", "--list"])
-      .split("\n")
-      .map(tag => tag.trim())
-      .filter(Boolean),
-  );
-}
-
 function parseSelectedReleaseTags(value) {
-  if (typeof value !== "string" || value === "") {
-    throw new Error(
-      "SELECTED_RELEASE_TAGS is required when packing release artifacts and must be a non-empty string.",
-    );
-  }
-
-  const tags = value.split(",");
-  const invalidIndexes = [];
-  for (const [index, tag] of tags.entries()) {
-    if (tag.length === 0 || tag !== tag.trim()) {
-      invalidIndexes.push(index);
-    }
-  }
-  if (invalidIndexes.length > 0) {
-    throw new Error(
-      "Invalid SELECTED_RELEASE_TAGS: empty tags or surrounding whitespace " +
-        `at indexes: ${invalidIndexes.join(", ")}.`,
-    );
-  }
-  return tags;
+  return parseReleaseTagCsv(value, "SELECTED_RELEASE_TAGS");
 }
 
 function formatSelectedReleaseTags(releases) {
-  const tags = releases.map(release => release.tag);
-  const commaTag = tags.find(tag => tag.includes(","));
-  if (commaTag !== undefined) {
-    throw new Error(`Release tags cannot contain commas: ${commaTag}.`);
-  }
-  return tags.join(",");
+  return formatReleaseTagCsv(
+    releases.map(release => release.tag),
+    "release tags",
+  );
 }
 
 function selectReleases(workspaces, existingTags, includeExisting) {
@@ -79,10 +54,7 @@ function selectReleases(workspaces, existingTags, includeExisting) {
 
 function selectRequestedReleases(workspaces, requestedTags) {
   const malformedTags = requestedTags.filter(
-    tag =>
-      !/^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*_v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
-        tag,
-      ),
+    tag => !releaseTagPattern.test(tag),
   );
   if (malformedTags.length > 0) {
     throw new Error(
@@ -140,18 +112,6 @@ function gitFailure(action, result) {
 
 function createOriginTagChecker(execute = gitResult) {
   return {
-    fetch() {
-      const result = execute([
-        "fetch",
-        "--force",
-        "--tags",
-        "--no-recurse-submodules",
-        "origin",
-      ]);
-      if (result.status !== 0) {
-        throw gitFailure("fetch release tags from origin", result);
-      }
-    },
     exists(tag) {
       const result = execute([
         "ls-remote",
@@ -173,7 +133,6 @@ function recheckSelectedReleaseTags(
   validationMode,
   originTags = createOriginTagChecker(),
 ) {
-  originTags.fetch();
   const conflictingTags = releases
     .filter(release => originTags.exists(release.tag))
     .map(release => release.tag);
@@ -219,8 +178,17 @@ function main() {
   const checkOnly = process.argv.includes("--check-only");
   const validationMode = process.env.VALIDATION_MODE === "true";
   const workspaces = listPublishableWorkspaces(repoRoot);
+  const originTags = createOriginTagChecker();
   const releases = checkOnly
-    ? selectReleases(workspaces, listGitTags(), validationMode)
+    ? selectReleases(
+        workspaces,
+        new Set(
+          workspaces
+            .filter(workspace => originTags.exists(workspace.tag))
+            .map(workspace => workspace.tag),
+        ),
+        validationMode,
+      )
     : selectRequestedReleases(
         workspaces,
         parseSelectedReleaseTags(process.env.SELECTED_RELEASE_TAGS),
@@ -238,7 +206,7 @@ function main() {
   setAzureOutput("shouldBuild", releases.length > 0 ? "true" : "false");
   setAzureOutput("packageCount", String(releases.length));
   setAzureOutput(
-    "releaseTags",
+    "selectedReleaseTags",
     formatSelectedReleaseTags(releases),
   );
   updateBuildNumberAfterSelection(releases.length, checkOnly);
@@ -247,7 +215,7 @@ function main() {
     return;
   }
 
-  recheckSelectedReleaseTags(releases, validationMode);
+  recheckSelectedReleaseTags(releases, validationMode, originTags);
 
   const releaseCommit = (
     process.env.BUILD_SOURCEVERSION || run("git", ["rev-parse", "HEAD"])

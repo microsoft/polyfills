@@ -57,6 +57,8 @@ extends:
         steps:
         - checkout: self
           clean: true
+          fetchDepth: 1
+          fetchTags: false
 
         - task: UseNode@1
           displayName: Install Node.js
@@ -97,48 +99,20 @@ extends:
           steps:
           - checkout: self
             clean: true
-            fetchDepth: 0
+            fetchDepth: 1
+            fetchTags: false
             persistCredentials: true
+
+          - task: UseNode@1
+            displayName: Install Node.js
+            inputs:
+              version: 24.x
 
           - task: Bash@3
             displayName: Create annotated release tags
             inputs:
               targetType: inline
-              script: |
-                set -euo pipefail
-
-                git fetch --no-tags origin "$RELEASE_COMMIT"
-                git config user.name "Azure Pipelines"
-                git config user.email "azure-pipelines@microsoft.com"
-
-                IFS=',' read -ra tags <<< "$RELEASE_TAGS"
-                for release_tag in "${tags[@]}"; do
-                  [[ -z "$release_tag" ]] && continue
-                  remote_ref="refs/azure-release-tags/${release_tag}"
-
-                  if git fetch --force origin "refs/tags/${release_tag}:${remote_ref}" 2>/dev/null; then
-                    existing_commit=$(git rev-parse "${remote_ref}^{}")
-                    if [[ "$existing_commit" != "$RELEASE_COMMIT" ]]; then
-                      echo "##vso[task.logissue type=error]${release_tag} points to ${existing_commit}, not ${RELEASE_COMMIT}."
-                      exit 1
-                    fi
-                    echo "${release_tag} already points to ${RELEASE_COMMIT}."
-                    continue
-                  fi
-
-                  git tag -a "$release_tag" "$RELEASE_COMMIT" -m "Release ${release_tag}"
-                  if git push origin "refs/tags/${release_tag}"; then
-                    continue
-                  fi
-
-                  git fetch --force origin "refs/tags/${release_tag}:${remote_ref}"
-                  raced_commit=$(git rev-parse "${remote_ref}^{}")
-                  if [[ "$raced_commit" != "$RELEASE_COMMIT" ]]; then
-                    echo "##vso[task.logissue type=error]Concurrent tag ${release_tag} points to ${raced_commit}, not ${RELEASE_COMMIT}."
-                    exit 1
-                  fi
-                  echo "Concurrent release run created ${release_tag} at the expected commit."
-                done
+              script: node build/scripts/manage-release-tags.mjs create
             env:
               RELEASE_COMMIT: $(releaseCommit)
               RELEASE_TAGS: $(releaseTags)
@@ -160,9 +134,8 @@ extends:
           steps:
           - checkout: self
             clean: true
-            fetchDepth: 0
-            fetchTags: true
-            persistCredentials: true
+            fetchDepth: 1
+            fetchTags: false
 
           - download: releaseBuild
             artifact: npm_packages
@@ -173,7 +146,7 @@ extends:
             inputs:
               SourceFolder: $(Pipeline.Workspace)/releaseBuild/npm_packages
               Contents: '*.tgz'
-              TargetFolder: $(Build.SourcesDirectory)/publish_artifacts
+              TargetFolder: $(Build.SourcesDirectory)/publish_artifacts_npm
               CleanTargetFolder: true
 
           - template: Polyfills.Release.PipelineTemplate.yml@polyfillsPipelines
@@ -185,56 +158,20 @@ extends:
           steps:
           - checkout: self
             clean: true
-            fetchDepth: 0
-            fetchTags: true
+            fetchDepth: 1
+            fetchTags: false
             persistCredentials: true
+
+          - task: UseNode@1
+            displayName: Install Node.js
+            inputs:
+              version: 24.x
 
           - task: Bash@3
             displayName: Mark releases as deployed
             inputs:
               targetType: inline
-              script: |
-                set -euo pipefail
-
-                git config user.name "Microsoft Polyfills Builds"
-                git config user.email "polyfills@microsoft.com"
-
-                IFS=',' read -ra tags <<< "$RELEASE_TAGS"
-                for release_tag in "${tags[@]}"; do
-                  [[ -z "$release_tag" ]] && continue
-                  deployed_tag="deployed/${release_tag}"
-                  remote_ref="refs/azure-deployment-tags/${release_tag}"
-
-                  if git fetch --force origin "refs/tags/${deployed_tag}:${remote_ref}" 2>/dev/null; then
-                    existing_commit=$(git rev-parse "${remote_ref}^{}")
-                    if [[ "$existing_commit" != "$RELEASE_COMMIT" ]]; then
-                      echo "##vso[task.logissue type=error]${deployed_tag} points to ${existing_commit}, not ${RELEASE_COMMIT}."
-                      exit 1
-                    fi
-                    echo "${deployed_tag} already marks the expected release."
-                    continue
-                  fi
-
-                  git fetch --force origin "refs/tags/${release_tag}:refs/tags/${release_tag}"
-                  release_commit=$(git rev-parse "refs/tags/${release_tag}^{}")
-                  if [[ "$release_commit" != "$RELEASE_COMMIT" ]]; then
-                    echo "##vso[task.logissue type=error]${release_tag} points to ${release_commit}, not ${RELEASE_COMMIT}."
-                    exit 1
-                  fi
-
-                  git tag "$deployed_tag" "refs/tags/${release_tag}"
-                  if git push origin "refs/tags/${deployed_tag}"; then
-                    continue
-                  fi
-
-                  git fetch --force origin "refs/tags/${deployed_tag}:${remote_ref}"
-                  raced_commit=$(git rev-parse "${remote_ref}^{}")
-                  if [[ "$raced_commit" != "$RELEASE_COMMIT" ]]; then
-                    echo "##vso[task.logissue type=error]Concurrent marker ${deployed_tag} points to ${raced_commit}, not ${RELEASE_COMMIT}."
-                    exit 1
-                  fi
-                  echo "Concurrent release run created ${deployed_tag} at the expected commit."
-                done
+              script: node build/scripts/manage-release-tags.mjs mark-deployed
             env:
               RELEASE_COMMIT: $(releaseCommit)
               RELEASE_TAGS: $(releaseTags)
@@ -246,6 +183,8 @@ extends:
           steps:
           - checkout: self
             clean: true
+            fetchDepth: 1
+            fetchTags: false
 
           - download: releaseBuild
             artifact: npm_packages

@@ -27,6 +27,11 @@ function selectedReleaseChecks(manifest, workspaces) {
     if (typeof pkg.tag !== "string" || pkg.tag.length === 0) {
       throw new Error(`Release manifest for ${workspace.name} has an invalid tag.`);
     }
+    if (pkg.tag !== workspace.tag) {
+      throw new Error(
+        `Release manifest tag ${pkg.tag} does not match current workspace tag ${workspace.tag}.`,
+      );
+    }
 
     return {
       name: workspace.name,

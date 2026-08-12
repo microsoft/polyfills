@@ -7,8 +7,9 @@ parameters:
 steps:
 - checkout: self
   clean: true
-  fetchDepth: 0
-  fetchTags: true
+  fetchDepth: 1
+  fetchTags: false
+  persistCredentials: true
 
 - task: UseNode@1
   displayName: Install Node.js
@@ -38,11 +39,11 @@ steps:
 - task: PublishPipelineArtifact@1
   displayName: Upload npm packages
   inputs:
-    targetPath: $(Build.SourcesDirectory)/publish_artifacts
+    targetPath: $(Build.SourcesDirectory)/publish_artifacts_npm
     artifactName: npm_packages
 
 - task: PublishPipelineArtifact@1
   displayName: Upload release metadata
   inputs:
-    targetPath: $(Build.SourcesDirectory)/release_metadata
+    targetPath: $(Build.SourcesDirectory)/publish_artifacts_meta
     artifactName: release-metadata
