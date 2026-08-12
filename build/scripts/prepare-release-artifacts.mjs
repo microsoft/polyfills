@@ -15,6 +15,7 @@ import {
   sha256File,
   validateNpmAssetFileName,
 } from "./release-manifest.mjs";
+import { reportReleaseScriptError } from "./release-script-error.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 import {
   assertSelectedReleaseTagsNotOnOrigin,
@@ -266,7 +267,7 @@ if (invokedDirectly) {
   try {
     main();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    reportReleaseScriptError(error);
     process.exit(1);
   }
 }

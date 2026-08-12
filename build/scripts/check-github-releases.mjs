@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateReleaseManifestPackages } from "./release-manifest.mjs";
+import { reportReleaseScriptError } from "./release-script-error.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -155,9 +156,7 @@ const invokedDirectly =
 
 if (invokedDirectly) {
   main().catch(error => {
-    console.error(
-      `##vso[task.logissue type=error]${error instanceof Error ? error.message : String(error)}`,
-    );
+    reportReleaseScriptError(error);
     process.exit(1);
   });
 }

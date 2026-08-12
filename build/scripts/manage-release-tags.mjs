@@ -10,6 +10,7 @@ import {
   parseReleaseTagCsv,
   validateReleaseTag,
 } from "./release-tag-csv.mjs";
+import { reportReleaseScriptError } from "./release-script-error.mjs";
 
 const defaultIdentity = {
   email: "azure-pipelines@microsoft.com",
@@ -278,7 +279,7 @@ if (invokedDirectly) {
   try {
     main();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    reportReleaseScriptError(error);
     process.exit(1);
   }
 }

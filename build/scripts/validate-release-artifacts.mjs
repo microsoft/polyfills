@@ -13,6 +13,7 @@ import {
   sha256File,
   validateReleaseManifest,
 } from "./release-manifest.mjs";
+import { reportReleaseScriptError } from "./release-script-error.mjs";
 import { listPublishableWorkspaces } from "./release-workspaces.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -88,7 +89,7 @@ if (invokedDirectly) {
   try {
     main();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    reportReleaseScriptError(error);
     process.exit(1);
   }
 }
