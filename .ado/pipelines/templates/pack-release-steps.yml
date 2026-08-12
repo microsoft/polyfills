@@ -46,9 +46,9 @@ steps:
     SELECTED_RELEASE_TAGS: ${{ parameters.selectedReleaseTags }}
     VALIDATION_MODE: ${{ parameters.validationMode }}
 
-# Artifact uploads retain their default succeeded() condition. A partial or
-# complete packing failure writes diagnostic metadata, then fails this step so
-# neither the incomplete npm directory nor diagnostic manifest is uploaded.
+# Both artifact uploads retain their default succeeded() conditions. Any
+# packing failure writes available diagnostic metadata, then fails this step,
+# preventing both pipeline artifact uploads.
 - task: PublishPipelineArtifact@1
   displayName: Upload npm packages
   inputs:

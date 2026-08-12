@@ -81,9 +81,9 @@ extends:
           displayName: Validate release metadata and packages
           inputs:
             targetType: inline
-            # The manifest is authoritative: bind provenance to the selected
-            # build resource, verify each SHA-256 with no unexpected assets,
-            # and emit outputs only from validated package prefixes.
+            # The manifest is authoritative: bind both sourceCommit and
+            # sourceBranch to the selected build resource, verify each SHA-256
+            # with no unexpected assets, and emit only validated outputs.
             script: node build/scripts/validate-release-artifacts.mjs
           env:
             AZURE_BUILD_ID: $(Build.BuildId)
