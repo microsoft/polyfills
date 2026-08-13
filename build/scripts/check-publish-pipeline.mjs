@@ -10,7 +10,7 @@
  *
  * For every non-private workspace it verifies that the pipeline declares the
  * matching `Package` stage output variables and a conditional
- * `DownloadGitHubRelease@0` task wired to the `polyfills` service connection.
+ * `DownloadGitHubRelease@0` task wired to the `fast` service connection.
  * It also fails when two packages collapse to the same Azure output prefix,
  * which would make their pipeline variables collide.
  */
@@ -154,7 +154,7 @@ function checkPublishPipeline(pipeline, publishable) {
       block =>
         block.includes(`Download ${name} release assets`) &&
         block.includes(condition) &&
-        block.includes("connection: polyfills") &&
+        block.includes("connection: fast") &&
         block.includes("userRepository: microsoft/polyfills") &&
         block.includes("defaultVersionType: 'specificTag'") &&
         block.includes(version),

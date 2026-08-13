@@ -3,6 +3,7 @@
 
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
+import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -17,11 +18,7 @@ import {
 
 let elementPolyfillMap;
 
-if (
-  hasDocument() &&
-  typeof MutationObserver !== "undefined" &&
-  !supportsFocusGroup()
-) {
+if (hasDocument() && typeof MutationObserver !== "undefined") {
   /** @type {Map<HTMLElement, FocusGroup>} */
   elementPolyfillMap = state.m ??= new Map();
 
@@ -67,10 +64,11 @@ if (
  * @param {HTMLElement} root - The polyfill target. Defaults to `<body>`.
  */
 export function polyfill(root) {
-  if (supportsFocusGroup() || !hasDocument()) {
+  if (!hasDocument()) {
     return;
   }
 
+  const hasNativeFocusGroup = supportsFocusGroup();
   root ??= document.body;
 
   const walker = createTreeWalker(
@@ -97,6 +95,11 @@ export function polyfill(root) {
       continue;
     }
 
+    const definition = parseDefinition(element);
+    if (hasNativeFocusGroup && definition.behavior !== "grid") {
+      continue;
+    }
+
     // Reserve the slot synchronously so a re-entrant polyfill() call (e.g.
     // from the global mutation observer) cannot schedule a duplicate
     // FocusGroup before the rAF callback below installs the real instance.
@@ -109,13 +112,22 @@ export function polyfill(root) {
       if (!elementPolyfillMap.has(element)) {
         return;
       }
-      const items = new TreeWalkerItemCollection(element);
+      const definition = parseDefinition(element);
+      const createItems = (nextDefinition) =>
+        nextDefinition.behavior === "grid"
+          ? new GridItemCollection(element, nextDefinition.manual)
+          : new TreeWalkerItemCollection(element);
+      const items = createItems(definition);
       const fg = new FocusGroup(element, items, {
-        definition: parseDefinition(element),
+        definition,
+        createItems,
         decorateOwner: (el, behavior) => inferRole(el, behavior, "owner"),
-        decorateItem: (el, behavior) => inferRole(el, behavior, "child"),
+        decorateItem: (el, behavior) => {
+          if (behavior !== "grid") {
+            inferRole(el, behavior, "child");
+          }
+        },
       });
-      items.observe(fg);
       elementPolyfillMap.set(element, fg);
     });
   } while (walker.nextNode());
