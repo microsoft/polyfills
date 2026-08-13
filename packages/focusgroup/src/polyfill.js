@@ -120,7 +120,7 @@ export function polyfill(root) {
       const createItems = (nextDefinition) =>
         nextDefinition.behavior === "grid"
           ? new GridItemCollection(element, nextDefinition.manual)
-          : new TreeWalkerItemCollection(element);
+          : new TreeWalkerItemCollection(element, nextDefinition.itemcontrols);
       const items = createItems(definition);
       const fg = new FocusGroup(element, items, {
         definition,

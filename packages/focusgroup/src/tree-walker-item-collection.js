@@ -72,11 +72,17 @@ export class TreeWalkerItemCollection {
   /** @type {MutationObserver | null} */
   #observer = null;
 
+  /** @type {boolean} */
+  #itemcontrols = false;
+
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
+   * @param {boolean} [itemcontrols=false] - Whether associated opt-out
+   *   controls should be filtered instead of creating segment boundaries.
    */
-  constructor(owner) {
+  constructor(owner, itemcontrols = false) {
     this.#owner = owner;
+    this.#itemcontrols = itemcontrols;
 
     this.#walker = createTreeWalker(
       document,
@@ -178,7 +184,14 @@ export class TreeWalkerItemCollection {
       skipSubtreeOf = null;
 
       if (this.#isNestedGroupOwner(node)) {
-        if (isSegmentor(node, this.#owner)) {
+        const containingItem = getClosestElement(
+          getParentElement(node),
+          `[${DatasetName.ITEM}="${this.id}"]`,
+        );
+        if (
+          isSegmentor(node, this.#owner) &&
+          (!this.#itemcontrols || !containingItem)
+        ) {
           pendingSegmentBoundary = true;
         }
         const isOptedOut = node
@@ -318,6 +331,53 @@ export class TreeWalkerItemCollection {
    */
   isItem(element) {
     return element.getAttribute(DatasetName.ITEM) === this.id;
+  }
+
+  /**
+   * Yields sequentially focusable controls inside `focusgroup="none"`
+   * subtrees together with their nearest containing item.
+   *
+   * @returns {Generator<{element: HTMLElement, item: HTMLElement}>}
+   */
+  *itemControls() {
+    if (!this.#owner) {
+      return;
+    }
+
+    const walker = createTreeWalker(
+      document,
+      this.#owner,
+      NodeFilter.SHOW_ELEMENT,
+    );
+
+    while (walker.nextNode()) {
+      const element = /** @type {HTMLElement} */ (walker.currentNode);
+      const optOut = getClosestElement(element, '[focusgroup~="none"]');
+
+      if (!optOut || !nodeContains(this.#owner, optOut)) {
+        continue;
+      }
+
+      const nearestOwner = getClosestElement(
+        getParentElement(optOut),
+        "[focusgroup]",
+      );
+      if (
+        nearestOwner !== this.#owner ||
+        !isKeyboardFocusable(element, this.#owner, true)
+      ) {
+        continue;
+      }
+
+      let item = getParentElement(optOut);
+      while (item && item !== this.#owner && !this.isItem(item)) {
+        item = getParentElement(item);
+      }
+
+      if (item && item !== this.#owner) {
+        yield { element, item: /** @type {HTMLElement} */ (item) };
+      }
+    }
   }
 
   /**
