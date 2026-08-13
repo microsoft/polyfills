@@ -34,6 +34,7 @@ test("polyfills grid when only base focusgroup support is available", async ({
     polyfill();
   }, specifier);
 
+  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();
@@ -55,6 +56,7 @@ test("native tables support two-dimensional navigation", async ({ page }, {
     `,
   );
 
+  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a2")).toBeFocused();
@@ -88,6 +90,61 @@ test("manual grids enroll focusgrouprow rows", async ({ page }, {
   );
 });
 
+test("manual grids discover rows and cells in shadow roots @shadow", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <template shadowrootmode="open">
+          <div focusgrouprow>
+            <button data-testid="a1">A1</button><button data-testid="a2">A2</button>
+          </div>
+          <div focusgrouprow>
+            <button data-testid="b1">B1</button><button data-testid="b2">B2</button>
+          </div>
+        </template>
+      </div>
+    `,
+  );
+
+  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("b1")).toBeFocused();
+});
+
+test("manual grids discover slotted rows and cells @shadow", async ({ page }, {
+  project,
+}) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <template shadowrootmode="open"><slot></slot></template>
+        <div focusgrouprow>
+          <template shadowrootmode="open"><slot></slot></template>
+          <button data-testid="a1">A1</button><button data-testid="a2">A2</button>
+        </div>
+        <div focusgrouprow>
+          <template shadowrootmode="open"><slot></slot></template>
+          <button data-testid="b1">B1</button><button data-testid="b2">B2</button>
+        </div>
+      </div>
+    `,
+  );
+
+  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("a2")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("b2")).toBeFocused();
+});
+
 test("directional navigation skips disabled grid items", async ({ page }, {
   project,
 }) => {
@@ -105,6 +162,7 @@ test("directional navigation skips disabled grid items", async ({ page }, {
     `,
   );
 
+  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a3")).toBeFocused();

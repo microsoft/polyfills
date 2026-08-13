@@ -4,12 +4,7 @@
 import { BehaviorToken, DatasetName } from "./constants.js";
 import { flushAllObservers } from "./observer-registry.js";
 import { nodeContains } from "./shadow-utils/index.js";
-import {
-  getGridNavigationDirection,
-  getNavigationDirection,
-  isKeyConflictElement,
-  supportsFocusGroup,
-} from "./utils.js";
+import { getNavigationDirection, supportsFocusGroup } from "./utils.js";
 
 /**
  * @import {
@@ -40,18 +35,6 @@ export class FocusGroup {
    * @type {BehaviorToken | null}
    */
   #behavior = null;
-
-  /**
-   * The focus group navigation axis limitation.
-   * @type {("inline" | "block" | undefined)}
-   */
-  #axis = undefined;
-
-  /**
-   * Whether the focus group wraps. Defaults to `false`.
-   * @type {boolean}
-   */
-  #wrap = false;
 
   /**
    * Whether the focus group remembers the previously focused element.
@@ -120,9 +103,6 @@ export class FocusGroup {
   /** @type {((definition: FocusGroupDefinition) => FocusGroupItemCollection) | undefined} */
   #createItems;
 
-  /** @type {((items: FocusGroupItemCollection, focusGroup: FocusGroup) => void) | undefined} */
-  #connectItems;
-
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
    * @param {FocusGroupItemCollection} items - The items collection providing
@@ -143,7 +123,6 @@ export class FocusGroup {
     this.#decorateOwner = options.decorateOwner;
     this.#decorateItem = options.decorateItem;
     this.#createItems = options.createItems;
-    this.#connectItems = options.connectItems;
 
     this.#updateDefinition(options.definition);
     this.#decorateOwner?.(this.#owner, this.#behavior);
@@ -165,7 +144,7 @@ export class FocusGroup {
       this.#handleFocusout.bind(this),
       opts,
     );
-    this.#connectItems?.(this.#items, this);
+    this.#items.observe?.(this);
   }
 
   /**
@@ -217,7 +196,7 @@ export class FocusGroup {
         this.#updateDefinition(info.definition);
         this.#decorateOwner?.(this.#owner, this.#behavior);
         this.#decorateItems();
-        this.#connectItems?.(this.#items, this);
+        this.#items.observe?.(this);
         return;
       }
       this.#updateDefinition(info.definition);
@@ -241,8 +220,6 @@ export class FocusGroup {
   #updateDefinition(def) {
     this.#definition = def ?? {};
     this.#behavior = def?.behavior ?? null;
-    this.#wrap = def?.wrap ?? false;
-    this.#axis = def?.axis;
     this.#memory = def?.memory ?? true;
     if (!this.#memory) {
       this.#current = null;
@@ -343,20 +320,10 @@ export class FocusGroup {
 
     let target;
 
-    if (
-      this.#behavior === BehaviorToken.GRID &&
-      this.#items.gridNext &&
-      (this.#items.isItem?.(current) ?? true)
-    ) {
-      if (isKeyConflictElement(current)) {
-        return;
-      }
-      const operation = getGridNavigationDirection(evt, this.#owner);
-      if (operation) {
-        target = this.#items.gridNext(current, operation, this.#definition);
-      }
+    if (this.#items.navigate) {
+      target = this.#items.navigate(evt, current, this.#definition);
     } else {
-      switch (getNavigationDirection(evt, current, this.#axis)) {
+      switch (getNavigationDirection(evt, current, this.#definition.axis)) {
         case "start":
           target = this.#items.first();
           break;
@@ -365,13 +332,13 @@ export class FocusGroup {
           break;
         case "forward":
           target = this.#items.next(current);
-          if (!target && this.#wrap) {
+          if (!target && this.#definition.wrap) {
             target = this.#items.first();
           }
           break;
         case "backward":
           target = this.#items.previous(current);
-          if (!target && this.#wrap) {
+          if (!target && this.#definition.wrap) {
             target = this.#items.last();
           }
           break;

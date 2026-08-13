@@ -5,8 +5,10 @@ import { DatasetName } from "./constants.js";
 import { observers } from "./observer-registry.js";
 import { createTreeWalker, getClosestElement } from "./shadow-utils/index.js";
 import {
+  getGridNavigationDirection,
   hasGenericRole,
   isKeyboardFocusable,
+  isKeyConflictElement,
   parseDefinition,
 } from "./utils.js";
 
@@ -201,7 +203,16 @@ export class GridItemCollection {
       }
     }
   }
-  gridNext(current, operation, def, visited = new Set()) {
+  navigate(event, current, definition) {
+    if (isKeyConflictElement(current)) {
+      return null;
+    }
+    const operation = getGridNavigationDirection(event, this.#owner);
+    return operation
+      ? this.#next(current, operation, definition, new Set())
+      : null;
+  }
+  #next(current, operation, def, visited) {
     if (visited.has(current)) {
       return null;
     }
@@ -272,7 +283,7 @@ export class GridItemCollection {
       return null;
     }
     if (!this.#isNavigable(target.element)) {
-      return this.gridNext(target.element, operation, def, visited);
+      return this.#next(target.element, operation, def, visited);
     }
     return target.element;
   }

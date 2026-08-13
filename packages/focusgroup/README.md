@@ -18,6 +18,8 @@ The polyfill supports V2 `focusgroup="grid"` for rectangular native tables and
 `focusgroup="grid manual"` for generic markup whose direct-child rows carry
 `focusgrouprow`. Grid movement supports Arrow keys, Home/End, Ctrl+Home/Ctrl+End,
 and the `wrap`, `flow`, `rowwrap`, `rowflow`, `colwrap`, and `colflow` modifiers.
+The `itemcontrols` modifier is not supported yet; support is tracked separately
+in [PR #66](https://github.com/microsoft/polyfills/pull/66).
 
 ## Usage
 

@@ -89,11 +89,38 @@ export function parseDefinition(owner) {
     memory: !tokens.includes("nomemory"),
   };
   if (behavior === BehaviorToken.GRID) {
-    definition.manual = tokens.includes("manual");
-    definition.rowEdge = rowEdge;
-    definition.colEdge = colEdge;
+    Object.assign(definition, {
+      manual: tokens.includes("manual"),
+      rowEdge,
+      colEdge,
+    });
   }
   return definition;
+}
+
+/**
+ * @typedef {(
+ *   "grid-start" | "grid-end" | "row-start" | "row-end" |
+ *   "inline-forward" | "inline-backward" |
+ *   "block-forward" | "block-backward"
+ * )} GridNavigationDirection
+ */
+
+/**
+ * Collects keyboard modifier and writing-direction state shared by linear and
+ * grid navigation.
+ * @param {KeyboardEvent} event
+ * @param {HTMLElement} owner
+ */
+function getKeyboardNavigationContext(event, owner) {
+  const { writingMode, direction } = window.getComputedStyle(owner);
+  return {
+    commandModified: event.ctrlKey || event.metaKey,
+    optionModified: event.shiftKey || event.altKey,
+    writingMode,
+    vertical: !writingMode.startsWith("horizontal-"),
+    rtl: direction === "rtl",
+  };
 }
 
 /**
@@ -101,27 +128,21 @@ export function parseDefinition(owner) {
  * and direction.
  * @param {KeyboardEvent} event
  * @param {HTMLElement} owner
- * @returns {string|null}
+ * @returns {GridNavigationDirection|null}
  */
 export function getGridNavigationDirection(event, owner) {
-  if (
-    (event.ctrlKey || event.metaKey) &&
-    !event.shiftKey &&
-    !event.altKey &&
-    !(event.ctrlKey && event.metaKey)
-  ) {
+  const { commandModified, optionModified, writingMode, vertical, rtl } =
+    getKeyboardNavigationContext(event, owner);
+  if (commandModified && !optionModified && !(event.ctrlKey && event.metaKey)) {
     return event.key === "Home"
       ? "grid-start"
       : event.key === "End"
         ? "grid-end"
         : null;
   }
-  if (event.shiftKey || event.altKey || event.metaKey) {
+  if (optionModified || event.metaKey) {
     return null;
   }
-  const { writingMode, direction } = window.getComputedStyle(owner);
-  const vertical = !writingMode.startsWith("horizontal-");
-  const rtl = direction === "rtl";
   const inlineReversed = rtl;
   const blockReversed = vertical && writingMode.endsWith("-rl");
   const map = {
@@ -175,8 +196,8 @@ export function isKeyboardFocusable(
       // Is tabbable
       element.tabIndex > -1 ||
       (ignorePolyfillTabindex &&
-        element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
         element.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
+        element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
         Number(element.getAttribute(DatasetName.AUTHOR_TABINDEX)) > -1)) &&
     !(
       // Not disabled
@@ -222,27 +243,27 @@ export function getNavigationDirection(event, owner, axis) {
     return event.key === "Tab" ? (event.shiftKey ? BACKWARD : FORWARD) : null;
   }
 
-  if (event.shiftKey || event.ctrlKey || event.metaKey) {
+  const { commandModified, optionModified, writingMode, vertical, rtl } =
+    getKeyboardNavigationContext(event, owner);
+
+  if (optionModified || commandModified) {
     return null;
   }
 
-  const { writingMode, direction } = window.getComputedStyle(owner);
-  const isVertical = !writingMode.startsWith("horizontal-");
-  const isRtl = direction === "rtl";
-  const horizontal = isVertical ? BLOCK : INLINE;
-  const vertical = isVertical ? INLINE : BLOCK;
-  const isHorizontalReversed = isVertical
-    ? writingMode.endsWith("-rl") !== isRtl
-    : isRtl;
-  const isVerticalReversed = isVertical && isRtl;
+  const horizontal = vertical ? BLOCK : INLINE;
+  const verticalAxis = vertical ? INLINE : BLOCK;
+  const isHorizontalReversed = vertical
+    ? writingMode.endsWith("-rl") !== rtl
+    : rtl;
+  const isVerticalReversed = vertical && rtl;
 
   const map = {
     ArrowUp: {
-      axis: vertical,
+      axis: verticalAxis,
       dir: isVerticalReversed ? FORWARD : BACKWARD,
     },
     ArrowDown: {
-      axis: vertical,
+      axis: verticalAxis,
       dir: isVerticalReversed ? BACKWARD : FORWARD,
     },
     ArrowLeft: {

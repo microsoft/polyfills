@@ -31,8 +31,6 @@
  *   token, or `null` when undecorating.
  * @property {(definition: FocusGroupDefinition) => FocusGroupItemCollection} [createItems] -
  *   Optional factory used when the focusgroup behavior changes.
- * @property {(items: FocusGroupItemCollection, focusGroup: FocusGroup) => void} [connectItems] -
- *   Optional hook used to connect a newly-created collection.
  */
 
 /**
@@ -115,6 +113,10 @@
  *   before `current` in tab order, or `null` if `current` is the first. Used by
  *   `FocusGroup` for backward arrow navigation.
  *
+ * @property {(event: KeyboardEvent, current: HTMLElement, definition: FocusGroupDefinition) => (HTMLElement | null)} [navigate]
+ *   Optional behavior-specific navigation hook. When omitted, `FocusGroup`
+ *   uses `first`, `last`, `next`, and `previous` for linear navigation.
+ *
  * @property {(element: Element) => boolean} contains Lax membership check:
  *   should `element` be treated as belonging to this group for `focusin` /
  *   `keydown` purposes? Returns `true` for items, including untraversable
@@ -158,6 +160,10 @@
  * @property {() => void} [disconnect] Optional. Called defensively from
  *   `FocusGroup#disconnect()` (`items.disconnect?.()`). Use it to detach any
  *   observers or other resources owned by the collection.
+ *
+ * @property {(focusGroup: FocusGroup) => void} [observe] Optional. Called once
+ *   after construction and whenever `FocusGroup` installs a replacement
+ *   collection. Use it to connect observers that call `focusGroup.update()`.
  *
  * @property {() => void} [flush] Optional. Called by `FocusGroup` after
  *   writing polyfill-managed attributes (`tabindex`, `data-fg-*`) so the

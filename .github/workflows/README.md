@@ -13,7 +13,7 @@ Nightly publishing is split into two coordinated jobs. GitHub Releases are the s
   2. **`release`** runs only when missing releases exist. It installs Node and the workspace dependencies, builds the repo, then runs the script in default mode. For every missing release the script packs the npm tarball into `publish_artifacts/` and creates the GitHub release with the asset attached via `gh release create --target <sha>`. The `gh` CLI reads `GH_TOKEN` (set to the ambient `${{ github.token }}` with `contents: write`) and creates the git tag atomically with the release, so "tag exists" and "release exists" are the same fact — a failed release is safely retried on the next run with no orphan tag left behind.
 - **`azure-pipelines-cd.yml`** (Azure Pipelines) runs every night (`0 9 * * *` UTC) with `always: true` so it still runs on no-op nights (it is checking external GitHub state, not repo commits). It is split into two stages so the heavy publish work is skipped on no-op nights:
   1. **`Check`** — runs [`build/scripts/download-github-releases.mjs --check-only`](../../build/scripts/download-github-releases.mjs). The script walks the current publishable workspaces, keeps only workspaces whose current `${name}_v${version}` release tag exists, filters out tags that already have a `deployed/<tag>` counterpart, and emits Azure Pipelines output variables for the overall deployment decision plus each package-specific release tag.
-  2. **`Package`** — depends on `Check` and runs only when `needsDeployment == 'true'`. Conditional `DownloadGitHubRelease@0` tasks download undeployed release assets through the `polyfills` GitHub service connection, a shell step gathers the `.tgz` assets, then the release pipeline publishes them to npm. On success, the pipeline pushes a `deployed/<tag>` git marker tag for each release that was just published. The next nightly run sees those markers and skips the corresponding releases.
+  2. **`Package`** — depends on `Check` and runs only when `needsDeployment == 'true'`. Conditional `DownloadGitHubRelease@0` tasks download undeployed release assets through the `fast` GitHub service connection, a shell step gathers the `.tgz` assets, then the release pipeline publishes them to npm. On success, the pipeline pushes a `deployed/<tag>` git marker tag for each release that was just published. The next nightly run sees those markers and skips the corresponding releases.
 
 Idempotency is enforced through git tags (`${name}_v${version}` on the GitHub side, `deployed/${name}_v${version}` on the Azure side).
 
@@ -37,7 +37,7 @@ When adding a new non-private workspace that should publish through CD:
 
 1. Ensure the workspace is included in the root `package.json` `workspaces` list and has a `name` and `version`.
 2. Add package-specific output variables to the `Package` stage in `azure-pipelines-cd.yml`. The output prefix is generated from the npm package name by removing the leading `@microsoft/` and converting the remainder to camel case. For example, `@microsoft/focusgroup-polyfill` emits `focusgroupPolyfillNeedsDeployment` and `focusgroupPolyfillReleaseTag`.
-3. Add a conditional `DownloadGitHubRelease@0` task for the package using the `polyfills` GitHub service connection, `defaultVersionType: 'specificTag'`, and the package's `$(<prefix>ReleaseTag)` variable.
+3. Add a conditional `DownloadGitHubRelease@0` task for the package using the `fast` GitHub service connection, `defaultVersionType: 'specificTag'`, and the package's `$(<prefix>ReleaseTag)` variable.
 4. Confirm the artifact-gathering step still covers the package assets (`.tgz` tarballs).
 
 Example Azure additions for `@microsoft/example-polyfill`:
@@ -52,7 +52,7 @@ steps:
   displayName: "Download @microsoft/example-polyfill release assets"
   condition: and(succeeded(), eq(variables['examplePolyfillNeedsDeployment'], 'true'))
   inputs:
-    connection: polyfills
+    connection: fast
     userRepository: microsoft/polyfills
     defaultVersionType: 'specificTag'
     version: '$(examplePolyfillReleaseTag)'

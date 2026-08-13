@@ -46,7 +46,7 @@ function pipelineFor(prefix, name) {
     `  displayName: "Download ${name} release assets"`,
     `  condition: and(succeeded(), eq(variables['${prefix}NeedsDeployment'], 'true'))`,
     "  inputs:",
-    "    connection: polyfills",
+    "    connection: fast",
     "    userRepository: microsoft/polyfills",
     "    defaultVersionType: 'specificTag'",
     `    version: '$(${prefix}ReleaseTag)'`,
@@ -58,7 +58,7 @@ test("getStepBlocks isolates a single task block", () => {
   const pipeline = pipelineFor("focusgroupPolyfill", "@microsoft/focusgroup-polyfill");
   const blocks = getStepBlocks(pipeline, "- task: DownloadGitHubRelease@0");
   assert.equal(blocks.length, 1);
-  assert.match(blocks[0], /connection: polyfills/);
+  assert.match(blocks[0], /connection: fast/);
 });
 
 test("checkPublishPipeline passes when the package is fully declared", () => {

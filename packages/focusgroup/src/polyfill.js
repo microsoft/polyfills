@@ -121,8 +121,6 @@ export function polyfill(root) {
       const fg = new FocusGroup(element, items, {
         definition,
         createItems,
-        connectItems: (collection, focusGroup) =>
-          collection.observe?.(focusGroup),
         decorateOwner: (el, behavior) => inferRole(el, behavior, "owner"),
         decorateItem: (el, behavior) => {
           if (behavior !== "grid") {

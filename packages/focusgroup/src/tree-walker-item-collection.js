@@ -12,6 +12,7 @@ import {
 } from "./shadow-utils/index.js";
 import {
   generateUniqueId,
+  getNavigationDirection,
   isKeyboardFocusable,
   isSegmentor,
   parseDefinition,
@@ -300,6 +301,27 @@ export class TreeWalkerItemCollection {
     return /** @type {HTMLElement | null} */ (
       this.#walker.previousNode() ?? null
     );
+  }
+
+  /**
+   * @param {KeyboardEvent} event
+   * @param {HTMLElement} current
+   * @param {FocusGroupDefinition} definition
+   * @returns {HTMLElement | null}
+   */
+  navigate(event, current, definition) {
+    switch (getNavigationDirection(event, current, definition.axis)) {
+      case "start":
+        return this.first();
+      case "end":
+        return this.last();
+      case "forward":
+        return this.next(current) ?? (definition.wrap ? this.first() : null);
+      case "backward":
+        return this.previous(current) ?? (definition.wrap ? this.last() : null);
+      default:
+        return null;
+    }
   }
 
   /**
