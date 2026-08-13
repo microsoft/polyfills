@@ -816,6 +816,8 @@ test.describe("parseDefinition()", () => {
       wrap: false,
       axis: "inline",
       memory: true,
+      itemcontrols: false,
+      noitemcontrols: false,
     });
   });
 

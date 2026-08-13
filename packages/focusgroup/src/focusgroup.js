@@ -65,6 +65,13 @@ export class FocusGroup {
   #current = null;
 
   /**
+   * Eligible nested controls managed by the V2 `itemcontrols` modifier.
+   * The saved value is the authored `tabindex`, or `null` when absent.
+   * @type {Map<HTMLElement, {item: HTMLElement, tabindex: string|null}>}
+   */
+  #itemControls = new Map();
+
+  /**
    * Whether the owner currently has `tabindex=0` set as a Tab-entry proxy so
    * sequential focus navigation can reach a tab stop inside a shadow root.
    * @type {boolean}
@@ -113,7 +120,9 @@ export class FocusGroup {
     if (
       !owner ||
       (supportsFocusGroup() &&
-        options.definition?.behavior !== BehaviorToken.GRID)
+        ![BehaviorToken.GRID, BehaviorToken.FEED].includes(
+          options.definition?.behavior,
+        ))
     ) {
       return;
     }
@@ -186,9 +195,10 @@ export class FocusGroup {
     if (info.definition !== undefined) {
       const behaviorChanged = info.definition.behavior !== this.#behavior;
       const topologyChanged =
-        this.#behavior === "grid" &&
-        info.definition.behavior === "grid" &&
-        info.definition.manual !== this.#definition.manual;
+        (this.#behavior === "grid" &&
+          info.definition.behavior === "grid" &&
+          info.definition.manual !== this.#definition.manual) ||
+        info.definition.itemcontrols !== this.#definition.itemcontrols;
       if ((behaviorChanged || topologyChanged) && this.#createItems) {
         this.#undecorateItems();
         this.#items.disconnect?.();
@@ -266,11 +276,14 @@ export class FocusGroup {
       this.#enableFocusabilityProxy(startItem);
     }
 
+    this.#decorateItemControls();
+
     this.#items.flush?.();
   }
 
   #undecorateItems() {
     this.#disableFocusabilityProxy();
+    this.#undecorateItemControls();
 
     let undecorated = false;
 
@@ -297,6 +310,48 @@ export class FocusGroup {
     if (undecorated) {
       this.#items.flush?.();
     }
+  }
+
+  #decorateItemControls() {
+    if (!this.#definition.itemcontrols || !this.#items.itemControls) {
+      return;
+    }
+
+    for (const { element, item } of this.#items.itemControls()) {
+      this.#itemControls.set(element, {
+        item,
+        tabindex: element.getAttribute("tabindex"),
+      });
+    }
+
+    this.#applyItemControls(this.#current);
+  }
+
+  #undecorateItemControls() {
+    for (const [element, { tabindex }] of this.#itemControls) {
+      if (tabindex === null) {
+        element.removeAttribute("tabindex");
+      } else {
+        element.setAttribute("tabindex", tabindex);
+      }
+    }
+    this.#itemControls.clear();
+  }
+
+  /** @param {HTMLElement|null} activeItem */
+  #applyItemControls(activeItem) {
+    for (const [element, { item, tabindex }] of this.#itemControls) {
+      if (item === activeItem) {
+        if (tabindex === null) {
+          element.removeAttribute("tabindex");
+        } else {
+          element.setAttribute("tabindex", tabindex);
+        }
+      } else {
+        element.tabIndex = -1;
+      }
+    }
+    this.#items.flush?.();
   }
 
   /** @param {KeyboardEvent} evt */
@@ -374,7 +429,8 @@ export class FocusGroup {
       return;
     }
 
-    if (!this.#items.contains(target)) {
+    const associatedItem = this.#itemControls.get(target)?.item;
+    if (!associatedItem && !this.#items.contains(target)) {
       return;
     }
 
@@ -385,13 +441,15 @@ export class FocusGroup {
     }
 
     const prev = this.#current;
-    this.#current = target;
+    this.#current = associatedItem ?? target;
 
-    if (prev === target) {
+    if (prev === this.#current) {
       return;
     }
 
-    if (target.tabIndex < 0) {
+    this.#applyItemControls(this.#current);
+
+    if (!associatedItem && target.tabIndex < 0) {
       const transferFrom = prev ?? this.#start;
       if (transferFrom) {
         this.#advanceFocus(transferFrom, target);
@@ -410,6 +468,9 @@ export class FocusGroup {
       const tabStop = this.#memory ? this.#current || this.#start : this.#start;
       if (tabStop) {
         this.#enableFocusabilityProxy(tabStop);
+      }
+      if (!this.#memory) {
+        this.#applyItemControls(this.#start);
       }
     }
 

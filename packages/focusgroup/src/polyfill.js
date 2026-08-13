@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { BehaviorToken } from "./constants.js";
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
 import { GridItemCollection } from "./grid-item-collection.js";
@@ -96,7 +97,10 @@ export function polyfill(root) {
     }
 
     const definition = parseDefinition(element);
-    if (hasNativeFocusGroup && definition.behavior !== "grid") {
+    if (
+      hasNativeFocusGroup &&
+      ![BehaviorToken.GRID, BehaviorToken.FEED].includes(definition.behavior)
+    ) {
       continue;
     }
 
@@ -116,7 +120,7 @@ export function polyfill(root) {
       const createItems = (nextDefinition) =>
         nextDefinition.behavior === "grid"
           ? new GridItemCollection(element, nextDefinition.manual)
-          : new TreeWalkerItemCollection(element);
+          : new TreeWalkerItemCollection(element, nextDefinition.itemcontrols);
       const items = createItems(definition);
       const fg = new FocusGroup(element, items, {
         definition,
