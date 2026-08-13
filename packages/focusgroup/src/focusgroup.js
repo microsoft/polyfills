@@ -37,23 +37,14 @@ export class FocusGroup {
   #behavior = null;
 
   /**
-   * The focus group navigation axis limitation.
-   * @type {("inline" | "block" | undefined)}
-   */
-  #axis = undefined;
-
-  /**
-   * Whether the focus group wraps. Defaults to `false`.
-   * @type {boolean}
-   */
-  #wrap = false;
-
-  /**
    * Whether the focus group remembers the previously focused element.
    * Defaults to `true`.
    * @type {boolean}
    */
   #memory = true;
+
+  /** @type {FocusGroupDefinition} */
+  #definition = {};
 
   /**
    * The focus group start element (initial tab stop after decoration).
@@ -109,6 +100,9 @@ export class FocusGroup {
    */
   #decorateItem;
 
+  /** @type {((definition: FocusGroupDefinition) => FocusGroupItemCollection) | undefined} */
+  #createItems;
+
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
    * @param {FocusGroupItemCollection} items - The items collection providing
@@ -116,7 +110,11 @@ export class FocusGroup {
    * @param {FocusGroupOptions} [options]
    */
   constructor(owner, items, options = {}) {
-    if (supportsFocusGroup() || !owner) {
+    if (
+      !owner ||
+      (supportsFocusGroup() &&
+        options.definition?.behavior !== BehaviorToken.GRID)
+    ) {
       return;
     }
 
@@ -124,6 +122,7 @@ export class FocusGroup {
     this.#items = items;
     this.#decorateOwner = options.decorateOwner;
     this.#decorateItem = options.decorateItem;
+    this.#createItems = options.createItems;
 
     this.#updateDefinition(options.definition);
     this.#decorateOwner?.(this.#owner, this.#behavior);
@@ -145,6 +144,7 @@ export class FocusGroup {
       this.#handleFocusout.bind(this),
       opts,
     );
+    this.#items.observe?.(this);
   }
 
   /**
@@ -184,6 +184,21 @@ export class FocusGroup {
     }
 
     if (info.definition !== undefined) {
+      const behaviorChanged = info.definition.behavior !== this.#behavior;
+      const topologyChanged =
+        this.#behavior === "grid" &&
+        info.definition.behavior === "grid" &&
+        info.definition.manual !== this.#definition.manual;
+      if ((behaviorChanged || topologyChanged) && this.#createItems) {
+        this.#undecorateItems();
+        this.#items.disconnect?.();
+        this.#items = this.#createItems(info.definition);
+        this.#updateDefinition(info.definition);
+        this.#decorateOwner?.(this.#owner, this.#behavior);
+        this.#decorateItems();
+        this.#items.observe?.(this);
+        return;
+      }
       this.#updateDefinition(info.definition);
       this.#decorateOwner?.(this.#owner, this.#behavior);
     }
@@ -203,9 +218,8 @@ export class FocusGroup {
 
   /** @param {FocusGroupDefinition} [def] */
   #updateDefinition(def) {
+    this.#definition = def ?? {};
     this.#behavior = def?.behavior ?? null;
-    this.#wrap = def?.wrap ?? false;
-    this.#axis = def?.axis;
     this.#memory = def?.memory ?? true;
     if (!this.#memory) {
       this.#current = null;
@@ -306,25 +320,29 @@ export class FocusGroup {
 
     let target;
 
-    switch (getNavigationDirection(evt, current, this.#axis)) {
-      case "start":
-        target = this.#items.first();
-        break;
-      case "end":
-        target = this.#items.last();
-        break;
-      case "forward":
-        target = this.#items.next(current);
-        if (!target && this.#wrap) {
+    if (this.#items.navigate) {
+      target = this.#items.navigate(evt, current, this.#definition);
+    } else {
+      switch (getNavigationDirection(evt, current, this.#definition.axis)) {
+        case "start":
           target = this.#items.first();
-        }
-        break;
-      case "backward":
-        target = this.#items.previous(current);
-        if (!target && this.#wrap) {
+          break;
+        case "end":
           target = this.#items.last();
-        }
-        break;
+          break;
+        case "forward":
+          target = this.#items.next(current);
+          if (!target && this.#definition.wrap) {
+            target = this.#items.first();
+          }
+          break;
+        case "backward":
+          target = this.#items.previous(current);
+          if (!target && this.#definition.wrap) {
+            target = this.#items.last();
+          }
+          break;
+      }
     }
 
     if (target && target !== current) {

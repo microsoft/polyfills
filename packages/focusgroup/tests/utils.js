@@ -19,6 +19,9 @@ export async function setupPage(page, project, html) {
     const { polyfill } = await import(specifier);
     polyfill();
   }, specifier);
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => resolve())),
+  );
 }
 
 /**
