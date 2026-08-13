@@ -19,14 +19,20 @@ export function hasDocument() {
 }
 
 /**
- * Whether the current user agent supports focusgroup.
+ * Whether the current user agent supports a focusgroup behavior.
  *
+ * @param {BehaviorToken | null} [behavior]
  * @returns {boolean}
  */
-export function supportsFocusGroup() {
+export function supportsFocusGroup(behavior) {
+  const prototype = globalThis?.HTMLElement?.prototype;
+  const focusGroup = prototype?.focusGroup;
+  if (typeof focusGroup?.supports === "function") {
+    return behavior ? focusGroup.supports(behavior) : true;
+  }
   return (
-    "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {}) ||
-    "focusGroup" in (globalThis?.HTMLElement?.prototype ?? {})
+    behavior !== BehaviorToken.GRID &&
+    ("focusgroup" in (prototype ?? {}) || "focusGroup" in (prototype ?? {}))
   );
 }
 

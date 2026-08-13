@@ -30,7 +30,10 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
     // build swaps this for a plain `MutationObserver`.
     const observer = createMutationObserver((entries) => {
       for (const entry of entries) {
-        if (entry.type !== "childList") {
+        if (entry.type === "attributes") {
+          if (state.b) {
+            polyfill(entry.target);
+          }
           continue;
         }
 
@@ -52,7 +55,12 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
         }
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["focusgroup"],
+      childList: true,
+      subtree: true,
+    });
     state.g = observer;
   }
 }
@@ -68,7 +76,6 @@ export function polyfill(root) {
     return;
   }
 
-  const hasNativeFocusGroup = supportsFocusGroup();
   root ??= document.body;
 
   const walker = createTreeWalker(
@@ -96,7 +103,7 @@ export function polyfill(root) {
     }
 
     const definition = parseDefinition(element);
-    if (hasNativeFocusGroup && definition.behavior !== "grid") {
+    if (supportsFocusGroup(definition.behavior)) {
       continue;
     }
 

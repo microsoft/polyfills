@@ -40,6 +40,45 @@ test("polyfills grid when only base focusgroup support is available", async ({
   await expect(page.getByTestId("b1")).toBeFocused();
 });
 
+test("polyfills a grid when an observed native owner changes behavior", async ({
+  page,
+}, { project }) => {
+  test.skip(
+    project.use.channel === "chrome-canary",
+    "Canary runs with native grid support enabled",
+  );
+
+  await page.goto("/test.html");
+  await page.evaluate(() => {
+    Object.defineProperty(HTMLElement.prototype, "focusgroup", {
+      configurable: true,
+    });
+  });
+  await page.setContent(`
+    <table role="grid" focusgroup="toolbar">
+      <tbody>
+        <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
+        <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" data-testid="b2">B2</td></tr>
+      </tbody>
+    </table>
+  `);
+  const specifier = project.name.endsWith("Shadowless")
+    ? "/build/index-shadowless.mjs"
+    : "/build/index.mjs";
+  await page.evaluate(async (moduleSpecifier) => {
+    const { polyfillBodyAndObserve } = await import(moduleSpecifier);
+    polyfillBodyAndObserve();
+  }, specifier);
+
+  await page.locator("table").evaluate((node) => {
+    node.setAttribute("focusgroup", "grid");
+  });
+  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("b1")).toBeFocused();
+});
+
 test("native tables support two-dimensional navigation", async ({ page }, {
   project,
 }) => {
