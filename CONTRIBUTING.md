@@ -28,10 +28,10 @@ On `publish_<timestamp>` branches only, `npm run checkchange` can skip `beachbal
 2. Run `npm run bump`, then commit and open a pull request for the version and changelog updates.
 3. After review, a repository admin merges the publish PR. The guarded `npm run checkchange` bypass allows this bump PR without requiring another change file.
 4. The `Release packages to GitHub releases` GitHub Actions workflow runs on schedule or by `workflow_dispatch`. It detects publishable workspaces without package-version tags, builds the workspaces, packs npm tarballs, and creates GitHub Releases using the default `GITHUB_TOKEN` with `contents: write`.
-5. The Azure CD pipeline checks for GitHub Releases that do not have `deployed/<tag>` marker tags. For each undeployed release, it downloads tarball assets using the Azure GitHub service connection named `polyfills`, publishes the packages to npm, and pushes `deployed/<tag>` marker tags on success.
+5. The Azure CD pipeline checks for GitHub Releases that do not have `deployed/<tag>` marker tags. For each undeployed release, it downloads tarball assets using the Azure GitHub service connection named `fast`, publishes the packages to npm, and pushes `deployed/<tag>` marker tags on success.
 
 Release environment assumptions:
 
-- The Azure GitHub service connection is named `polyfills` and can read release assets from `microsoft/polyfills`.
+- The Azure GitHub service connection is named `fast` and can read release assets from `microsoft/polyfills`.
 - The pipeline can push `deployed/<tag>` tags after checkout.
 - Publishable workspaces are non-private packages; currently `@microsoft/focusgroup-polyfill` is publishable and `@microsoft/shadowrootadoptedstylesheets-ponyfill` is private.
