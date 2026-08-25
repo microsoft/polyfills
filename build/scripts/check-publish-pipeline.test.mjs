@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
   checkPublishPipeline,
   getStepBlocks,
+  listPublishableWorkspaces,
   npmNameToOutputPrefix,
   validateUniquePrefixes,
 } from "./check-publish-pipeline.mjs";
@@ -46,7 +48,7 @@ function pipelineFor(prefix, name) {
     `  displayName: "Download ${name} release assets"`,
     `  condition: and(succeeded(), eq(variables['${prefix}NeedsDeployment'], 'true'))`,
     "  inputs:",
-    "    connection: polyfills",
+    "    connection: fast",
     "    userRepository: microsoft/polyfills",
     "    defaultVersionType: 'specificTag'",
     `    version: '$(${prefix}ReleaseTag)'`,
@@ -58,7 +60,7 @@ test("getStepBlocks isolates a single task block", () => {
   const pipeline = pipelineFor("focusgroupPolyfill", "@microsoft/focusgroup-polyfill");
   const blocks = getStepBlocks(pipeline, "- task: DownloadGitHubRelease@0");
   assert.equal(blocks.length, 1);
-  assert.match(blocks[0], /connection: polyfills/);
+  assert.match(blocks[0], /connection: fast/);
 });
 
 test("checkPublishPipeline passes when the package is fully declared", () => {
@@ -68,6 +70,17 @@ test("checkPublishPipeline passes when the package is fully declared", () => {
     { name, outputPrefix: prefix },
   ]);
   assert.deepEqual(failures, []);
+});
+
+test("checkPublishPipeline rejects the wrong GitHub service connection", () => {
+  const name = "@microsoft/focusgroup-polyfill";
+  const prefix = "focusgroupPolyfill";
+  const pipeline = pipelineFor(prefix, name).replace(
+    "connection: fast",
+    "connection: polyfills",
+  );
+  const failures = checkPublishPipeline(pipeline, [{ name, outputPrefix: prefix }]);
+  assert.ok(failures.some(f => /Missing DownloadGitHubRelease@0 task/.test(f)));
 });
 
 test("checkPublishPipeline fails when the download task is missing", () => {
@@ -90,4 +103,15 @@ test("checkPublishPipeline fails when a stage variable is missing", () => {
   );
   const failures = checkPublishPipeline(pipeline, [{ name, outputPrefix: prefix }]);
   assert.ok(failures.some(f => /Missing Package stage variable/.test(f)));
+});
+
+test("the real Azure pipeline covers every publishable workspace", () => {
+  const pipeline = readFileSync(
+    new URL("../../azure-pipelines-cd.yml", import.meta.url),
+    "utf8",
+  );
+  assert.deepEqual(
+    checkPublishPipeline(pipeline, listPublishableWorkspaces()),
+    [],
+  );
 });
