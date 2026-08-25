@@ -21,6 +21,24 @@ and the `wrap`, `flow`, `rowwrap`, `rowflow`, `colwrap`, and `colflow` modifiers
 The `itemcontrols` modifier is not supported yet; support is tracked separately
 in [PR #66](https://github.com/microsoft/polyfills/pull/66).
 
+### V2 (grid) compatibility
+
+`focusgroup="grid"` is based on an early-stage, unstable explainer/spec: the
+attribute's shape and behaviors can still change before any browser ships a
+matching implementation. To avoid a compatibility trap where a browser ships
+a native V2 implementation that follows an older iteration of the spec than
+the one your site (and the polyfill) has moved on to, **the polyfill always
+polyfills `grid`, even when the browser reports native support for it**, until
+there's confidence the API has stabilized (e.g. once a browser ships it).
+
+If you need to exercise a browser's native implementation directly — for
+example, for an origin trial, a demo site, or a test — opt back into deferring
+to it by setting the following flag before the polyfill runs:
+
+```js
+globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__ = true;
+```
+
 ## Usage
 
 ```bash

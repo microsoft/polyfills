@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
-import { observers } from "./observer-registry.js";
+import { ObservableItemCollection } from "./observable-item-collection.js";
 import { createTreeWalker, getClosestElement } from "./shadow-utils/index.js";
 import {
   getGridNavigationDirection,
@@ -34,7 +34,6 @@ export class GridItemCollection {
   #manual;
   #entries = [];
   #valid = false;
-  #observer;
   #rowCount = 0;
   #colCount = 0;
 
@@ -288,49 +287,52 @@ export class GridItemCollection {
     return target.element;
   }
   observe(focusGroup) {
-    this.#observer = new MutationObserver((records) => {
-      const authorTabindexChanges = records
-        .filter(
+    this.#observable.startObserving(
+      this.#owner,
+      (records) => {
+        const authorTabindexChanges = records
+          .filter(
+            (record) =>
+              record.type === "attributes" &&
+              record.attributeName === "tabindex" &&
+              this.#entries.some((entry) => entry.element === record.target),
+          )
+          .map((record) => record.target);
+        const definition = records.some(
           (record) =>
             record.type === "attributes" &&
-            record.attributeName === "tabindex" &&
-            this.#entries.some((entry) => entry.element === record.target),
+            record.target === this.#owner &&
+            record.attributeName === "focusgroup",
         )
-        .map((record) => record.target);
-      const definition = records.some(
-        (record) =>
-          record.type === "attributes" &&
-          record.target === this.#owner &&
-          record.attributeName === "focusgroup",
-      )
-        ? parseDefinition(this.#owner)
-        : undefined;
-      focusGroup.update({ definition, authorTabindexChanges });
-    });
-    this.#observer.observe(this.#owner, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-      attributeFilter: [
-        "focusgroup",
-        "focusgrouprow",
-        "focusgroupstart",
-        "disabled",
-        "hidden",
-        "inert",
-        "rowspan",
-        "colspan",
-        "tabindex",
-      ],
-    });
-    observers.add(this.#observer);
+          ? parseDefinition(this.#owner)
+          : undefined;
+        focusGroup.update({ definition, authorTabindexChanges });
+      },
+      {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: [
+          "focusgroup",
+          "focusgrouprow",
+          "focusgroupstart",
+          "disabled",
+          "hidden",
+          "inert",
+          "rowspan",
+          "colspan",
+          "tabindex",
+        ],
+      },
+      (callback) => new MutationObserver(callback),
+    );
   }
   disconnect() {
-    observers.delete(this.#observer);
-    this.#observer?.disconnect();
-    this.#observer = null;
+    this.#observable.stopObserving();
   }
   flush() {
-    this.#observer?.takeRecords();
+    this.#observable.flush();
   }
+
+  #observable = new ObservableItemCollection();
 }

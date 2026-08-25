@@ -19,20 +19,50 @@ export function hasDocument() {
 }
 
 /**
- * Whether the current user agent supports a focusgroup behavior.
+ * Whether the current user agent natively supports a focusgroup behavior.
+ *
+ * V2 behaviors (e.g. `grid`) are unconditionally polyfilled — see
+ * `shouldPolyfillV2()` below for why — so this only reports native support
+ * for the V1 surface (`document.body.focusGroup`).
  *
  * @param {BehaviorToken | null} [behavior]
  * @returns {boolean}
  */
 export function supportsFocusGroup(behavior) {
-  const prototype = globalThis?.HTMLElement?.prototype;
-  const focusGroup = prototype?.focusGroup;
+  if (!hasDocument()) {
+    return false;
+  }
+  const focusGroup = document.body.focusGroup;
   if (typeof focusGroup?.supports === "function") {
     return behavior ? focusGroup.supports(behavior) : true;
   }
+  return false;
+}
+
+/**
+ * V2 (e.g. `grid`) is still an early-stage, unstable explainer/spec: the
+ * shape of the attribute and its behaviors can still change before any
+ * browser ships a matching implementation. If the polyfill deferred to a
+ * native implementation whenever one exists, sites could get caught in a
+ * compatibility trap — a browser could ship a V2 implementation that matches
+ * an older iteration of the spec than the one the polyfill (and the site)
+ * has moved on to, silently changing behavior underneath the site once the
+ * polyfill defers to it.
+ *
+ * To avoid that, usage of V2 behaviors is unconditionally polyfilled by
+ * default, regardless of native support, until there's confidence the API
+ * shape has stabilized (e.g. once a browser ships it). Authors can opt back
+ * into deferring to a native implementation — e.g. for an origin trial, demo
+ * site, or test that needs to exercise the native behavior — by setting
+ * `globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__` to `true`.
+ *
+ * @param {BehaviorToken | null} [behavior]
+ * @returns {boolean}
+ */
+export function shouldPolyfillV2(behavior) {
   return (
-    behavior !== BehaviorToken.GRID &&
-    ("focusgroup" in (prototype ?? {}) || "focusGroup" in (prototype ?? {}))
+    behavior === BehaviorToken.GRID &&
+    !globalThis?.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__
   );
 }
 

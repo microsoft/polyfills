@@ -4,7 +4,11 @@
 import { BehaviorToken, DatasetName } from "./constants.js";
 import { flushAllObservers } from "./observer-registry.js";
 import { nodeContains } from "./shadow-utils/index.js";
-import { getNavigationDirection, supportsFocusGroup } from "./utils.js";
+import {
+  getNavigationDirection,
+  shouldPolyfillV2,
+  supportsFocusGroup,
+} from "./utils.js";
 
 /**
  * @import {
@@ -110,7 +114,11 @@ export class FocusGroup {
    * @param {FocusGroupOptions} [options]
    */
   constructor(owner, items, options = {}) {
-    if (!owner || supportsFocusGroup(options.definition?.behavior)) {
+    const behavior = options.definition?.behavior;
+    if (
+      !owner ||
+      (!shouldPolyfillV2(behavior) && supportsFocusGroup(behavior))
+    ) {
       return;
     }
 

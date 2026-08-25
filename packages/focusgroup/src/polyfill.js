@@ -13,6 +13,7 @@ import {
   hasDocument,
   inferRole,
   parseDefinition,
+  shouldPolyfillV2,
   supportsFocusGroup,
 } from "./utils.js";
 
@@ -103,7 +104,10 @@ export function polyfill(root) {
     }
 
     const definition = parseDefinition(element);
-    if (supportsFocusGroup(definition.behavior)) {
+    if (
+      !shouldPolyfillV2(definition.behavior) &&
+      supportsFocusGroup(definition.behavior)
+    ) {
       continue;
     }
 

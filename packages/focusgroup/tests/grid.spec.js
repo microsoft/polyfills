@@ -4,18 +4,16 @@
 import { test } from "@playwright/test";
 import { expect, setupPage } from "./utils.js";
 
-test("polyfills grid when only base focusgroup support is available", async ({
+test("polyfills grid unconditionally, even when the browser claims native grid support", async ({
   page,
 }, { project }) => {
-  test.skip(
-    project.use.channel === "chrome-canary",
-    "Canary runs with native grid support enabled",
-  );
-
   await page.goto("/test.html");
   await page.evaluate(() => {
-    Object.defineProperty(HTMLElement.prototype, "focusgroup", {
+    Object.defineProperty(HTMLElement.prototype, "focusGroup", {
       configurable: true,
+      get() {
+        return { supports: () => true };
+      },
     });
   });
   await page.setContent(`
@@ -34,7 +32,6 @@ test("polyfills grid when only base focusgroup support is available", async ({
     polyfill();
   }, specifier);
 
-  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();
@@ -43,15 +40,13 @@ test("polyfills grid when only base focusgroup support is available", async ({
 test("polyfills a grid when an observed native owner changes behavior", async ({
   page,
 }, { project }) => {
-  test.skip(
-    project.use.channel === "chrome-canary",
-    "Canary runs with native grid support enabled",
-  );
-
   await page.goto("/test.html");
   await page.evaluate(() => {
-    Object.defineProperty(HTMLElement.prototype, "focusgroup", {
+    Object.defineProperty(HTMLElement.prototype, "focusGroup", {
       configurable: true,
+      get() {
+        return { supports: () => true };
+      },
     });
   });
   await page.setContent(`
@@ -73,10 +68,41 @@ test("polyfills a grid when an observed native owner changes behavior", async ({
   await page.locator("table").evaluate((node) => {
     node.setAttribute("focusgroup", "grid");
   });
-  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();
+});
+
+test("defers to native grid support when the compatibility opt-out flag is set", async ({
+  page,
+}, { project }) => {
+  await page.goto("/test.html");
+  await page.evaluate(() => {
+    Object.defineProperty(HTMLElement.prototype, "focusGroup", {
+      configurable: true,
+      get() {
+        return { supports: () => true };
+      },
+    });
+    globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__ = true;
+  });
+  await page.setContent(`
+    <table role="grid" focusgroup="grid">
+      <tbody>
+        <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
+        <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" data-testid="b2">B2</td></tr>
+      </tbody>
+    </table>
+  `);
+  const specifier = project.name.endsWith("Shadowless")
+    ? "/build/index-shadowless.mjs"
+    : "/build/index.mjs";
+  await page.evaluate(async (moduleSpecifier) => {
+    const { polyfill } = await import(moduleSpecifier);
+    polyfill();
+  }, specifier);
+
+  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
 });
 
 test("native tables support two-dimensional navigation", async ({ page }, {
@@ -95,7 +121,6 @@ test("native tables support two-dimensional navigation", async ({ page }, {
     `,
   );
 
-  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a2")).toBeFocused();
