@@ -16,7 +16,7 @@ This project welcomes contributions and suggestions. Please see [CONTRIBUTING.md
 
 ## Publishing
 
-Maintainer publishing is documented in [CONTRIBUTING.md](CONTRIBUTING.md#maintainer-publishing-flow). GitHub Releases are created with the default GitHub Actions `GITHUB_TOKEN`, and Azure Pipelines downloads release tarballs and publishes them to npm. Currently, `@microsoft/focusgroup-polyfill` is publishable; `@microsoft/shadowrootadoptedstylesheets-ponyfill` is private.
+Maintainer publishing is documented in [CONTRIBUTING.md](CONTRIBUTING.md#maintainer-publishing-flow). GitHub Releases are created with the default GitHub Actions `GITHUB_TOKEN`, and Azure Pipelines downloads release tarballs and publishes them to npm. Non-private workspaces are publishable; private workspaces are skipped.
 
 ## Security
 
