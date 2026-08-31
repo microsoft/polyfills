@@ -90,9 +90,12 @@ export class FocusGroup {
 
   /**
    * Optional owner-decoration hook injected via `options.decorateOwner`.
-   * Called with `(owner, behavior)` on decoration and `(owner, null)` on
-   * undecoration. When absent, no owner decoration happens.
-   * @type {((element: HTMLElement, behavior: BehaviorToken|null) => void) | undefined}
+   * Called with `(owner, behavior, valid)` on decoration and `(owner, null)`
+   * on undecoration. `valid` reflects the item collection's post-build
+   * validity (e.g. `GridItemCollection#valid`) when applicable, and is
+   * `undefined` for collections that don't expose it. When absent, no owner
+   * decoration happens.
+   * @type {((element: HTMLElement, behavior: BehaviorToken|null, valid?: boolean) => void) | undefined}
    */
   #decorateOwner;
 
@@ -106,6 +109,17 @@ export class FocusGroup {
 
   /** @type {((definition: FocusGroupDefinition) => FocusGroupItemCollection) | undefined} */
   #createItems;
+
+  /**
+   * Optional hook injected via `options.onNativeTakeover`, called with the
+   * owner element when `update()` tears this instance down because the
+   * owner's behavior changed to one the browser now natively supports (see
+   * `update()`). Lets the caller (`polyfill.js`) remove the owner from its
+   * tracking map so a later behavior change back to a polyfilled behavior
+   * re-activates polyfilling instead of being silently ignored.
+   * @type {((owner: HTMLElement) => void) | undefined}
+   */
+  #onNativeTakeover;
 
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
@@ -127,9 +141,10 @@ export class FocusGroup {
     this.#decorateOwner = options.decorateOwner;
     this.#decorateItem = options.decorateItem;
     this.#createItems = options.createItems;
+    this.#onNativeTakeover = options.onNativeTakeover;
 
     this.#updateDefinition(options.definition);
-    this.#decorateOwner?.(this.#owner, this.#behavior);
+    this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
     this.#decorateItems();
 
     const opts = { signal: this.#abort.signal };
@@ -187,8 +202,43 @@ export class FocusGroup {
       return;
     }
 
+    // Apply author tabindex changes first: a behavior/topology change and an
+    // author tabindex change can arrive in the same mutation batch, and the
+    // definition-changed branch below may swap/undecorate the items
+    // collection (which rewrites `data-fg-ati`) or tear this instance down
+    // entirely. Applying the tabindex marker update up front ensures it's
+    // never lost or overwritten by that swap.
+    if (info.authorTabindexChanges) {
+      for (const el of info.authorTabindexChanges) {
+        el.setAttribute(
+          DatasetName.AUTHOR_TABINDEX,
+          el.getAttribute("tabindex") ?? "none",
+        );
+      }
+    }
+
     if (info.definition !== undefined) {
       const behaviorChanged = info.definition.behavior !== this.#behavior;
+
+      if (
+        behaviorChanged &&
+        !shouldPolyfillV2(info.definition.behavior) &&
+        supportsFocusGroup(info.definition.behavior)
+      ) {
+        // The behavior changed to one the browser now natively supports
+        // (and that we don't force-polyfill). Tear down entirely instead of
+        // swapping in a different items collection and staying "polyfilled"
+        // — otherwise this instance would keep managing an owner that
+        // should be left to native handling. The global attribute-mutation
+        // observer in `polyfill.js` will re-activate polyfilling later if
+        // the behavior reverts to a polyfilled one.
+        const owner = this.#owner;
+        this.#undecorateItems();
+        this.disconnect();
+        this.#onNativeTakeover?.(owner);
+        return;
+      }
+
       const topologyChanged =
         this.#behavior === "grid" &&
         info.definition.behavior === "grid" &&
@@ -198,22 +248,13 @@ export class FocusGroup {
         this.#items.disconnect?.();
         this.#items = this.#createItems(info.definition);
         this.#updateDefinition(info.definition);
-        this.#decorateOwner?.(this.#owner, this.#behavior);
+        this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
         this.#decorateItems();
         this.#items.observe?.(this);
         return;
       }
       this.#updateDefinition(info.definition);
-      this.#decorateOwner?.(this.#owner, this.#behavior);
-    }
-
-    if (info.authorTabindexChanges) {
-      for (const el of info.authorTabindexChanges) {
-        el.setAttribute(
-          DatasetName.AUTHOR_TABINDEX,
-          el.getAttribute("tabindex") ?? "none",
-        );
-      }
+      this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
     }
 
     this.#undecorateItems();

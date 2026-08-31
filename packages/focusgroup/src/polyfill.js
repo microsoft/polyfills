@@ -132,7 +132,15 @@ export function polyfill(root) {
       const fg = new FocusGroup(element, items, {
         definition,
         createItems,
-        decorateOwner: (el, behavior) => inferRole(el, behavior, "owner"),
+        onNativeTakeover: (owner) => {
+          elementPolyfillMap.delete(owner);
+        },
+        decorateOwner: (el, behavior, valid) =>
+          inferRole(
+            el,
+            behavior === "grid" && valid === false ? null : behavior,
+            "owner",
+          ),
         decorateItem: (el, behavior) => {
           if (behavior !== "grid") {
             inferRole(el, behavior, "child");

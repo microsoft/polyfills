@@ -160,6 +160,66 @@ function getKeyboardNavigationContext(event, owner) {
 }
 
 /**
+ * Resolves the logical axis ("inline"/"block") and base direction (forward/
+ * backward, before writing-mode/direction reversal) for one of the four
+ * arrow keys. Returns `null` for any other key. Shared by
+ * `getNavigationDirection()` and `getGridNavigationDirection()` so the
+ * writing-mode-aware arrow-key mapping only lives in one place.
+ *
+ * `group` is the physical key pairing ("row" for Up/Down, "col" for
+ * Left/Right) — kept distinct from `axis` because in vertical writing modes
+ * the logical axis swaps (Up/Down becomes the inline axis) while the
+ * reversal formula (see `isAxisReversed()`) still depends on which physical
+ * pairing the key belongs to.
+ *
+ * @param {string} key
+ * @param {boolean} vertical
+ * @returns {{axis: "inline"|"block", group: "row"|"col", forward: boolean}|null}
+ */
+function getArrowKeyAxis(key, vertical) {
+  const map = {
+    ArrowLeft: {
+      axis: vertical ? "block" : "inline",
+      group: "col",
+      forward: false,
+    },
+    ArrowRight: {
+      axis: vertical ? "block" : "inline",
+      group: "col",
+      forward: true,
+    },
+    ArrowUp: {
+      axis: vertical ? "inline" : "block",
+      group: "row",
+      forward: false,
+    },
+    ArrowDown: {
+      axis: vertical ? "inline" : "block",
+      group: "row",
+      forward: true,
+    },
+  };
+  return map[key] ?? null;
+}
+
+/**
+ * Whether the given physical key pairing's direction is reversed given the
+ * writing mode and direction. See `getArrowKeyAxis()` for `group`.
+ *
+ * @param {"row"|"col"} group
+ * @param {string} writingMode
+ * @param {boolean} vertical
+ * @param {boolean} rtl
+ * @returns {boolean}
+ */
+function isAxisReversed(group, writingMode, vertical, rtl) {
+  if (group === "col") {
+    return vertical ? writingMode.endsWith("-rl") !== rtl : rtl;
+  }
+  return vertical && rtl;
+}
+
+/**
  * Returns a grid operation for a directional key, accounting for writing mode
  * and direction.
  * @param {KeyboardEvent} event
@@ -179,26 +239,19 @@ export function getGridNavigationDirection(event, owner) {
   if (optionModified || event.metaKey) {
     return null;
   }
-  const inlineReversed = rtl;
-  const blockReversed = vertical && writingMode.endsWith("-rl");
-  const map = {
-    ArrowLeft: [vertical ? "block" : "inline", "backward"],
-    ArrowRight: [vertical ? "block" : "inline", "forward"],
-    ArrowUp: [vertical ? "inline" : "block", "backward"],
-    ArrowDown: [vertical ? "inline" : "block", "forward"],
-  };
   if (event.key === "Home") {
     return "row-start";
   }
   if (event.key === "End") {
     return "row-end";
   }
-  const action = map[event.key];
+  const action = getArrowKeyAxis(event.key, vertical);
   if (!action) {
     return null;
   }
-  const reversed = action[0] === "inline" ? inlineReversed : blockReversed;
-  return `${action[0]}-${reversed ? (action[1] === "forward" ? "backward" : "forward") : action[1]}`;
+  const reversed = isAxisReversed(action.group, writingMode, vertical, rtl);
+  const forward = reversed ? !action.forward : action.forward;
+  return `${action.axis}-${forward ? "forward" : "backward"}`;
 }
 
 /**
@@ -270,13 +323,12 @@ export function isKeyboardFocusable(
  *     if there shouldn’t be navigation, e.g. when directional limit applies.
  */
 export function getNavigationDirection(event, owner, axis) {
-  const FORWARD = "forward";
-  const BACKWARD = "backward";
-  const BLOCK = "block";
-  const INLINE = "inline";
-
   if (isKeyConflictElement(event.composedPath()[0])) {
-    return event.key === "Tab" ? (event.shiftKey ? BACKWARD : FORWARD) : null;
+    return event.key === "Tab"
+      ? event.shiftKey
+        ? "backward"
+        : "forward"
+      : null;
   }
 
   const { commandModified, optionModified, writingMode, vertical, rtl } =
@@ -286,40 +338,21 @@ export function getNavigationDirection(event, owner, axis) {
     return null;
   }
 
-  const horizontal = vertical ? BLOCK : INLINE;
-  const verticalAxis = vertical ? INLINE : BLOCK;
-  const isHorizontalReversed = vertical
-    ? writingMode.endsWith("-rl") !== rtl
-    : rtl;
-  const isVerticalReversed = vertical && rtl;
+  if (event.key === "Home") {
+    return "start";
+  }
+  if (event.key === "End") {
+    return "end";
+  }
 
-  const map = {
-    ArrowUp: {
-      axis: verticalAxis,
-      dir: isVerticalReversed ? FORWARD : BACKWARD,
-    },
-    ArrowDown: {
-      axis: verticalAxis,
-      dir: isVerticalReversed ? BACKWARD : FORWARD,
-    },
-    ArrowLeft: {
-      axis: horizontal,
-      dir: isHorizontalReversed ? FORWARD : BACKWARD,
-    },
-    ArrowRight: {
-      axis: horizontal,
-      dir: isHorizontalReversed ? BACKWARD : FORWARD,
-    },
-    Home: { dir: "start" },
-    End: { dir: "end" },
-  };
-
-  const action = map[event.key];
-  if (!action || (axis && action.axis && action.axis !== axis)) {
+  const action = getArrowKeyAxis(event.key, vertical);
+  if (!action || (axis && action.axis !== axis)) {
     return null;
   }
 
-  return action.dir;
+  const reversed = isAxisReversed(action.group, writingMode, vertical, rtl);
+  const forward = reversed ? !action.forward : action.forward;
+  return forward ? "forward" : "backward";
 }
 
 /**

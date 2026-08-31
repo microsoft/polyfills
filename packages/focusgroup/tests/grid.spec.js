@@ -209,7 +209,7 @@ test("manual grids discover slotted rows and cells @shadow", async ({ page }, {
   await expect(page.getByTestId("b2")).toBeFocused();
 });
 
-test("directional navigation skips disabled grid items", async ({ page }, {
+test("a disabled sole cell target invalidates the grid", async ({ page }, {
   project,
 }) => {
   await setupPage(
@@ -226,10 +226,36 @@ test("directional navigation skips disabled grid items", async ({ page }, {
     `,
   );
 
+  // A disabled control is not a valid candidate. With no other candidate in
+  // that cell, the grid has an empty cell and is invalid — none of the
+  // items should be decorated.
+  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
+  await expect(page.getByTestId("a3")).not.toHaveAttribute("data-fg-item");
+});
+
+test("a disabled control alongside a valid target still yields a single candidate", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <div focusgrouprow>
+          <button data-testid="a1">A1</button>
+          <div data-testid="a2-cell"><button disabled>Disabled</button><button data-testid="a2">A2</button></div>
+        </div>
+      </div>
+    `,
+  );
+
+  // The disabled descendant should not count as a candidate, so the cell
+  // still resolves to its single valid target.
   await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
+  await expect(page.getByTestId("a2")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByTestId("a3")).toBeFocused();
+  await expect(page.getByTestId("a2")).toBeFocused();
 });
 
 test.describe("grid edge behavior", () => {
@@ -304,6 +330,80 @@ test.describe("grid edge behavior", () => {
     await page.keyboard.press("Control+Home");
     await expect(page.getByTestId("a1")).toBeFocused();
   });
+});
+
+test("a focusable descendant outside the resolved cell targets invalidates the grid", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <div focusgrouprow>
+          <button data-testid="a1">A1</button>
+          <div data-testid="a2-cell">
+            <span data-testid="stray" tabindex="0">Stray</span>
+            <button data-testid="a2">A2</button>
+          </div>
+        </div>
+      </div>
+    `,
+  );
+
+  // "stray" is keyboard-focusable, positive tabindex, and not the resolved
+  // single candidate for its cell (a2 is). A full-scope walk should find it
+  // and invalidate the whole grid rather than silently ignoring it.
+  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
+  await expect(page.getByTestId("a2")).not.toHaveAttribute("data-fg-item");
+});
+
+test("a focusgrouprow marker outside the enrolled rows invalidates a manual grid", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <div focusgrouprow>
+          <button data-testid="a1">A1</button>
+          <button data-testid="a2">A2</button>
+        </div>
+        <div>
+          <div focusgrouprow>
+            <button data-testid="b1">B1</button>
+          </div>
+        </div>
+      </div>
+    `,
+  );
+
+  // The nested focusgrouprow marker is not one of the top-level enrolled
+  // rows in the resolved topology, so the whole grid should be invalidated.
+  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
+  await expect(page.getByTestId("b1")).not.toHaveAttribute("data-fg-item");
+});
+
+test("a negative-tabindex descendant can initiate navigation from its cell without being a destination", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <div focusgrouprow>
+          <div data-testid="a1-cell"><span data-testid="a1-source" tabindex="-1">Source</span><button data-testid="a1">A1</button></div>
+          <button data-testid="a2">A2</button>
+        </div>
+      </div>
+    `,
+  );
+
+  await page.getByTestId("a1-source").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("a2")).toBeFocused();
 });
 
 test("invalid ragged grids do not take over navigation", async ({ page }, {
