@@ -3,6 +3,7 @@
 
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
+import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -12,16 +13,13 @@ import {
   hasDocument,
   inferRole,
   parseDefinition,
+  shouldPolyfillV2,
   supportsFocusGroup,
 } from "./utils.js";
 
 let elementPolyfillMap;
 
-if (
-  hasDocument() &&
-  typeof MutationObserver !== "undefined" &&
-  !supportsFocusGroup()
-) {
+if (hasDocument() && typeof MutationObserver !== "undefined") {
   /** @type {Map<HTMLElement, FocusGroup>} */
   elementPolyfillMap = state.m ??= new Map();
 
@@ -33,7 +31,10 @@ if (
     // build swaps this for a plain `MutationObserver`.
     const observer = createMutationObserver((entries) => {
       for (const entry of entries) {
-        if (entry.type !== "childList") {
+        if (entry.type === "attributes") {
+          if (state.b) {
+            polyfill(entry.target);
+          }
           continue;
         }
 
@@ -55,7 +56,12 @@ if (
         }
       }
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["focusgroup"],
+      childList: true,
+      subtree: true,
+    });
     state.g = observer;
   }
 }
@@ -67,7 +73,7 @@ if (
  * @param {HTMLElement} root - The polyfill target. Defaults to `<body>`.
  */
 export function polyfill(root) {
-  if (supportsFocusGroup() || !hasDocument()) {
+  if (!hasDocument()) {
     return;
   }
 
@@ -97,6 +103,14 @@ export function polyfill(root) {
       continue;
     }
 
+    const definition = parseDefinition(element);
+    if (
+      !shouldPolyfillV2(definition.behavior) &&
+      supportsFocusGroup(definition.behavior)
+    ) {
+      continue;
+    }
+
     // Reserve the slot synchronously so a re-entrant polyfill() call (e.g.
     // from the global mutation observer) cannot schedule a duplicate
     // FocusGroup before the rAF callback below installs the real instance.
@@ -109,13 +123,30 @@ export function polyfill(root) {
       if (!elementPolyfillMap.has(element)) {
         return;
       }
-      const items = new TreeWalkerItemCollection(element);
+      const definition = parseDefinition(element);
+      const createItems = (nextDefinition) =>
+        nextDefinition.behavior === "grid"
+          ? new GridItemCollection(element, nextDefinition.manual)
+          : new TreeWalkerItemCollection(element);
+      const items = createItems(definition);
       const fg = new FocusGroup(element, items, {
-        definition: parseDefinition(element),
-        decorateOwner: (el, behavior) => inferRole(el, behavior, "owner"),
-        decorateItem: (el, behavior) => inferRole(el, behavior, "child"),
+        definition,
+        createItems,
+        onNativeTakeover: (owner) => {
+          elementPolyfillMap.delete(owner);
+        },
+        decorateOwner: (el, behavior, valid) =>
+          inferRole(
+            el,
+            behavior === "grid" && valid === false ? null : behavior,
+            "owner",
+          ),
+        decorateItem: (el, behavior) => {
+          if (behavior !== "grid") {
+            inferRole(el, behavior, "child");
+          }
+        },
       });
-      items.observe(fg);
       elementPolyfillMap.set(element, fg);
     });
   } while (walker.nextNode());

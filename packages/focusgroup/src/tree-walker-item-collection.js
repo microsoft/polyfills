@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
-import { observers } from "./observer-registry.js";
+import { ObservableItemCollection } from "./observable-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -12,6 +12,7 @@ import {
 } from "./shadow-utils/index.js";
 import {
   generateUniqueId,
+  getNavigationDirection,
   isKeyboardFocusable,
   isSegmentor,
   parseDefinition,
@@ -69,9 +70,6 @@ export class TreeWalkerItemCollection {
   /** @type {ShadowTreeWalker} */
   #walker;
 
-  /** @type {MutationObserver | null} */
-  #observer = null;
-
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
    */
@@ -94,29 +92,32 @@ export class TreeWalkerItemCollection {
    * @param {FocusGroup} focusGroup
    */
   observe(focusGroup) {
-    this.#observer = createMutationObserver((records) => {
-      const info = this.#classify(records);
-      if (info) {
-        focusGroup.update(info);
-      }
-    });
-    this.#observer.observe(this.#owner, {
-      attributes: true,
-      attributeFilter: [
-        "focusgroup",
-        "focusgroupstart",
-        "controls",
-        "contenteditable",
-        "disabled",
-        "href",
-        "hidden",
-        "tabindex",
-        "type",
-      ],
-      childList: true,
-      subtree: true,
-    });
-    observers.add(this.#observer);
+    this.#observable.startObserving(
+      this.#owner,
+      (records) => {
+        const info = this.#classify(records);
+        if (info) {
+          focusGroup.update(info);
+        }
+      },
+      {
+        attributes: true,
+        attributeFilter: [
+          "focusgroup",
+          "focusgroupstart",
+          "controls",
+          "contenteditable",
+          "disabled",
+          "href",
+          "hidden",
+          "tabindex",
+          "type",
+        ],
+        childList: true,
+        subtree: true,
+      },
+      createMutationObserver,
+    );
   }
 
   /**
@@ -124,11 +125,9 @@ export class TreeWalkerItemCollection {
    * registry. Called from `FocusGroup#disconnect()`; safe to call directly.
    */
   disconnect() {
-    observers.delete(this.#observer);
-    this.#observer?.disconnect();
+    this.#observable.stopObserving();
     this.#owner = null;
     this.#walker = null;
-    this.#observer = null;
   }
 
   /**
@@ -138,8 +137,10 @@ export class TreeWalkerItemCollection {
    * `tabindex`/`data-fg-*` to avoid re-entering `#handleItemsMutate`.
    */
   flush() {
-    this.#observer?.takeRecords();
+    this.#observable.flush();
   }
+
+  #observable = new ObservableItemCollection();
 
   /**
    * Discovers items in the owner subtree and writes the marker attributes
@@ -300,6 +301,27 @@ export class TreeWalkerItemCollection {
     return /** @type {HTMLElement | null} */ (
       this.#walker.previousNode() ?? null
     );
+  }
+
+  /**
+   * @param {KeyboardEvent} event
+   * @param {HTMLElement} current
+   * @param {FocusGroupDefinition} definition
+   * @returns {HTMLElement | null}
+   */
+  navigate(event, current, definition) {
+    switch (getNavigationDirection(event, current, definition.axis)) {
+      case "start":
+        return this.first();
+      case "end":
+        return this.last();
+      case "forward":
+        return this.next(current) ?? (definition.wrap ? this.first() : null);
+      case "backward":
+        return this.previous(current) ?? (definition.wrap ? this.last() : null);
+      default:
+        return null;
+    }
   }
 
   /**

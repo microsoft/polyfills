@@ -1,0 +1,7 @@
+{
+  "type": "minor",
+  "comment": "Add Focusgroup V2 grid pattern support",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "dmytrokirpa@microsoft.com",
+  "dependentChangeType": "none"
+}
