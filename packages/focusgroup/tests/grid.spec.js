@@ -32,6 +32,7 @@ test("polyfills grid unconditionally, even when the browser claims native grid s
     polyfill();
   }, specifier);
 
+  await expect(page.getByTestId("b1")).toHaveAttribute("tabindex", "-1");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();
@@ -68,6 +69,7 @@ test("polyfills a grid when an observed native owner changes behavior", async ({
   await page.locator("table").evaluate((node) => {
     node.setAttribute("focusgroup", "grid");
   });
+  await expect(page.getByTestId("b1")).toHaveAttribute("tabindex", "-1");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();

@@ -157,10 +157,9 @@
  *   segment support omit this; `FocusGroup` then defaults to single-roving-stop
  *   behavior.
  *
- * @property {() => Iterable<{element: HTMLElement, item: HTMLElement}>} [itemControls]
- *   Optional V2 hook returning eligible opted-out controls and the owned item
- *   each control is associated with. `FocusGroup` uses these associations to
- *   remove controls of inactive items from sequential focus navigation.
+ * @property {(node: Element) => (HTMLElement | null)} [itemForNode]
+ *   Optional V2 hook resolving an associated nested node to its owned item.
+ *   For grids this maps a node inside a cell to that cell's target.
  *
  * @property {() => void} [disconnect] Optional. Called defensively from
  *   `FocusGroup#disconnect()` (`items.disconnect?.()`). Use it to detach any

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
+import { isControlWrite } from "./item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
 import {
   createMutationObserver,
@@ -70,12 +71,10 @@ export class TreeWalkerItemCollection {
   /** @type {ShadowTreeWalker} */
   #walker;
 
-  /** @type {boolean} */
-  #itemcontrols = false;
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
-   * @param {boolean} [itemcontrols=false] - Whether associated opt-out
-   *   controls should be filtered instead of creating segment boundaries.
+   * @param {boolean} [itemcontrols=false] - Whether nested content within
+   *   an owned item should create a segment boundary.
    */
   constructor(owner, itemcontrols = false) {
     this.#owner = owner;
@@ -115,6 +114,11 @@ export class TreeWalkerItemCollection {
           "disabled",
           "href",
           "hidden",
+          "inert",
+          "class",
+          "style",
+          "slot",
+          "name",
           "tabindex",
           "type",
         ],
@@ -146,6 +150,9 @@ export class TreeWalkerItemCollection {
   }
 
   #observable = new ObservableItemCollection();
+
+  /** @type {boolean} */
+  #itemcontrols = false;
 
   /**
    * Discovers items in the owner subtree and writes the marker attributes
@@ -354,51 +361,14 @@ export class TreeWalkerItemCollection {
     return element.getAttribute(DatasetName.ITEM) === this.id;
   }
 
-  /**
-   * Yields sequentially focusable controls inside `focusgroup="none"`
-   * subtrees together with their nearest containing item.
-   *
-   * @returns {Generator<{element: HTMLElement, item: HTMLElement}>}
-   */
-  *itemControls() {
-    if (!this.#owner) {
-      return;
-    }
-
-    const walker = createTreeWalker(
-      document,
-      this.#owner,
-      NodeFilter.SHOW_ELEMENT,
-    );
-
-    while (walker.nextNode()) {
-      const element = /** @type {HTMLElement} */ (walker.currentNode);
-      const optOut = getClosestElement(element, '[focusgroup~="none"]');
-
-      if (!optOut || !nodeContains(this.#owner, optOut)) {
-        continue;
-      }
-
-      const nearestOwner = getClosestElement(
-        getParentElement(optOut),
-        "[focusgroup]",
-      );
-      if (
-        nearestOwner !== this.#owner ||
-        !isKeyboardFocusable(element, this.#owner, true)
-      ) {
-        continue;
-      }
-
-      let item = getParentElement(optOut);
-      while (item && item !== this.#owner && !this.isItem(item)) {
-        item = getParentElement(item);
-      }
-
-      if (item && item !== this.#owner) {
-        yield { element, item: /** @type {HTMLElement} */ (item) };
+  /** @param {Element} node */
+  itemForNode(node) {
+    for (let el = node; el && el !== this.#owner; el = getParentElement(el)) {
+      if (this.isItem(el)) {
+        return /** @type {HTMLElement} */ (el);
       }
     }
+    return null;
   }
 
   /**
@@ -475,8 +445,9 @@ export class TreeWalkerItemCollection {
         !(
           e.type === "attributes" &&
           e.attributeName === "tabindex" &&
-          ((e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
-            e.target.getAttribute(DatasetName.ITEM) !== this.id) ||
+          (isControlWrite(e.target) ||
+            (e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
+              e.target.getAttribute(DatasetName.ITEM) !== this.id) ||
             e.target === this.#owner)
         ),
     );

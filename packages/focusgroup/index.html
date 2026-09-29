@@ -397,8 +397,8 @@
 <h2>Native table grid</h2>
 <table class="grid-demo" focusgroup="grid rowwrap">
   <tbody>
-    <tr><td tabindex="0">A1</td><td tabindex="0">A2</td><td tabindex="0">A3</td></tr>
-    <tr><td tabindex="0">B1</td><td tabindex="0">B2</td><td tabindex="0">B3</td></tr>
+    <tr><td tabindex="0">A1 <button focusgroup="none">A1 action</button></td><td tabindex="0">A2</td><td tabindex="0">A3</td></tr>
+    <tr><td tabindex="0">B1</td><td tabindex="0">B2 <button focusgroup="none">B2 action</button></td><td tabindex="0">B3</td></tr>
     <tr><td tabindex="0">C1</td><td tabindex="0">C2</td><td tabindex="0">C3</td></tr>
   </tbody>
 </table>
@@ -417,6 +417,21 @@
     <button>C1</button><button>C2</button><button>C3</button>
   </div>
 </div>
+
+<hr>
+
+<h2>Article feed with item controls</h2>
+<div focusgroup="feed" aria-label="Recent posts">
+  <div tabindex="0" aria-label="First post">
+    First post <button focusgroup="none">Like first post</button>
+    <button focusgroup="none">Reply to first post</button>
+  </div>
+  <div tabindex="0" aria-label="Second post">
+    Second post <button focusgroup="none">Like second post</button>
+    <button focusgroup="none">Reply to second post</button>
+  </div>
+</div>
+<p>Use Up/Down to move between articles, Tab to enter the active article's actions, and Shift+Tab to return to its boundary.</p>
 
 <hr>
 

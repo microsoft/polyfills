@@ -2,11 +2,13 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
+import { isControlWrite } from "./item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
+  nodeContains,
 } from "./shadow-utils/index.js";
 import {
   getGridNavigationDirection,
@@ -258,6 +260,14 @@ export class GridItemCollection {
   isItem(element) {
     return this.#entries.some((e) => e.element === element);
   }
+  /** @param {Element} node */
+  itemForNode(node) {
+    return (
+      (this.#valid
+        ? this.#entries.find((entry) => nodeContains(entry.cell, node))?.element
+        : null) ?? null
+    );
+  }
   #isNavigable(element) {
     const entry = this.#entries.find((item) => item.element === element);
     if (!entry) {
@@ -390,6 +400,15 @@ export class GridItemCollection {
     this.#observable.startObserving(
       this.#owner,
       (records) => {
+        records = records.filter(
+          (record) =>
+            record.type !== "attributes" ||
+            record.attributeName !== "tabindex" ||
+            !isControlWrite(record.target),
+        );
+        if (!records.length) {
+          return;
+        }
         const authorTabindexChanges = records
           .filter(
             (record) =>
@@ -422,6 +441,10 @@ export class GridItemCollection {
           "href",
           "hidden",
           "inert",
+          "class",
+          "style",
+          "slot",
+          "name",
           "rowspan",
           "colspan",
           "tabindex",

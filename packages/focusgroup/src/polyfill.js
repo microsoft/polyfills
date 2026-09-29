@@ -1,13 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { BehaviorToken } from "./constants.js";
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
 import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
+  nodeContains,
 } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import {
@@ -40,9 +40,11 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
         }
 
         for (const node of entry.removedNodes) {
-          if (elementPolyfillMap.has(node)) {
-            elementPolyfillMap.get(node)?.disconnect();
-            elementPolyfillMap.delete(node);
+          for (const [owner, group] of elementPolyfillMap) {
+            if (!owner.isConnected && nodeContains(node, owner)) {
+              group?.disconnect();
+              elementPolyfillMap.delete(owner);
+            }
           }
         }
 
@@ -90,6 +92,7 @@ export function polyfill(root) {
         : NodeFilter.FILTER_SKIP,
   );
 
+  const pending = [];
   do {
     const element = walker.currentNode;
 
@@ -107,7 +110,8 @@ export function polyfill(root) {
     const definition = parseDefinition(element);
     if (
       !shouldPolyfillV2(definition.behavior) &&
-      supportsFocusGroup(definition.behavior)
+      supportsFocusGroup(definition.behavior) &&
+      (!definition.itemcontrols || supportsFocusGroup("itemcontrols"))
     ) {
       continue;
     }
@@ -116,8 +120,12 @@ export function polyfill(root) {
     // from the global mutation observer) cannot schedule a duplicate
     // FocusGroup before the rAF callback below installs the real instance.
     elementPolyfillMap.set(element, null);
+    pending.push(element);
+  } while (walker.nextNode());
 
-    // Make sure the element is ready during initial polyfilling.
+  // Descendants must establish their own tab stops before an ancestor can
+  // decide which nested boundaries to filter.
+  for (const element of pending.reverse()) {
     requestAnimationFrame(() => {
       // The element may have been removed (and its slot deleted) before the
       // rAF fired; bail out so we don't resurrect a tracking entry.
@@ -149,8 +157,13 @@ export function polyfill(root) {
         },
       });
       elementPolyfillMap.set(element, fg);
+      for (const [ancestor, group] of elementPolyfillMap) {
+        if (ancestor !== element && group && nodeContains(ancestor, element)) {
+          group.update();
+        }
+      }
     });
-  } while (walker.nextNode());
+  }
 }
 
 /**
