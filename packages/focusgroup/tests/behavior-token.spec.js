@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { expect, test } from "@playwright/test";
-import { setupPage } from "./utils.js";
+import { pressTab, setupPage } from "./utils.js";
 
 // behavior-first-requirement.html
 test.describe("behavior token can appear in any position", () => {
@@ -124,11 +124,11 @@ test.describe("behavior tokens comprehensive", () => {
       await expect(action1Explicit).toHaveAttribute("tabindex", "0");
       await expect(action2).toHaveAttribute("tabindex", "-1");
 
-      await page.keyboard.press("Tab");
+      await pressTab(page, project);
       await expect(action1).toBeFocused();
-      await page.keyboard.press("Tab");
+      await pressTab(page, project);
       await expect(action1Explicit).toBeFocused();
-      await page.keyboard.press("Tab");
+      await pressTab(page, project);
       expect(
         await page.evaluate(() => document.activeElement?.dataset.testid),
       ).toBe("after");

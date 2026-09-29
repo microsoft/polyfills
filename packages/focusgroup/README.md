@@ -12,24 +12,35 @@ The polyfill follows these principles:
 - **Updates**: Ship updates as the spec evolves so the latest version of the polyfill implements the latest version of the spec.
 - **Migration**: Make it easy to migrate to new updates if/when the spec evolves.
 
-For more information about focusgroup itself, see the [V1 explainer](https://open-ui.org/components/scoped-focusgroup.explainer/) and [V2 grid explainer](https://open-ui.org/components/focusgroup-v2.explainer/).
+For more information about focusgroup itself, see the [V1 explainer](https://open-ui.org/components/scoped-focusgroup.explainer/) and [V2 explainer](https://open-ui.org/components/focusgroup-v2.explainer/).
 
-The polyfill supports V2 `focusgroup="grid"` for rectangular native tables and
+The polyfill supports V2 `focusgroup="feed"` for block-axis navigation between
+articles and the `itemcontrols` modifier on other linear behaviors (for example,
+`focusgroup="toolbar itemcontrols"`). `feed` and
+`grid` default to `itemcontrols`; `noitemcontrols` disables either default or
+an explicit modifier. Mark individual controls with `focusgroup="none"`, or
+place a compound control in an independent nested focusgroup. Tab reaches
+controls of the focused item, while inactive items' controls are skipped;
+Shift+Tab enters a group at the item boundary. Script or pointer focus on a
+nested control activates its containing item without making a negative-`tabindex`
+control sequentially focusable.
+
+The polyfill also supports `focusgroup="grid"` for rectangular native tables and
 `focusgroup="grid manual"` for generic markup whose direct-child rows carry
 `focusgrouprow`. Grid movement supports Arrow keys, Home/End, Ctrl+Home/Ctrl+End,
 and the `wrap`, `flow`, `rowwrap`, `rowflow`, `colwrap`, and `colflow` modifiers.
-The `itemcontrols` modifier is not supported yet; support is tracked separately
-in [PR #66](https://github.com/microsoft/polyfills/pull/66).
 
-### V2 (grid) compatibility
+### V2 compatibility
 
-`focusgroup="grid"` is based on an early-stage, unstable explainer/spec: the
+`feed`, `grid`, and `itemcontrols` are based on an early-stage explainer/spec: the
 attribute's shape and behaviors can still change before any browser ships a
 matching implementation. To avoid a compatibility trap where a browser ships
 a native V2 implementation that follows an older iteration of the spec than
 the one your site (and the polyfill) has moved on to, **the polyfill always
-polyfills `grid`, even when the browser reports native support for it**, until
+polyfills `feed` and `grid`, even when the browser reports native support**, until
 there's confidence the API has stabilized (e.g. once a browser ships it).
+On V1 behaviors, `itemcontrols` is polyfilled when the browser supports the
+behavior but not the `itemcontrols` token.
 
 If you need to exercise a browser's native implementation directly — for
 example, for an origin trial, a demo site, or a test — opt back into deferring

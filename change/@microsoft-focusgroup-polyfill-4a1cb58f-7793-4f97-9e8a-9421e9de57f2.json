@@ -1,0 +1,7 @@
+{
+  "type": "minor",
+  "comment": "Add Focusgroup V2 feed and itemcontrols support, including owner-relative activity and memory for nested controls and grid cells.",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "dmytrokirpa@microsoft.com",
+  "dependentChangeType": "none"
+}

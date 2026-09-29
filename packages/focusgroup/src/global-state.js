@@ -13,8 +13,9 @@
 //   g: MutationObserver — singleton observer on `document.body` for
 //      auto-disconnect on removal and (when `b` is true) auto-polyfill on add.
 //   b: boolean — whether the global observer should also polyfill new nodes.
+//   c: Map<HTMLElement, *> — shared itemcontrols filter for nested owners.
 /**
- * @type {{ o: Set<MutationObserver>, m?: Map<HTMLElement, *>, g?: MutationObserver, b: boolean }}
+ * @type {{ o: Set<MutationObserver>, m?: Map<HTMLElement, *>, g?: MutationObserver, b: boolean, c?: Map<HTMLElement, *> }}
  * @global
  */
 globalThis.__FOCUSGROUP_POLYFILL__ ??= {

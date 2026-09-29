@@ -412,7 +412,7 @@ export function isSegmentor(element, owner) {
   while (walker.nextNode()) {
     if (
       walker.currentNode !== element &&
-      isKeyboardFocusable(walker.currentNode, owner)
+      isKeyboardFocusable(walker.currentNode, owner, true)
     ) {
       return true;
     }
