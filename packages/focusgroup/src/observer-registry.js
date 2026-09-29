@@ -3,8 +3,8 @@
 
 import { state } from "./global-state.js";
 
-/** @type {Set<import("./observable-item-collection.js").ObservableItemCollection>} */
-export const observers = state.o;
+state.p ??= new Set();
+export const observers = state.p;
 
 /** @type {WeakMap<MutationRecord, string|null>} */
 const tabindexValues = new WeakMap();

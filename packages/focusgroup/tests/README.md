@@ -15,6 +15,18 @@ toolbar remains untouched by the polyfill. It also covers native takeover and
 observer cleanup when `noitemcontrols` is removed, and reinstallation when it
 returns.
 
+`itemcontrols-lifecycle.spec.js` covers pending authored tabindex on subtree
+removal (including shared nested controls), and native deferral changing between
+reservation and frame-delayed installation. `bundle-compatibility.spec.js`
+always checks the legacy observer protocol. Its additional real-bundle cases
+need a separately built pre-provenance version: set `FOCUSGROUP_LEGACY_BUILD` to
+the absolute directory containing its `index.min.mjs` and
+`index-shadowless.min.mjs`, then run that spec. Without this fixture those cases
+are explicitly skipped; no historical code is downloaded during normal tests.
+Both load orders exercise sibling and nested owners, arrow keys, and pending
+author records during legacy focus handling. The review regression was measured
+against bundles built from `f71d77b` using the same library build commands.
+
 Run the isolated Chromium mutation benchmark from this package:
 
 ```sh

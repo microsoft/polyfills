@@ -199,21 +199,19 @@ export class FocusGroup {
   }
 
   /**
-   * Tears down the focus group: disables the owner proxy, removes all event
-   * listeners (via the abort signal), then disconnects the items collection
-   * if it supports it.
+   * Tears down listeners and the collection, then restores proxy/control
+   * tabindex. The collection adopts pending authored values before release.
    *
-   * Restore proxy/control tabindex while the observer is registered so these
-   * managed writes are excluded from overlapping collections too.
+   * Other registered collections still exclude the teardown's managed writes.
    *
    * NOTE: This method does not undecorate the elements. Call it only after
    * the focusgroup owner has been removed from the DOM.
    */
   disconnect() {
-    this.#disableFocusabilityProxy();
-    this.#undecorateItemControls();
     this.#abort.abort();
     this.#items?.disconnect?.();
+    this.#disableFocusabilityProxy();
+    this.#undecorateItemControls();
     this.#owner = null;
   }
 
