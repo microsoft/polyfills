@@ -128,6 +128,10 @@ export function polyfill(root) {
         return;
       }
       const definition = parseDefinition(element);
+      if (shouldDeferToNative(definition)) {
+        elementPolyfillMap.delete(element);
+        return;
+      }
       const createItems = (nextDefinition) =>
         nextDefinition.behavior === "grid"
           ? new GridItemCollection(element, nextDefinition.manual)

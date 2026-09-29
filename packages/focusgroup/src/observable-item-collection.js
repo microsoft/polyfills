@@ -86,6 +86,8 @@ export class ObservableItemCollection {
   }
 
   stopObserving() {
+    this.capture();
+    adoptControlWrites(this.#pending);
     observers.delete(this);
     this.#observer?.disconnect();
     this.#observer = null;

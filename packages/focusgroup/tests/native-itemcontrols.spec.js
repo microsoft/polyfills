@@ -120,7 +120,7 @@ test("removing noitemcontrols hands off to native and toggling back reinstalls o
   expect(
     await page.evaluate(() => {
       const state = globalThis.__FOCUSGROUP_POLYFILL__;
-      return { owners: state.m.size, observers: state.o.size };
+      return { owners: state.m.size, observers: state.p.size };
     }),
   ).toEqual({ owners: 0, observers: 0 });
   await owner.evaluate((el) => {
@@ -130,7 +130,7 @@ test("removing noitemcontrols hands off to native and toggling back reinstalls o
   expect(
     await page.evaluate(() => {
       const state = globalThis.__FOCUSGROUP_POLYFILL__;
-      return { owners: state.m.size, observers: state.o.size };
+      return { owners: state.m.size, observers: state.p.size };
     }),
   ).toEqual({ owners: 1, observers: 1 });
   await page.getByTestId("one").focus();
