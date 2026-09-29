@@ -70,6 +70,8 @@ extends:
         undeployedTags: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.undeployedTags'] ]
         focusgroupPolyfillNeedsDeployment: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.focusgroupPolyfillNeedsDeployment'] ]
         focusgroupPolyfillReleaseTag: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.focusgroupPolyfillReleaseTag'] ]
+        postcssAtFunctionNeedsDeployment: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.postcssAtFunctionNeedsDeployment'] ]
+        postcssAtFunctionReleaseTag: $[ stageDependencies.Check.CheckVersion.outputs['deploymentCheck.postcssAtFunctionReleaseTag'] ]
       jobs:
       - job: Deploy
         steps:
@@ -86,10 +88,20 @@ extends:
             displayName: "Download @microsoft/focusgroup-polyfill release assets"
             condition: and(succeeded(), eq(variables['focusgroupPolyfillNeedsDeployment'], 'true'))
             inputs:
-              connection: fast
+              connection: polyfills
               userRepository: microsoft/polyfills
               defaultVersionType: 'specificTag'
               version: '$(focusgroupPolyfillReleaseTag)'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: DownloadGitHubRelease@0
+            displayName: "Download @microsoft/postcss-at-function release assets"
+            condition: and(succeeded(), eq(variables['postcssAtFunctionNeedsDeployment'], 'true'))
+            inputs:
+              connection: polyfills
+              userRepository: microsoft/polyfills
+              defaultVersionType: 'specificTag'
+              version: '$(postcssAtFunctionReleaseTag)'
               downloadPath: '$(System.ArtifactsDirectory)'
 
           - script: |
