@@ -299,13 +299,26 @@ export function generateUniqueId() {
  * @param {HTMLElement} element
  * @param {HTMLElement=} owner
  * @param {boolean=} ignorePolyfillTabindex
+ * @param {string|null} [authoredTabindex] - Test an unsuppressed tabindex;
+ *   null tests implicit native focusability while a control is suppressed.
  * @returns {boolean}
  */
 export function isKeyboardFocusable(
   element,
   owner,
   ignorePolyfillTabindex = false,
+  authoredTabindex = undefined,
 ) {
+  let tabIndex = element.tabIndex;
+  if (authoredTabindex === null) {
+    tabIndex = element.matches(
+      "button, input, select, textarea, a[href], area[href], summary, iframe, object, embed",
+    )
+      ? 0
+      : -1;
+  } else if (authoredTabindex !== undefined) {
+    tabIndex = Number(authoredTabindex);
+  }
   return (
     // Is content editable
     (element.isContentEditable ||
@@ -313,7 +326,7 @@ export function isKeyboardFocusable(
       // `tabIndex` is `-1` in WebKit in this case
       element.matches(":is(audio, video)[controls]") ||
       // Is tabbable
-      element.tabIndex > -1 ||
+      tabIndex > -1 ||
       (ignorePolyfillTabindex &&
         element.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
         element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
