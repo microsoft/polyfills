@@ -24,6 +24,8 @@ controls of the focused item, while inactive items' controls are skipped;
 Shift+Tab enters a group at the item boundary. Script or pointer focus on a
 nested control activates its containing item without making a negative-`tabindex`
 control sequentially focusable.
+Generic feed items infer the `article` role; native button items retain their
+button semantics rather than receiving an invalid `article` role.
 
 The polyfill also supports `focusgroup="grid"` for rectangular native tables and
 `focusgroup="grid manual"` for generic markup whose direct-child rows carry

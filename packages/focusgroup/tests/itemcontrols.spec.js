@@ -49,6 +49,64 @@ test("feed navigation, roles, entry, and activity follow nested controls", async
   await expect(page.getByTestId("first")).toBeFocused();
 });
 
+for (const nestedBehavior of ["none", "toolbar"]) {
+  test(`Shift+Tab redirects a remaining ${nestedBehavior} control stop to the remembered feed item`, async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <div focusgroup="feed">
+          <div tabindex="0" data-testid="first">First item</div>
+          <div tabindex="0" data-testid="second">Second item
+            <div focusgroup="${nestedBehavior}">
+              <button data-testid="action">Nested action</button>
+            </div>
+          </div>
+        </div>
+        <button data-testid="after">After</button>
+      `,
+    );
+    await page.getByTestId("first").focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("second")).toBeFocused();
+    await pressTab(page, project);
+    await expect(page.getByTestId("action")).toBeFocused();
+
+    // Author event isolation can prevent the outer owner from seeing focusout,
+    // leaving the remembered item's controls as reverse-entry candidates.
+    await page.getByTestId("action").evaluate((element) => {
+      element.addEventListener("focusout", (event) => event.stopPropagation(), {
+        once: true,
+      });
+    });
+    await page.getByTestId("after").focus();
+    await expect(page.getByTestId("action")).not.toHaveAttribute(
+      "tabindex",
+      "-1",
+    );
+    await page.evaluate(() => {
+      document.body.dataset.focusTrace = "";
+      document.addEventListener(
+        "focusin",
+        (event) => {
+          document.body.dataset.focusTrace += `${event.target.dataset.testid},`;
+        },
+        { capture: true },
+      );
+    });
+
+    await pressTab(page, project, true);
+    await expect(page.getByTestId("second")).toBeFocused();
+    await expect(page.getByTestId("action")).not.toBeFocused();
+    await expect(page.locator("body")).toHaveAttribute(
+      "data-focus-trace",
+      "action,second,",
+    );
+  });
+}
+
 test("noitemcontrols overrides feed default and explicit modifier", async ({
   page,
 }, { project }) => {

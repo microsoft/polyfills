@@ -524,15 +524,15 @@ export function checkVisibility(element, ancestor) {
  * @param {"owner" | "child"} kind - Which role to look up from RoleMap.
  */
 export function inferRole(element, behavior, kind) {
+  const cfg = BehaviorMap[behavior];
+  const mappedRole = kind === "owner" ? cfg?.ownerRole : cfg?.childRole;
   const allowRoleInferring =
     hasGenericRole(element) ||
-    (kind === "child" && element.nodeName === "BUTTON");
-  const cfg = BehaviorMap[behavior];
-  const role = allowRoleInferring
-    ? kind === "owner"
-      ? cfg?.ownerRole
-      : cfg?.childRole
-    : undefined;
+    // Only mapped roles permitted on buttons by ARIA in HTML.
+    (kind === "child" &&
+      element.nodeName === "BUTTON" &&
+      ["tab", "radio", "option", "menuitem", "gridcell"].includes(mappedRole));
+  const role = allowRoleInferring ? mappedRole : undefined;
 
   if (role) {
     if (
