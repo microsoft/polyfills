@@ -491,19 +491,10 @@ export class FocusGroup {
         isKeyboardFocusable(element, this.#owner, true)
       );
     }
-    if (
-      element.disabled ||
-      element.inert ||
-      !checkVisibility(element, this.#owner)
-    ) {
-      return false;
-    }
-    return saved === null
-      ? element.isContentEditable ||
-          element.matches(
-            "button, input, select, textarea, a[href], area[href], summary, audio[controls], video[controls]",
-          )
-      : Number(saved) >= 0;
+    return (
+      (saved === null || Number(saved) >= 0) &&
+      isKeyboardFocusable(element, this.#owner, true, saved)
+    );
   }
 
   /** @param {KeyboardEvent} evt */
