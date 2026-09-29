@@ -5,10 +5,15 @@ https://github.com/web-platform-tests/wpt/blob/master/html/interaction/focus/foc
 
 `itemcontrols-rendering.spec.js` covers class/style visibility changes (including
 sibling selectors), ownership state, and native control eligibility.
+`itemcontrols-pending-mutations.spec.js` covers author changes and focus movement
+in the same task, including nested owners, shadow trees, and custom element
+reactions. Managed tabindex writes must not discard these pending author changes.
 `native-itemcontrols.spec.js` also runs in the `Google Chrome Canary` project. It
 records actual feature detection and uses a deterministic toolbar-only support
 stub when the browser either lacks V1 or already supports V2; an ordinary native
-toolbar remains untouched by the polyfill.
+toolbar remains untouched by the polyfill. It also covers native takeover and
+observer cleanup when `noitemcontrols` is removed, and reinstallation when it
+returns.
 
 Run the isolated Chromium mutation benchmark from this package:
 

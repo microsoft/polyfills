@@ -45,8 +45,9 @@
  *   provided, replaces the current definition. The polyfill computes this
  *   from the owner's `focusgroup` attribute when the attribute mutates.
  * @property {Node[]} [removedNodes] - Nodes removed from the owner subtree.
- * @property {HTMLElement[]} [authorTabindexChanges] - Decorated items whose
- *   author-set `tabindex` changed.
+ * @property {HTMLElement[]|Map<HTMLElement, string|null>} [authorTabindexChanges] -
+ *   Decorated items whose author-set `tabindex` changed. A map retains values
+ *   captured before synchronous focus handling can overwrite the DOM attribute.
  */
 
 /**
@@ -169,11 +170,9 @@
  *   after construction and whenever `FocusGroup` installs a replacement
  *   collection. Use it to connect observers that call `focusGroup.update()`.
  *
- * @property {() => void} [flush] Optional. Called by `FocusGroup` after
- *   writing polyfill-managed attributes (`tabindex`, `data-fg-*`) so the
- *   implementation can drop pending mutation records it would otherwise
- *   re-deliver. For `MutationObserver`-backed implementations this is typically
- *   `observer.takeRecords()`.
+ * @property {() => void} [flush] Optional. Called after managed writes.
+ *   Observer-backed collections must retain pending author mutations; only
+ *   records known to originate from managed writes may be discarded.
  */
 
 export {};
