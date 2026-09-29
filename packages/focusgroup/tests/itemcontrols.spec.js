@@ -248,7 +248,7 @@ test("mutations update eligible controls without stealing focus", async ({
   await expect(page.getByTestId("other")).not.toHaveAttribute("tabindex", "-1");
 });
 
-test("native V1 without itemcontrols still polyfills that modifier; native V2 can opt in", async ({
+test("feed is polyfilled despite native support unless native V2 is allowed", async ({
   page,
 }, { project }) => {
   for (const allowNative of [false, true]) {
@@ -433,6 +433,34 @@ test("author tabindex changes and removing itemcontrols restore authored eligibi
   await expect(page.getByTestId("action")).toBeFocused();
 });
 
+test("an authored tabindex=-1 on an inactive item's control survives activation", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+    <div focusgroup="feed">
+      <div tabindex="0" data-testid="one">One
+        <button focusgroup="none" data-testid="action">Action</button>
+      </div>
+      <div tabindex="0" data-testid="two">Two</div>
+    </div>
+    <button data-testid="after">After</button>
+  `,
+  );
+  await page.getByTestId("two").focus();
+  await expect(page.getByTestId("action")).toHaveAttribute("tabindex", "-1");
+  // Same value the filter already wrote, so only oldValue tells them apart.
+  await page
+    .getByTestId("action")
+    .evaluate((el) => el.setAttribute("tabindex", "-1"));
+  await page.getByTestId("one").focus();
+  await expect(page.getByTestId("action")).toHaveAttribute("tabindex", "-1");
+  await pressTab(page, project);
+  await expect(page.getByTestId("after")).toBeFocused();
+});
+
 test("nested none wrappers are transparent to opt-out association", async ({
   page,
 }, { project }) => {
@@ -585,4 +613,98 @@ test("removing an owner subtree releases controls with their original tabindex",
   const action = await page.getByTestId("action").elementHandle();
   await page.getByTestId("wrapper").evaluate((el) => el.remove());
   await expect.poll(() => action.getAttribute("tabindex")).toBeNull();
+});
+
+test("noitemcontrols is polyfilled when native itemcontrols cannot be disabled", async ({
+  page,
+}, { project }) => {
+  const specifier = project.name.endsWith("Shadowless")
+    ? "/build/index-shadowless.mjs"
+    : "/build/index.mjs";
+  for (const { attr, supported, polyfilled } of [
+    {
+      attr: "feed noitemcontrols",
+      supported: ["feed", "itemcontrols"],
+      polyfilled: true,
+    },
+    {
+      attr: "feed noitemcontrols",
+      supported: ["feed", "itemcontrols", "noitemcontrols"],
+      polyfilled: false,
+    },
+    // Without native itemcontrols there is nothing for noitemcontrols to undo.
+    {
+      attr: "toolbar noitemcontrols",
+      supported: ["toolbar"],
+      polyfilled: false,
+    },
+  ]) {
+    await page.goto("about:blank");
+    await page.goto("/test.html");
+    await page.setContent(
+      `<div focusgroup="${attr}"><div tabindex="0">One</div>
+        <div tabindex="0" data-testid="two">Two</div></div>`,
+    );
+    await page.evaluate(
+      async ({ supported, specifier }) => {
+        globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__ = true;
+        document.body.focusGroup = {
+          supports: (token) => supported.includes(token),
+        };
+        const { polyfill } = await import(specifier);
+        polyfill();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      },
+      { supported, specifier },
+    );
+    await expect(page.getByTestId("two")).toHaveAttribute(
+      "tabindex",
+      polyfilled ? "-1" : "0",
+    );
+  }
+});
+
+test("item controls work when the engine lacks :popover-open", async ({
+  page,
+}, { project }) => {
+  await page.goto("/test.html");
+  await page.setContent(`
+    <div focusgroup="feed">
+      <div tabindex="0" data-testid="one">One
+        <button focusgroup="none" data-testid="one-action">Action</button>
+      </div>
+      <div tabindex="0" data-testid="two">Two
+        <button focusgroup="none" data-testid="two-action">Action</button>
+      </div>
+    </div>`);
+  await page.evaluate(
+    async (specifier) => {
+      const matches = Element.prototype.matches;
+      Element.prototype.matches = function (selector) {
+        if (selector.includes(":popover-open")) {
+          throw new DOMException("Unsupported selector", "SyntaxError");
+        }
+        return matches.call(this, selector);
+      };
+      const { polyfill } = await import(specifier);
+      polyfill();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    },
+    project.name.endsWith("Shadowless")
+      ? "/build/index-shadowless.mjs"
+      : "/build/index.mjs",
+  );
+  await page.getByTestId("one").focus();
+  await expect(page.getByTestId("two-action")).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("two")).toBeFocused();
+  await expect(page.getByTestId("one-action")).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+  await pressTab(page, project);
+  await expect(page.getByTestId("two-action")).toBeFocused();
 });

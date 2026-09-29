@@ -19,9 +19,9 @@ import {
   checkVisibility,
   getNavigationDirection,
   isKeyboardFocusable,
+  isTopLayer,
   parseDefinition,
-  shouldPolyfillV2,
-  supportsFocusGroup,
+  shouldDeferToNative,
 } from "./utils.js";
 
 /**
@@ -150,14 +150,7 @@ export class FocusGroup {
    * @param {FocusGroupOptions} [options]
    */
   constructor(owner, items, options = {}) {
-    const behavior = options.definition?.behavior;
-    if (
-      !owner ||
-      (!shouldPolyfillV2(behavior) &&
-        supportsFocusGroup(behavior) &&
-        (!options.definition?.itemcontrols ||
-          supportsFocusGroup("itemcontrols")))
-    ) {
+    if (!owner || shouldDeferToNative(options.definition)) {
       return;
     }
 
@@ -264,9 +257,7 @@ export class FocusGroup {
       if (
         (behaviorChanged ||
           info.definition.itemcontrols !== this.#definition.itemcontrols) &&
-        !shouldPolyfillV2(info.definition.behavior) &&
-        supportsFocusGroup(info.definition.behavior) &&
-        (!info.definition.itemcontrols || supportsFocusGroup("itemcontrols"))
+        shouldDeferToNative(info.definition)
       ) {
         // The behavior changed to one the browser now natively supports
         // (and that we don't force-polyfill). Tear down entirely instead of
@@ -460,10 +451,7 @@ export class FocusGroup {
       ancestor && ancestor !== this.#owner;
       ancestor = getParentElement(ancestor)
     ) {
-      if (
-        ancestor.matches?.(":modal, :popover-open") ||
-        ancestor.matches?.("[inert]")
-      ) {
+      if (isTopLayer(ancestor) || ancestor.matches?.("[inert]")) {
         return null;
       }
       if (ancestor.hasAttribute?.("focusgroup")) {

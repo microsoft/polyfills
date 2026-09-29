@@ -115,13 +115,15 @@ export class TreeWalkerItemCollection {
           "href",
           "hidden",
           "inert",
-          "class",
-          "style",
           "slot",
           "name",
           "tabindex",
           "type",
+          // Rendering changes can alter which item controls are eligible.
+          // Only observe these hot attributes when that filter is active.
+          ...(this.#itemcontrols ? ["class", "style"] : []),
         ],
+        attributeOldValue: true,
         childList: true,
         subtree: true,
       },
@@ -445,7 +447,7 @@ export class TreeWalkerItemCollection {
         !(
           e.type === "attributes" &&
           e.attributeName === "tabindex" &&
-          (isControlWrite(e.target) ||
+          (isControlWrite(e, records) ||
             (e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
               e.target.getAttribute(DatasetName.ITEM) !== this.id) ||
             e.target === this.#owner)

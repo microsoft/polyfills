@@ -27,16 +27,44 @@ export function setItemTabindex(element, value) {
   }
 }
 
-export function isControlWrite(element) {
+/** @type {WeakMap<MutationRecord[], Map<Node, MutationRecord>>} */
+const lastWrites = new WeakMap();
+
+/**
+ * Whether a `tabindex` mutation record was caused by the control filter. Any
+ * other write is adopted as the control's authored value.
+ * Requires `attributeOldValue` on the observer.
+ * @param {MutationRecord} record
+ * @param {MutationRecord[]} records - The batch `record` was delivered in.
+ */
+export function isControlWrite(record, records) {
+  const element = /** @type {HTMLElement} */ (record.target);
   const entry = controls.get(element);
   if (!entry) {
     return false;
+  }
+  let last = lastWrites.get(records);
+  if (!last) {
+    last = new Map();
+    for (const r of records) {
+      if (r.attributeName === "tabindex") {
+        last.set(r.target, r);
+      }
+    }
+    lastWrites.set(records, last);
+  }
+  // Only the batch's last write pairs its oldValue with the current value.
+  // Earlier ones may include writes another observer already reconciled.
+  if (last.get(element) !== record) {
+    return true;
   }
   const current = element.getAttribute("tabindex");
   const expected = [...entry.owners.values()].every(Boolean)
     ? entry.tabindex
     : "-1";
-  if (current === expected) {
+  // `apply()` never rewrites an unchanged value, so a same-value write (e.g.
+  // an author setting `tabindex="-1"` on an inactive control) is authored.
+  if (current === expected && record.oldValue !== current) {
     return true;
   }
   entry.tabindex = current;

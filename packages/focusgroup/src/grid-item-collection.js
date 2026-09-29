@@ -404,7 +404,7 @@ export class GridItemCollection {
           (record) =>
             record.type !== "attributes" ||
             record.attributeName !== "tabindex" ||
-            !isControlWrite(record.target),
+            !isControlWrite(record, records),
         );
         if (!records.length) {
           return;
@@ -429,6 +429,7 @@ export class GridItemCollection {
       },
       {
         attributes: true,
+        attributeOldValue: true,
         childList: true,
         subtree: true,
         attributeFilter: [
