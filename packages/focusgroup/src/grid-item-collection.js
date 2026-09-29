@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
-import { isControlWrite } from "./item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
+import { authoredTabindex } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -400,23 +400,22 @@ export class GridItemCollection {
     this.#observable.startObserving(
       this.#owner,
       (records) => {
-        records = records.filter(
-          (record) =>
-            record.type !== "attributes" ||
-            record.attributeName !== "tabindex" ||
-            !isControlWrite(record, records),
-        );
         if (!records.length) {
           return;
         }
-        const authorTabindexChanges = records
-          .filter(
-            (record) =>
-              record.type === "attributes" &&
-              record.attributeName === "tabindex" &&
-              this.#entries.some((entry) => entry.element === record.target),
-          )
-          .map((record) => record.target);
+        const authorTabindexChanges = new Map(
+          records
+            .filter(
+              (record) =>
+                record.type === "attributes" &&
+                record.attributeName === "tabindex" &&
+                this.#entries.some((entry) => entry.element === record.target),
+            )
+            .map((record) => [
+              /** @type {HTMLElement} */ (record.target),
+              authoredTabindex(record),
+            ]),
+        );
         const definition = records.some(
           (record) =>
             record.type === "attributes" &&

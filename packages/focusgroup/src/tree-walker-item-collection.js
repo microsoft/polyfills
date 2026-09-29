@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
-import { isControlWrite } from "./item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
+import { authoredTabindex } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -142,10 +142,8 @@ export class TreeWalkerItemCollection {
   }
 
   /**
-   * Flushes this collection's mutation observer by calling `takeRecords()`,
-   * dropping any pending records (typically caused by polyfill-managed
-   * attribute writes during decoration). Called by `FocusGroup` after writing
-   * `tabindex`/`data-fg-*` to avoid re-entering `#handleItemsMutate`.
+   * Queues pending author records for reconciliation. Managed tabindex writes
+   * are excluded at their source rather than by discarding the whole batch.
    */
   flush() {
     this.#observable.flush();
@@ -447,9 +445,8 @@ export class TreeWalkerItemCollection {
         !(
           e.type === "attributes" &&
           e.attributeName === "tabindex" &&
-          (isControlWrite(e, records) ||
-            (e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
-              e.target.getAttribute(DatasetName.ITEM) !== this.id) ||
+          ((e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
+            e.target.getAttribute(DatasetName.ITEM) !== this.id) ||
             e.target === this.#owner)
         ),
     );
@@ -470,8 +467,8 @@ export class TreeWalkerItemCollection {
       }
     }
 
-    /** @type {HTMLElement[]} */
-    const authorTabindexChanges = [];
+    /** @type {Map<HTMLElement, string|null>} */
+    const authorTabindexChanges = new Map();
     for (const e of relevant) {
       if (
         e.type === "attributes" &&
@@ -479,7 +476,10 @@ export class TreeWalkerItemCollection {
         e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
         e.target.getAttribute(DatasetName.ITEM) === this.id
       ) {
-        authorTabindexChanges.push(/** @type {HTMLElement} */ (e.target));
+        authorTabindexChanges.set(
+          /** @type {HTMLElement} */ (e.target),
+          authoredTabindex(e),
+        );
       }
     }
 

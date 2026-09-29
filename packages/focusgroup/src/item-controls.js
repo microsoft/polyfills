@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { state } from "./global-state.js";
+import { authoredTabindex, writeTabindex } from "./observer-registry.js";
 
 /**
  * Multiple enclosing focusgroups can filter the same nested boundary. Keep
@@ -20,56 +21,26 @@ export function setItemTabindex(element, value) {
   if (entry) {
     entry.tabindex = value;
     apply(element, entry);
-  } else if (value === null) {
-    element.removeAttribute("tabindex");
   } else {
-    element.setAttribute("tabindex", value);
+    writeTabindex(element, value);
   }
 }
 
-/** @type {WeakMap<MutationRecord[], Map<Node, MutationRecord>>} */
-const lastWrites = new WeakMap();
-
 /**
- * Whether a `tabindex` mutation record was caused by the control filter. Any
- * other write is adopted as the control's authored value.
- * Requires `attributeOldValue` on the observer.
- * @param {MutationRecord} record
- * @param {MutationRecord[]} records - The batch `record` was delivered in.
+ * Adopt author values retained by the observer, not the possibly overwritten
+ * DOM value after a synchronous focus change.
+ * @param {MutationRecord[]} records
  */
-export function isControlWrite(record, records) {
-  const element = /** @type {HTMLElement} */ (record.target);
-  const entry = controls.get(element);
-  if (!entry) {
-    return false;
-  }
-  let last = lastWrites.get(records);
-  if (!last) {
-    last = new Map();
-    for (const r of records) {
-      if (r.attributeName === "tabindex") {
-        last.set(r.target, r);
-      }
+export function adoptControlWrites(records) {
+  for (const record of records) {
+    if (record.attributeName !== "tabindex") {
+      continue;
     }
-    lastWrites.set(records, last);
+    const entry = controls.get(/** @type {HTMLElement} */ (record.target));
+    if (entry) {
+      entry.tabindex = authoredTabindex(record);
+    }
   }
-  // Only the batch's last write pairs its oldValue with the current value.
-  // Earlier ones may include writes another observer already reconciled.
-  if (last.get(element) !== record) {
-    return true;
-  }
-  const current = element.getAttribute("tabindex");
-  const expected = [...entry.owners.values()].every(Boolean)
-    ? entry.tabindex
-    : "-1";
-  // `apply()` never rewrites an unchanged value, so a same-value write (e.g.
-  // an author setting `tabindex="-1"` on an inactive control) is authored.
-  if (current === expected && record.oldValue !== current) {
-    return true;
-  }
-  entry.tabindex = current;
-  apply(element, entry);
-  return false;
 }
 
 export function setControlActive(element, owner, active) {
@@ -98,9 +69,5 @@ function apply(element, entry) {
   const value = [...entry.owners.values()].every(Boolean)
     ? entry.tabindex
     : "-1";
-  if (value === null) {
-    element.removeAttribute("tabindex");
-  } else if (element.getAttribute("tabindex") !== value) {
-    element.setAttribute("tabindex", value);
-  }
+  writeTabindex(element, value);
 }

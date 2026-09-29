@@ -42,6 +42,11 @@ class ShadowMutationObserver {
   }
 
   #callbackWrapper = (mutations, observer) => {
+    this.#trackShadows(mutations);
+    this.#callback(mutations, observer);
+  };
+
+  #trackShadows(mutations) {
     for (const mutation of mutations) {
       if (mutation.type === "childList") {
         const removed = mutation.removedNodes;
@@ -56,9 +61,7 @@ class ShadowMutationObserver {
         }
       }
     }
-
-    this.#callback(mutations, observer);
-  };
+  }
 
   #addSubObserver(shadowRoot) {
     if (
@@ -193,6 +196,7 @@ class ShadowMutationObserver {
       records.push(...subObserver.takeRecords());
     }
 
+    this.#trackShadows(records);
     return records;
   }
 }

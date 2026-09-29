@@ -6,16 +6,15 @@
 // one registry. Short property names so bundlers can mangle local references
 // freely; only the one long key on `globalThis` survives minification.
 //
-//   o: Set<MutationObserver> — every focusgroup MutationObserver, flushed
-//      together during focus events to discard stale records from
-//      polyfill-managed attribute writes (prevents cross-group loops).
+//   o: Set<ObservableItemCollection> — collection observers that distinguish
+//      managed tabindex writes from pending author mutations.
 //   m: Map<HTMLElement, FocusGroup> — element → polyfilled FocusGroup.
 //   g: MutationObserver — singleton observer on `document.body` for
 //      auto-disconnect on removal and (when `b` is true) auto-polyfill on add.
 //   b: boolean — whether the global observer should also polyfill new nodes.
 //   c: Map<HTMLElement, *> — shared itemcontrols filter for nested owners.
 /**
- * @type {{ o: Set<MutationObserver>, m?: Map<HTMLElement, *>, g?: MutationObserver, b: boolean, c?: Map<HTMLElement, *> }}
+ * @type {{ o: Set<import("./observable-item-collection.js").ObservableItemCollection>, m?: Map<HTMLElement, *>, g?: MutationObserver, b: boolean, c?: Map<HTMLElement, *> }}
  * @global
  */
 globalThis.__FOCUSGROUP_POLYFILL__ ??= {

@@ -9,7 +9,7 @@ import {
   setControlActive,
   setItemTabindex,
 } from "./item-controls.js";
-import { flushAllObservers } from "./observer-registry.js";
+import { writeTabindex } from "./observer-registry.js";
 import {
   createTreeWalker,
   getParentElement,
@@ -203,9 +203,8 @@ export class FocusGroup {
    * listeners (via the abort signal), then disconnects the items collection
    * if it supports it.
    *
-   * Ordering matters: owner-proxy teardown can trigger `flushAllObservers()`,
-   * which expects the items' observer to still be in the global registry.
-   * The items' own `disconnect()` is therefore called last.
+   * Restore proxy/control tabindex while the observer is registered so these
+   * managed writes are excluded from overlapping collections too.
    *
    * NOTE: This method does not undecorate the elements. Call it only after
    * the focusgroup owner has been removed from the DOM.
@@ -242,12 +241,15 @@ export class FocusGroup {
     // entirely. Applying the tabindex marker update up front ensures it's
     // never lost or overwritten by that swap.
     if (info.authorTabindexChanges) {
-      for (const el of info.authorTabindexChanges) {
+      for (const change of info.authorTabindexChanges) {
+        const el = Array.isArray(change) ? change[0] : change;
         const saved = managedTabindex(el);
-        el.setAttribute(
-          DatasetName.AUTHOR_TABINDEX,
-          (saved === undefined ? el.getAttribute("tabindex") : saved) ?? "none",
-        );
+        const value = Array.isArray(change)
+          ? change[1]
+          : saved === undefined
+            ? el.getAttribute("tabindex")
+            : saved;
+        el.setAttribute(DatasetName.AUTHOR_TABINDEX, value ?? "none");
       }
     }
 
@@ -256,7 +258,8 @@ export class FocusGroup {
 
       if (
         (behaviorChanged ||
-          info.definition.itemcontrols !== this.#definition.itemcontrols) &&
+          info.definition.itemcontrols !== this.#definition.itemcontrols ||
+          info.definition.noitemcontrols !== this.#definition.noitemcontrols) &&
         shouldDeferToNative(info.definition)
       ) {
         // The behavior changed to one the browser now natively supports
@@ -688,10 +691,8 @@ export class FocusGroup {
     }
 
     this.#ownerTabindexBeforeProxy = this.#owner.getAttribute("tabindex");
-    this.#owner.tabIndex = 0;
+    writeTabindex(this.#owner, "0");
     this.#ownerIsProxy = true;
-
-    flushAllObservers();
   }
 
   /** Undoes `#enableFocusabilityProxy`. */
@@ -700,17 +701,11 @@ export class FocusGroup {
       return;
     }
 
-    if (this.#ownerTabindexBeforeProxy !== null) {
-      this.#owner.setAttribute("tabindex", this.#ownerTabindexBeforeProxy);
-    } else {
-      this.#owner.removeAttribute("tabindex");
-    }
+    writeTabindex(this.#owner, this.#ownerTabindexBeforeProxy);
 
     this.#ownerIsProxy = false;
     this.#ownerTabindexBeforeProxy = null;
     this.#items.flush?.();
-
-    flushAllObservers();
   }
 
   /**
@@ -739,7 +734,5 @@ export class FocusGroup {
     // disabled (it was disabled in #handleFocusin). Just clear in case any
     // lingered.
     this.#disableFocusabilityProxy();
-
-    flushAllObservers();
   }
 }
