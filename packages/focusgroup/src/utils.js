@@ -67,6 +67,27 @@ export function shouldPolyfillV2(behavior) {
 }
 
 /**
+ * Whether an owner should be left to the native implementation: its behavior
+ * is natively supported and not force-polyfilled, and every modifier that
+ * changes its semantics is natively supported too. `noitemcontrols` only
+ * matters when the user agent could otherwise apply `itemcontrols`.
+ *
+ * @param {FocusGroupDefinition} [definition]
+ * @returns {boolean}
+ */
+export function shouldDeferToNative(definition) {
+  const { behavior, itemcontrols, noitemcontrols } = definition ?? {};
+  return (
+    !shouldPolyfillV2(behavior) &&
+    supportsFocusGroup(behavior) &&
+    (!itemcontrols || supportsFocusGroup(BehaviorToken.ITEMCONTROLS)) &&
+    (!noitemcontrols ||
+      !supportsFocusGroup(BehaviorToken.ITEMCONTROLS) ||
+      supportsFocusGroup(BehaviorToken.NOITEMCONTROLS))
+  );
+}
+
+/**
  * @typedef {Object} FocusGroupDefinition
  * @property {BehaviorToken | null} [behavior]
  * @property {boolean} [wrap]
@@ -418,6 +439,31 @@ export function isSegmentor(element, owner) {
     }
   }
   return false;
+}
+
+/** @type {string|undefined} */
+let topLayerSelector;
+
+/**
+ * Whether the element is a modal dialog or an open popover. Pseudo-classes the
+ * engine doesn't support are skipped, since an unsupported selector would make
+ * `matches()` throw (e.g. `:popover-open` before Safari 17 / Firefox 125).
+ *
+ * @param {Element} element
+ * @returns {boolean}
+ */
+export function isTopLayer(element) {
+  topLayerSelector ??= [":modal", ":popover-open"]
+    .filter((selector) => {
+      try {
+        element.matches(selector);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .join();
+  return !!topLayerSelector && !!element.matches?.(topLayerSelector);
 }
 
 /**

@@ -7,6 +7,7 @@ import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
+  getParentElement,
   nodeContains,
 } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
@@ -14,8 +15,7 @@ import {
   hasDocument,
   inferRole,
   parseDefinition,
-  shouldPolyfillV2,
-  supportsFocusGroup,
+  shouldDeferToNative,
 } from "./utils.js";
 
 let elementPolyfillMap;
@@ -107,12 +107,7 @@ export function polyfill(root) {
       continue;
     }
 
-    const definition = parseDefinition(element);
-    if (
-      !shouldPolyfillV2(definition.behavior) &&
-      supportsFocusGroup(definition.behavior) &&
-      (!definition.itemcontrols || supportsFocusGroup("itemcontrols"))
-    ) {
+    if (shouldDeferToNative(parseDefinition(element))) {
       continue;
     }
 
@@ -157,10 +152,14 @@ export function polyfill(root) {
         },
       });
       elementPolyfillMap.set(element, fg);
-      for (const [ancestor, group] of elementPolyfillMap) {
-        if (ancestor !== element && group && nodeContains(ancestor, element)) {
-          group.update();
-        }
+      // Walk ancestors rather than scanning every tracked owner, which would
+      // make initial polyfilling quadratic in the number of owners.
+      for (
+        let ancestor = getParentElement(element);
+        ancestor;
+        ancestor = getParentElement(ancestor)
+      ) {
+        elementPolyfillMap.get(ancestor)?.update();
       }
     });
   }
