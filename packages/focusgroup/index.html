@@ -66,6 +66,26 @@
     writing-mode: vertical-rl;
   }
 
+  .grid-demo {
+    border-collapse: collapse;
+
+    :is(td, [focusgrouprow] > *) {
+      border: 1px solid;
+      min-inline-size: 6rem;
+      padding: 0.75rem;
+      text-align: center;
+    }
+  }
+
+  div.grid-demo {
+    display: grid;
+    grid-template-columns: repeat(3, max-content);
+
+    [focusgrouprow] {
+      display: contents;
+    }
+  }
+
   aside {
     background-color: light-dark(#eee, #222);
     border-radius: 0.5rem;
@@ -370,6 +390,32 @@
   <button>1</button>
   <input>
   <button>2</button>
+</div>
+
+<hr>
+
+<h2>Native table grid</h2>
+<table class="grid-demo" focusgroup="grid rowwrap">
+  <tbody>
+    <tr><td tabindex="0">A1</td><td tabindex="0">A2</td><td tabindex="0">A3</td></tr>
+    <tr><td tabindex="0">B1</td><td tabindex="0">B2</td><td tabindex="0">B3</td></tr>
+    <tr><td tabindex="0">C1</td><td tabindex="0">C2</td><td tabindex="0">C3</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Manual grid with flow</h2>
+<div class="grid-demo" focusgroup="grid manual flow">
+  <div focusgrouprow>
+    <button>A1</button><button>A2</button><button>A3</button>
+  </div>
+  <div focusgrouprow>
+    <button>B1</button><button>B2</button><button>B3</button>
+  </div>
+  <div focusgrouprow>
+    <button>C1</button><button>C2</button><button>C3</button>
+  </div>
 </div>
 
 <hr>

@@ -28,6 +28,7 @@ export const BehaviorToken = {
   LISTBOX: "listbox",
   MENU: "menu",
   MENUBAR: "menubar",
+  GRID: "grid",
   NONE: "none",
 };
 export const BEHAVIOR_TOKENS = [
@@ -37,6 +38,7 @@ export const BEHAVIOR_TOKENS = [
   BehaviorToken.LISTBOX,
   BehaviorToken.MENU,
   BehaviorToken.MENUBAR,
+  BehaviorToken.GRID,
   BehaviorToken.NONE,
 ];
 
@@ -85,5 +87,11 @@ export const BehaviorMap = {
     childRole: "menuitem",
     wrap: true,
     axis: "inline",
+  },
+  grid: {
+    ownerRole: "grid",
+    childRole: "gridcell",
+    wrap: false,
+    axis: undefined,
   },
 };

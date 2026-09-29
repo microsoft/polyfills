@@ -4,7 +4,11 @@
 import { BehaviorToken, DatasetName } from "./constants.js";
 import { flushAllObservers } from "./observer-registry.js";
 import { nodeContains } from "./shadow-utils/index.js";
-import { getNavigationDirection, supportsFocusGroup } from "./utils.js";
+import {
+  getNavigationDirection,
+  shouldPolyfillV2,
+  supportsFocusGroup,
+} from "./utils.js";
 
 /**
  * @import {
@@ -37,23 +41,14 @@ export class FocusGroup {
   #behavior = null;
 
   /**
-   * The focus group navigation axis limitation.
-   * @type {("inline" | "block" | undefined)}
-   */
-  #axis = undefined;
-
-  /**
-   * Whether the focus group wraps. Defaults to `false`.
-   * @type {boolean}
-   */
-  #wrap = false;
-
-  /**
    * Whether the focus group remembers the previously focused element.
    * Defaults to `true`.
    * @type {boolean}
    */
   #memory = true;
+
+  /** @type {FocusGroupDefinition} */
+  #definition = {};
 
   /**
    * The focus group start element (initial tab stop after decoration).
@@ -95,9 +90,12 @@ export class FocusGroup {
 
   /**
    * Optional owner-decoration hook injected via `options.decorateOwner`.
-   * Called with `(owner, behavior)` on decoration and `(owner, null)` on
-   * undecoration. When absent, no owner decoration happens.
-   * @type {((element: HTMLElement, behavior: BehaviorToken|null) => void) | undefined}
+   * Called with `(owner, behavior, valid)` on decoration and `(owner, null)`
+   * on undecoration. `valid` reflects the item collection's post-build
+   * validity (e.g. `GridItemCollection#valid`) when applicable, and is
+   * `undefined` for collections that don't expose it. When absent, no owner
+   * decoration happens.
+   * @type {((element: HTMLElement, behavior: BehaviorToken|null, valid?: boolean) => void) | undefined}
    */
   #decorateOwner;
 
@@ -109,6 +107,20 @@ export class FocusGroup {
    */
   #decorateItem;
 
+  /** @type {((definition: FocusGroupDefinition) => FocusGroupItemCollection) | undefined} */
+  #createItems;
+
+  /**
+   * Optional hook injected via `options.onNativeTakeover`, called with the
+   * owner element when `update()` tears this instance down because the
+   * owner's behavior changed to one the browser now natively supports (see
+   * `update()`). Lets the caller (`polyfill.js`) remove the owner from its
+   * tracking map so a later behavior change back to a polyfilled behavior
+   * re-activates polyfilling instead of being silently ignored.
+   * @type {((owner: HTMLElement) => void) | undefined}
+   */
+  #onNativeTakeover;
+
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
    * @param {FocusGroupItemCollection} items - The items collection providing
@@ -116,7 +128,11 @@ export class FocusGroup {
    * @param {FocusGroupOptions} [options]
    */
   constructor(owner, items, options = {}) {
-    if (supportsFocusGroup() || !owner) {
+    const behavior = options.definition?.behavior;
+    if (
+      !owner ||
+      (!shouldPolyfillV2(behavior) && supportsFocusGroup(behavior))
+    ) {
       return;
     }
 
@@ -124,9 +140,11 @@ export class FocusGroup {
     this.#items = items;
     this.#decorateOwner = options.decorateOwner;
     this.#decorateItem = options.decorateItem;
+    this.#createItems = options.createItems;
+    this.#onNativeTakeover = options.onNativeTakeover;
 
     this.#updateDefinition(options.definition);
-    this.#decorateOwner?.(this.#owner, this.#behavior);
+    this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
     this.#decorateItems();
 
     const opts = { signal: this.#abort.signal };
@@ -145,6 +163,7 @@ export class FocusGroup {
       this.#handleFocusout.bind(this),
       opts,
     );
+    this.#items.observe?.(this);
   }
 
   /**
@@ -183,11 +202,12 @@ export class FocusGroup {
       return;
     }
 
-    if (info.definition !== undefined) {
-      this.#updateDefinition(info.definition);
-      this.#decorateOwner?.(this.#owner, this.#behavior);
-    }
-
+    // Apply author tabindex changes first: a behavior/topology change and an
+    // author tabindex change can arrive in the same mutation batch, and the
+    // definition-changed branch below may swap/undecorate the items
+    // collection (which rewrites `data-fg-ati`) or tear this instance down
+    // entirely. Applying the tabindex marker update up front ensures it's
+    // never lost or overwritten by that swap.
     if (info.authorTabindexChanges) {
       for (const el of info.authorTabindexChanges) {
         el.setAttribute(
@@ -197,15 +217,54 @@ export class FocusGroup {
       }
     }
 
+    if (info.definition !== undefined) {
+      const behaviorChanged = info.definition.behavior !== this.#behavior;
+
+      if (
+        behaviorChanged &&
+        !shouldPolyfillV2(info.definition.behavior) &&
+        supportsFocusGroup(info.definition.behavior)
+      ) {
+        // The behavior changed to one the browser now natively supports
+        // (and that we don't force-polyfill). Tear down entirely instead of
+        // swapping in a different items collection and staying "polyfilled"
+        // — otherwise this instance would keep managing an owner that
+        // should be left to native handling. The global attribute-mutation
+        // observer in `polyfill.js` will re-activate polyfilling later if
+        // the behavior reverts to a polyfilled one.
+        const owner = this.#owner;
+        this.#undecorateItems();
+        this.disconnect();
+        this.#onNativeTakeover?.(owner);
+        return;
+      }
+
+      const topologyChanged =
+        this.#behavior === "grid" &&
+        info.definition.behavior === "grid" &&
+        info.definition.manual !== this.#definition.manual;
+      if ((behaviorChanged || topologyChanged) && this.#createItems) {
+        this.#undecorateItems();
+        this.#items.disconnect?.();
+        this.#items = this.#createItems(info.definition);
+        this.#updateDefinition(info.definition);
+        this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
+        this.#decorateItems();
+        this.#items.observe?.(this);
+        return;
+      }
+      this.#updateDefinition(info.definition);
+      this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
+    }
+
     this.#undecorateItems();
     this.#decorateItems();
   }
 
   /** @param {FocusGroupDefinition} [def] */
   #updateDefinition(def) {
+    this.#definition = def ?? {};
     this.#behavior = def?.behavior ?? null;
-    this.#wrap = def?.wrap ?? false;
-    this.#axis = def?.axis;
     this.#memory = def?.memory ?? true;
     if (!this.#memory) {
       this.#current = null;
@@ -306,25 +365,29 @@ export class FocusGroup {
 
     let target;
 
-    switch (getNavigationDirection(evt, current, this.#axis)) {
-      case "start":
-        target = this.#items.first();
-        break;
-      case "end":
-        target = this.#items.last();
-        break;
-      case "forward":
-        target = this.#items.next(current);
-        if (!target && this.#wrap) {
+    if (this.#items.navigate) {
+      target = this.#items.navigate(evt, current, this.#definition);
+    } else {
+      switch (getNavigationDirection(evt, current, this.#definition.axis)) {
+        case "start":
           target = this.#items.first();
-        }
-        break;
-      case "backward":
-        target = this.#items.previous(current);
-        if (!target && this.#wrap) {
+          break;
+        case "end":
           target = this.#items.last();
-        }
-        break;
+          break;
+        case "forward":
+          target = this.#items.next(current);
+          if (!target && this.#definition.wrap) {
+            target = this.#items.first();
+          }
+          break;
+        case "backward":
+          target = this.#items.previous(current);
+          if (!target && this.#definition.wrap) {
+            target = this.#items.last();
+          }
+          break;
+      }
     }
 
     if (target && target !== current) {

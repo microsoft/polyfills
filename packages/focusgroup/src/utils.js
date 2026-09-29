@@ -19,14 +19,50 @@ export function hasDocument() {
 }
 
 /**
- * Whether the current user agent supports focusgroup.
+ * Whether the current user agent natively supports a focusgroup behavior.
  *
+ * V2 behaviors (e.g. `grid`) are unconditionally polyfilled — see
+ * `shouldPolyfillV2()` below for why — so this only reports native support
+ * for the V1 surface (`document.body.focusGroup`).
+ *
+ * @param {BehaviorToken | null} [behavior]
  * @returns {boolean}
  */
-export function supportsFocusGroup() {
+export function supportsFocusGroup(behavior) {
+  if (!hasDocument()) {
+    return false;
+  }
+  const focusGroup = document.body.focusGroup;
+  if (typeof focusGroup?.supports === "function") {
+    return behavior ? focusGroup.supports(behavior) : true;
+  }
+  return false;
+}
+
+/**
+ * V2 (e.g. `grid`) is still an early-stage, unstable explainer/spec: the
+ * shape of the attribute and its behaviors can still change before any
+ * browser ships a matching implementation. If the polyfill deferred to a
+ * native implementation whenever one exists, sites could get caught in a
+ * compatibility trap — a browser could ship a V2 implementation that matches
+ * an older iteration of the spec than the one the polyfill (and the site)
+ * has moved on to, silently changing behavior underneath the site once the
+ * polyfill defers to it.
+ *
+ * To avoid that, usage of V2 behaviors is unconditionally polyfilled by
+ * default, regardless of native support, until there's confidence the API
+ * shape has stabilized (e.g. once a browser ships it). Authors can opt back
+ * into deferring to a native implementation — e.g. for an origin trial, demo
+ * site, or test that needs to exercise the native behavior — by setting
+ * `globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__` to `true`.
+ *
+ * @param {BehaviorToken | null} [behavior]
+ * @returns {boolean}
+ */
+export function shouldPolyfillV2(behavior) {
   return (
-    "focusgroup" in (globalThis?.HTMLElement?.prototype ?? {}) ||
-    "focusGroup" in (globalThis?.HTMLElement?.prototype ?? {})
+    behavior === BehaviorToken.GRID &&
+    !globalThis?.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__
   );
 }
 
@@ -36,6 +72,9 @@ export function supportsFocusGroup() {
  * @property {boolean} [wrap]
  * @property {("inline"|"block"|undefined)} [axis]
  * @property {boolean} [memory]
+ * @property {("none"|"wrap"|"flow")} [rowEdge]
+ * @property {("none"|"wrap"|"flow")} [colEdge]
+ * @property {boolean} [manual]
  */
 
 /**
@@ -47,7 +86,9 @@ export function supportsFocusGroup() {
  * @returns {FocusGroupDefinition}
  */
 export function parseDefinition(owner) {
-  const tokens = (owner.getAttribute("focusgroup") ?? "").split(" ");
+  const tokens = (owner.getAttribute("focusgroup") ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
   const behavior =
     tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ?? null;
   const base = BehaviorMap[behavior];
@@ -67,12 +108,150 @@ export function parseDefinition(owner) {
       : hasInline
         ? "inline"
         : "block";
-  return {
+  const resolveEdge = (wrapToken, flowToken) => {
+    const hasWrap = tokens.includes(wrapToken) || tokens.includes("wrap");
+    const hasFlow = tokens.includes(flowToken) || tokens.includes("flow");
+    if (tokens.includes("nowrap") || (hasWrap && hasFlow)) {
+      return "none";
+    }
+    return hasWrap ? "wrap" : hasFlow ? "flow" : "none";
+  };
+  const rowEdge = resolveEdge("rowwrap", "rowflow");
+  const colEdge = resolveEdge("colwrap", "colflow");
+  const definition = {
     behavior,
     wrap,
     axis,
     memory: !tokens.includes("nomemory"),
   };
+  if (behavior === BehaviorToken.GRID) {
+    Object.assign(definition, {
+      manual: tokens.includes("manual"),
+      rowEdge,
+      colEdge,
+    });
+  }
+  return definition;
+}
+
+/**
+ * @typedef {(
+ *   "grid-start" | "grid-end" | "row-start" | "row-end" |
+ *   "inline-forward" | "inline-backward" |
+ *   "block-forward" | "block-backward"
+ * )} GridNavigationDirection
+ */
+
+/**
+ * Collects keyboard modifier and writing-direction state shared by linear and
+ * grid navigation.
+ * @param {KeyboardEvent} event
+ * @param {HTMLElement} owner
+ */
+function getKeyboardNavigationContext(event, owner) {
+  const { writingMode, direction } = window.getComputedStyle(owner);
+  return {
+    commandModified: event.ctrlKey || event.metaKey,
+    optionModified: event.shiftKey || event.altKey,
+    writingMode,
+    vertical: !writingMode.startsWith("horizontal-"),
+    rtl: direction === "rtl",
+  };
+}
+
+/**
+ * Resolves the logical axis ("inline"/"block") and base direction (forward/
+ * backward, before writing-mode/direction reversal) for one of the four
+ * arrow keys. Returns `null` for any other key. Shared by
+ * `getNavigationDirection()` and `getGridNavigationDirection()` so the
+ * writing-mode-aware arrow-key mapping only lives in one place.
+ *
+ * `group` is the physical key pairing ("row" for Up/Down, "col" for
+ * Left/Right) — kept distinct from `axis` because in vertical writing modes
+ * the logical axis swaps (Up/Down becomes the inline axis) while the
+ * reversal formula (see `isAxisReversed()`) still depends on which physical
+ * pairing the key belongs to.
+ *
+ * @param {string} key
+ * @param {boolean} vertical
+ * @returns {{axis: "inline"|"block", group: "row"|"col", forward: boolean}|null}
+ */
+function getArrowKeyAxis(key, vertical) {
+  const map = {
+    ArrowLeft: {
+      axis: vertical ? "block" : "inline",
+      group: "col",
+      forward: false,
+    },
+    ArrowRight: {
+      axis: vertical ? "block" : "inline",
+      group: "col",
+      forward: true,
+    },
+    ArrowUp: {
+      axis: vertical ? "inline" : "block",
+      group: "row",
+      forward: false,
+    },
+    ArrowDown: {
+      axis: vertical ? "inline" : "block",
+      group: "row",
+      forward: true,
+    },
+  };
+  return map[key] ?? null;
+}
+
+/**
+ * Whether the given physical key pairing's direction is reversed given the
+ * writing mode and direction. See `getArrowKeyAxis()` for `group`.
+ *
+ * @param {"row"|"col"} group
+ * @param {string} writingMode
+ * @param {boolean} vertical
+ * @param {boolean} rtl
+ * @returns {boolean}
+ */
+function isAxisReversed(group, writingMode, vertical, rtl) {
+  if (group === "col") {
+    return vertical ? writingMode.endsWith("-rl") !== rtl : rtl;
+  }
+  return vertical && rtl;
+}
+
+/**
+ * Returns a grid operation for a directional key, accounting for writing mode
+ * and direction.
+ * @param {KeyboardEvent} event
+ * @param {HTMLElement} owner
+ * @returns {GridNavigationDirection|null}
+ */
+export function getGridNavigationDirection(event, owner) {
+  const { commandModified, optionModified, writingMode, vertical, rtl } =
+    getKeyboardNavigationContext(event, owner);
+  if (commandModified && !optionModified && !(event.ctrlKey && event.metaKey)) {
+    return event.key === "Home"
+      ? "grid-start"
+      : event.key === "End"
+        ? "grid-end"
+        : null;
+  }
+  if (optionModified || event.metaKey) {
+    return null;
+  }
+  if (event.key === "Home") {
+    return "row-start";
+  }
+  if (event.key === "End") {
+    return "row-end";
+  }
+  const action = getArrowKeyAxis(event.key, vertical);
+  if (!action) {
+    return null;
+  }
+  const reversed = isAxisReversed(action.group, writingMode, vertical, rtl);
+  const forward = reversed ? !action.forward : action.forward;
+  return `${action.axis}-${forward ? "forward" : "backward"}`;
 }
 
 /**
@@ -89,9 +268,14 @@ export function generateUniqueId() {
  *
  * @param {HTMLElement} element
  * @param {HTMLElement=} owner
+ * @param {boolean=} ignorePolyfillTabindex
  * @returns {boolean}
  */
-export function isKeyboardFocusable(element, owner) {
+export function isKeyboardFocusable(
+  element,
+  owner,
+  ignorePolyfillTabindex = false,
+) {
   return (
     // Is content editable
     (element.isContentEditable ||
@@ -99,7 +283,11 @@ export function isKeyboardFocusable(element, owner) {
       // `tabIndex` is `-1` in WebKit in this case
       element.matches(":is(audio, video)[controls]") ||
       // Is tabbable
-      element.tabIndex > -1) &&
+      element.tabIndex > -1 ||
+      (ignorePolyfillTabindex &&
+        element.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
+        element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
+        Number(element.getAttribute(DatasetName.AUTHOR_TABINDEX)) > -1)) &&
     !(
       // Not disabled
       (
@@ -114,7 +302,8 @@ export function isKeyboardFocusable(element, owner) {
         // Not a media element without controls
         element.matches(":is(audio, video):not([controls])") ||
         // Has not been assigned a tabindex by the polyfill
-        element.hasAttribute(DatasetName.AUTHOR_TABINDEX)
+        (!ignorePolyfillTabindex &&
+          element.hasAttribute(DatasetName.AUTHOR_TABINDEX))
       )
     )
   );
@@ -134,56 +323,36 @@ export function isKeyboardFocusable(element, owner) {
  *     if there shouldn’t be navigation, e.g. when directional limit applies.
  */
 export function getNavigationDirection(event, owner, axis) {
-  const FORWARD = "forward";
-  const BACKWARD = "backward";
-  const BLOCK = "block";
-  const INLINE = "inline";
-
   if (isKeyConflictElement(event.composedPath()[0])) {
-    return event.key === "Tab" ? (event.shiftKey ? BACKWARD : FORWARD) : null;
+    return event.key === "Tab"
+      ? event.shiftKey
+        ? "backward"
+        : "forward"
+      : null;
   }
 
-  if (event.shiftKey || event.ctrlKey || event.metaKey) {
+  const { commandModified, optionModified, writingMode, vertical, rtl } =
+    getKeyboardNavigationContext(event, owner);
+
+  if (optionModified || commandModified) {
     return null;
   }
 
-  const { writingMode, direction } = window.getComputedStyle(owner);
-  const isVertical = !writingMode.startsWith("horizontal-");
-  const isRtl = direction === "rtl";
-  const horizontal = isVertical ? BLOCK : INLINE;
-  const vertical = isVertical ? INLINE : BLOCK;
-  const isHorizontalReversed = isVertical
-    ? writingMode.endsWith("-rl") !== isRtl
-    : isRtl;
-  const isVerticalReversed = isVertical && isRtl;
+  if (event.key === "Home") {
+    return "start";
+  }
+  if (event.key === "End") {
+    return "end";
+  }
 
-  const map = {
-    ArrowUp: {
-      axis: vertical,
-      dir: isVerticalReversed ? FORWARD : BACKWARD,
-    },
-    ArrowDown: {
-      axis: vertical,
-      dir: isVerticalReversed ? BACKWARD : FORWARD,
-    },
-    ArrowLeft: {
-      axis: horizontal,
-      dir: isHorizontalReversed ? FORWARD : BACKWARD,
-    },
-    ArrowRight: {
-      axis: horizontal,
-      dir: isHorizontalReversed ? BACKWARD : FORWARD,
-    },
-    Home: { dir: "start" },
-    End: { dir: "end" },
-  };
-
-  const action = map[event.key];
-  if (!action || (axis && action.axis && action.axis !== axis)) {
+  const action = getArrowKeyAxis(event.key, vertical);
+  if (!action || (axis && action.axis !== axis)) {
     return null;
   }
 
-  return action.dir;
+  const reversed = isAxisReversed(action.group, writingMode, vertical, rtl);
+  const forward = reversed ? !action.forward : action.forward;
+  return forward ? "forward" : "backward";
 }
 
 /**
@@ -252,7 +421,7 @@ export function isSegmentor(element, owner) {
  *     When omitted, only `element` itself is checked.
  * @returns {boolean}
  */
-function checkVisibility(element, ancestor) {
+export function checkVisibility(element, ancestor) {
   if ("checkVisibility" in Element.prototype) {
     return element.checkVisibility({
       visibilityProperty: true,
