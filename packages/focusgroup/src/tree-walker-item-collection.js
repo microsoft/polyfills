@@ -45,6 +45,9 @@ export class TreeWalkerItemCollection {
    */
   id = generateUniqueId();
 
+  /** @type {Set<Element>} */
+  #decorated = new Set();
+
   /**
    * First descendant with the `focusgroupstart` attribute (shadow-aware),
    * or the first item as fallback, or `null` if none exist. `FocusGroup`
@@ -214,6 +217,7 @@ export class TreeWalkerItemCollection {
       }
 
       node.setAttribute(DatasetName.ITEM, this.id);
+      this.#decorated.add(node);
       if (pendingSegmentBoundary) {
         segment++;
         node.setAttribute(DatasetName.SEGMENT, String(segment));
@@ -246,21 +250,15 @@ export class TreeWalkerItemCollection {
 
   /**
    * Clears all marker attributes (`data-fg-item`, `data-fg-seg`,
-   * `data-fg-segs`) written by `decorate()`. Light walk over marked nodes.
+   * `data-fg-segs`) written by `decorate()`, including items that left the tree.
    */
   undecorate() {
-    // Snapshot first — clearing markers mid-walk would invalidate the
-    // walker's filter and skip subsequent nodes.
-    const marked = [];
-    this.#walker.currentNode = this.#owner;
-    while (this.#walker.nextNode()) {
-      marked.push(/** @type {HTMLElement} */ (this.#walker.currentNode));
-    }
-    for (const node of marked) {
+    for (const node of this.#decorated) {
       node.removeAttribute(DatasetName.ITEM);
       node.removeAttribute(DatasetName.SEGMENT);
       node.removeAttribute(DatasetName.SEGMENT_START);
     }
+    this.#decorated.clear();
   }
 
   /**
@@ -440,6 +438,9 @@ export class TreeWalkerItemCollection {
    * @returns {FocusGroupUpdateInfo | null}
    */
   #classify(records) {
+    if (!records.length) {
+      return {};
+    }
     const relevant = records.filter(
       (e) =>
         !(
