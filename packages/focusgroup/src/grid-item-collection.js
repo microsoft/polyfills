@@ -425,9 +425,6 @@ export class GridItemCollection {
     this.#observable.startObserving(
       this.#owner,
       (records) => {
-        if (!records.length) {
-          return;
-        }
         const authorTabindexChanges = new Map(
           records
             .filter(

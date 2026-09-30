@@ -8,7 +8,6 @@ import {
   createMutationObserver,
   createTreeWalker,
   getParentElement,
-  nodeContains,
 } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import {
@@ -31,21 +30,21 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
     // a plain `MutationObserver` never sees those additions. The shadowless
     // build swaps this for a plain `MutationObserver`.
     const observer = createMutationObserver((entries) => {
+      if (entries.some((entry) => entry.removedNodes.length)) {
+        // The task may have moved owners out of the removed wrapper again.
+        for (const [owner, group] of elementPolyfillMap) {
+          if (!owner.isConnected) {
+            group?.disconnect();
+            elementPolyfillMap.delete(owner);
+          }
+        }
+      }
       for (const entry of entries) {
         if (entry.type === "attributes") {
           if (state.b) {
             polyfill(entry.target);
           }
           continue;
-        }
-
-        for (const node of entry.removedNodes) {
-          for (const [owner, group] of elementPolyfillMap) {
-            if (!owner.isConnected && nodeContains(node, owner)) {
-              group?.disconnect();
-              elementPolyfillMap.delete(owner);
-            }
-          }
         }
 
         if (!state.b) {

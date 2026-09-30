@@ -3,6 +3,12 @@ https://github.com/web-platform-tests/wpt/blob/master/html/interaction/focus/foc
 
 ## Item controls regressions
 
+`review-lifecycle.spec.js` checks detached reparenting/reinsertion, slot assignment
+changes for shadow-owned items and controls, and native button semantics in grids.
+Removal cleanup restores authored attributes; connected moves retain ownership.
+The shadow-aware observer reports an empty batch for `slotchange`, since no DOM
+mutation record exists under a shadow-owned group for light-DOM reassignment.
+
 `itemcontrols-rendering.spec.js` covers class/style visibility changes (including
 sibling selectors), ownership state, and native control eligibility.
 `itemcontrols-pending-mutations.spec.js` covers author changes and focus movement

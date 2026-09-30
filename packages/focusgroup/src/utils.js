@@ -544,7 +544,7 @@ export function inferRole(element, behavior, kind) {
     // Only mapped roles permitted on buttons by ARIA in HTML.
     (kind === "child" &&
       element.nodeName === "BUTTON" &&
-      ["tab", "radio", "option", "menuitem", "gridcell"].includes(mappedRole));
+      ["tab", "radio", "option", "menuitem"].includes(mappedRole));
   const role = allowRoleInferring ? mappedRole : undefined;
 
   if (role) {

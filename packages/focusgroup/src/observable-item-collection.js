@@ -1,8 +1,13 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { DatasetName } from "./constants.js";
 import { adoptControlWrites } from "./item-controls.js";
-import { observers, rememberTabindexValues } from "./observer-registry.js";
+import {
+  authoredTabindex,
+  observers,
+  rememberTabindexValues,
+} from "./observer-registry.js";
 import { createTreeWalker } from "./shadow-utils/index.js";
 import { checkVisibility } from "./utils.js";
 
@@ -78,6 +83,14 @@ export class ObservableItemCollection {
       }
     };
     this.#observer = createObserver((records) => {
+      // Slot assignment changes have no MutationRecord in the owner's DOM tree.
+      if (!records.length) {
+        this.capture();
+        this.#deliver?.();
+        this.#rendering = null;
+        onRecords(records);
+        return;
+      }
       this.#enqueue(records);
       this.#deliver?.();
     });
@@ -88,6 +101,18 @@ export class ObservableItemCollection {
   stopObserving() {
     this.capture();
     adoptControlWrites(this.#pending);
+    for (const record of this.#pending) {
+      const element = /** @type {HTMLElement} */ (record.target);
+      if (
+        record.attributeName === "tabindex" &&
+        element.hasAttribute(DatasetName.AUTHOR_TABINDEX)
+      ) {
+        element.setAttribute(
+          DatasetName.AUTHOR_TABINDEX,
+          authoredTabindex(record) ?? "none",
+        );
+      }
+    }
     observers.delete(this);
     this.#observer?.disconnect();
     this.#observer = null;

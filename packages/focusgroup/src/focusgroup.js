@@ -48,6 +48,9 @@ export class FocusGroup {
    */
   #items;
 
+  /** @type {Set<HTMLElement>} */
+  #decoratedItems = new Set();
+
   /**
    * The focus group behavior.
    * @type {BehaviorToken | null}
@@ -204,14 +207,13 @@ export class FocusGroup {
    *
    * Other registered collections still exclude the teardown's managed writes.
    *
-   * NOTE: This method does not undecorate the elements. Call it only after
-   * the focusgroup owner has been removed from the DOM.
+   * Restore decorations too so removed owners can be safely reinserted.
    */
   disconnect() {
     this.#abort.abort();
     this.#items?.disconnect?.();
-    this.#disableFocusabilityProxy();
-    this.#undecorateItemControls();
+    this.#undecorateItems();
+    this.#decorateOwner?.(this.#owner, null);
     this.#owner = null;
   }
 
@@ -316,6 +318,7 @@ export class FocusGroup {
     this.#items.decorate?.();
 
     for (const { element, segmentBoundary } of this.#items.items()) {
+      this.#decoratedItems.add(element);
       // Set role
       this.#decorateItem?.(element, this.#behavior);
 
@@ -362,7 +365,8 @@ export class FocusGroup {
 
     let undecorated = false;
 
-    for (const { element } of this.#items.items()) {
+    // Items can have left the flat tree (for example after slot reassignment).
+    for (const element of this.#decoratedItems) {
       undecorated = true;
 
       // Restore role
@@ -379,6 +383,7 @@ export class FocusGroup {
         element.removeAttribute(DatasetName.AUTHOR_TABINDEX);
       }
     }
+    this.#decoratedItems.clear();
 
     this.#items.undecorate?.();
 
