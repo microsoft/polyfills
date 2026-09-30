@@ -61,8 +61,29 @@ export function supportsFocusGroup(behavior) {
  */
 export function shouldPolyfillV2(behavior) {
   return (
-    behavior === BehaviorToken.GRID &&
+    (behavior === BehaviorToken.GRID || behavior === BehaviorToken.FEED) &&
     !globalThis?.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__
+  );
+}
+
+/**
+ * Whether an owner should be left to the native implementation: its behavior
+ * is natively supported and not force-polyfilled, and every modifier that
+ * changes its semantics is natively supported too. `noitemcontrols` only
+ * matters when the user agent could otherwise apply `itemcontrols`.
+ *
+ * @param {FocusGroupDefinition} [definition]
+ * @returns {boolean}
+ */
+export function shouldDeferToNative(definition) {
+  const { behavior, itemcontrols, noitemcontrols } = definition ?? {};
+  return (
+    !shouldPolyfillV2(behavior) &&
+    supportsFocusGroup(behavior) &&
+    (!itemcontrols || supportsFocusGroup(BehaviorToken.ITEMCONTROLS)) &&
+    (!noitemcontrols ||
+      !supportsFocusGroup(BehaviorToken.ITEMCONTROLS) ||
+      supportsFocusGroup(BehaviorToken.NOITEMCONTROLS))
   );
 }
 
@@ -72,6 +93,8 @@ export function shouldPolyfillV2(behavior) {
  * @property {boolean} [wrap]
  * @property {("inline"|"block"|undefined)} [axis]
  * @property {boolean} [memory]
+ * @property {boolean} [itemcontrols]
+ * @property {boolean} [noitemcontrols]
  * @property {("none"|"wrap"|"flow")} [rowEdge]
  * @property {("none"|"wrap"|"flow")} [colEdge]
  * @property {boolean} [manual]
@@ -92,6 +115,10 @@ export function parseDefinition(owner) {
   const behavior =
     tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ?? null;
   const base = BehaviorMap[behavior];
+  const hasItemControls = tokens.includes(BehaviorToken.ITEMCONTROLS);
+  const hasNoItemControls = tokens.includes(BehaviorToken.NOITEMCONTROLS);
+  const defaultItemControls =
+    behavior === BehaviorToken.FEED || behavior === BehaviorToken.GRID;
   let wrap = base?.wrap ?? false;
   if (tokens.includes("wrap")) {
     wrap = true;
@@ -123,6 +150,9 @@ export function parseDefinition(owner) {
     wrap,
     axis,
     memory: !tokens.includes("nomemory"),
+    itemcontrols:
+      !hasNoItemControls && (hasItemControls || defaultItemControls),
+    noitemcontrols: hasNoItemControls,
   };
   if (behavior === BehaviorToken.GRID) {
     Object.assign(definition, {
@@ -269,13 +299,26 @@ export function generateUniqueId() {
  * @param {HTMLElement} element
  * @param {HTMLElement=} owner
  * @param {boolean=} ignorePolyfillTabindex
+ * @param {string|null} [authoredTabindex] - Test an unsuppressed tabindex;
+ *   null tests implicit native focusability while a control is suppressed.
  * @returns {boolean}
  */
 export function isKeyboardFocusable(
   element,
   owner,
   ignorePolyfillTabindex = false,
+  authoredTabindex = undefined,
 ) {
+  let tabIndex = element.tabIndex;
+  if (authoredTabindex === null) {
+    tabIndex = element.matches(
+      "button, input, select, textarea, a[href], area[href], summary, iframe, object, embed",
+    )
+      ? 0
+      : -1;
+  } else if (authoredTabindex !== undefined) {
+    tabIndex = Number(authoredTabindex);
+  }
   return (
     // Is content editable
     (element.isContentEditable ||
@@ -283,7 +326,7 @@ export function isKeyboardFocusable(
       // `tabIndex` is `-1` in WebKit in this case
       element.matches(":is(audio, video)[controls]") ||
       // Is tabbable
-      element.tabIndex > -1 ||
+      tabIndex > -1 ||
       (ignorePolyfillTabindex &&
         element.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
         element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
@@ -403,12 +446,37 @@ export function isSegmentor(element, owner) {
   while (walker.nextNode()) {
     if (
       walker.currentNode !== element &&
-      isKeyboardFocusable(walker.currentNode, owner)
+      isKeyboardFocusable(walker.currentNode, owner, true)
     ) {
       return true;
     }
   }
   return false;
+}
+
+/** @type {string|undefined} */
+let topLayerSelector;
+
+/**
+ * Whether the element is a modal dialog or an open popover. Pseudo-classes the
+ * engine doesn't support are skipped, since an unsupported selector would make
+ * `matches()` throw (e.g. `:popover-open` before Safari 17 / Firefox 125).
+ *
+ * @param {Element} element
+ * @returns {boolean}
+ */
+export function isTopLayer(element) {
+  topLayerSelector ??= [":modal", ":popover-open"]
+    .filter((selector) => {
+      try {
+        element.matches(selector);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .join();
+  return !!topLayerSelector && !!element.matches?.(topLayerSelector);
 }
 
 /**
@@ -469,15 +537,15 @@ export function checkVisibility(element, ancestor) {
  * @param {"owner" | "child"} kind - Which role to look up from RoleMap.
  */
 export function inferRole(element, behavior, kind) {
+  const cfg = BehaviorMap[behavior];
+  const mappedRole = kind === "owner" ? cfg?.ownerRole : cfg?.childRole;
   const allowRoleInferring =
     hasGenericRole(element) ||
-    (kind === "child" && element.nodeName === "BUTTON");
-  const cfg = BehaviorMap[behavior];
-  const role = allowRoleInferring
-    ? kind === "owner"
-      ? cfg?.ownerRole
-      : cfg?.childRole
-    : undefined;
+    // Only mapped roles permitted on buttons by ARIA in HTML.
+    (kind === "child" &&
+      element.nodeName === "BUTTON" &&
+      ["tab", "radio", "option", "menuitem"].includes(mappedRole));
+  const role = allowRoleInferring ? mappedRole : undefined;
 
   if (role) {
     if (

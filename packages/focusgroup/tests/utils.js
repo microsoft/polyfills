@@ -10,6 +10,9 @@ import { expect as baseExpect } from "@playwright/test";
  * @param {string} html - HTML body content to set
  */
 export async function setupPage(page, project, html) {
+  // A fresh document avoids Firefox cancelling a same-URL navigation after
+  // setContent() replaced the previous document.
+  await page.goto("about:blank");
   await page.goto("/test.html");
   await page.setContent(html);
   const specifier = project.name.endsWith("Shadowless")
@@ -18,10 +21,17 @@ export async function setupPage(page, project, html) {
   await page.evaluate(async (specifier) => {
     const { polyfill } = await import(specifier);
     polyfill();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
   }, specifier);
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => resolve())),
   );
+}
+
+export async function pressTab(page, project, reverse = false) {
+  // Safari's default macOS setting skips native buttons unless Option is held.
+  const modifiers = project.name.startsWith("webkit") ? "Alt+" : "";
+  await page.keyboard.press(`${modifiers}${reverse ? "Shift+" : ""}Tab`);
 }
 
 /**

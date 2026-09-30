@@ -816,9 +816,28 @@ test.describe("parseDefinition()", () => {
       wrap: false,
       axis: "inline",
       memory: true,
+      itemcontrols: false,
+      noitemcontrols: false,
     });
   });
 
+  test("parses V2 defaults and noitemcontrols precedence", async ({ page }) => {
+    expect(await parse(page, "feed")).toMatchObject({
+      behavior: "feed",
+      axis: "block",
+      wrap: false,
+      itemcontrols: true,
+    });
+    expect((await parse(page, "grid")).itemcontrols).toBe(true);
+    expect((await parse(page, "toolbar itemcontrols")).itemcontrols).toBe(true);
+    for (const attr of [
+      "feed noitemcontrols",
+      "grid itemcontrols noitemcontrols",
+      "toolbar noitemcontrols itemcontrols",
+    ]) {
+      expect((await parse(page, attr)).itemcontrols).toBe(false);
+    }
+  });
   test("uses the first valid behavior token regardless of position", async ({
     page,
   }) => {

@@ -7,14 +7,14 @@ import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
+  getParentElement,
 } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import {
   hasDocument,
   inferRole,
   parseDefinition,
-  shouldPolyfillV2,
-  supportsFocusGroup,
+  shouldDeferToNative,
 } from "./utils.js";
 
 let elementPolyfillMap;
@@ -30,19 +30,21 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
     // a plain `MutationObserver` never sees those additions. The shadowless
     // build swaps this for a plain `MutationObserver`.
     const observer = createMutationObserver((entries) => {
+      if (entries.some((entry) => entry.removedNodes.length)) {
+        // The task may have moved owners out of the removed wrapper again.
+        for (const [owner, group] of elementPolyfillMap) {
+          if (!owner.isConnected) {
+            group?.disconnect();
+            elementPolyfillMap.delete(owner);
+          }
+        }
+      }
       for (const entry of entries) {
         if (entry.type === "attributes") {
           if (state.b) {
             polyfill(entry.target);
           }
           continue;
-        }
-
-        for (const node of entry.removedNodes) {
-          if (elementPolyfillMap.has(node)) {
-            elementPolyfillMap.get(node)?.disconnect();
-            elementPolyfillMap.delete(node);
-          }
         }
 
         if (!state.b) {
@@ -89,6 +91,7 @@ export function polyfill(root) {
         : NodeFilter.FILTER_SKIP,
   );
 
+  const pending = [];
   do {
     const element = walker.currentNode;
 
@@ -103,11 +106,7 @@ export function polyfill(root) {
       continue;
     }
 
-    const definition = parseDefinition(element);
-    if (
-      !shouldPolyfillV2(definition.behavior) &&
-      supportsFocusGroup(definition.behavior)
-    ) {
+    if (shouldDeferToNative(parseDefinition(element))) {
       continue;
     }
 
@@ -115,8 +114,12 @@ export function polyfill(root) {
     // from the global mutation observer) cannot schedule a duplicate
     // FocusGroup before the rAF callback below installs the real instance.
     elementPolyfillMap.set(element, null);
+    pending.push(element);
+  } while (walker.nextNode());
 
-    // Make sure the element is ready during initial polyfilling.
+  // Descendants must establish their own tab stops before an ancestor can
+  // decide which nested boundaries to filter.
+  for (const element of pending.reverse()) {
     requestAnimationFrame(() => {
       // The element may have been removed (and its slot deleted) before the
       // rAF fired; bail out so we don't resurrect a tracking entry.
@@ -124,10 +127,14 @@ export function polyfill(root) {
         return;
       }
       const definition = parseDefinition(element);
+      if (shouldDeferToNative(definition)) {
+        elementPolyfillMap.delete(element);
+        return;
+      }
       const createItems = (nextDefinition) =>
         nextDefinition.behavior === "grid"
           ? new GridItemCollection(element, nextDefinition.manual)
-          : new TreeWalkerItemCollection(element);
+          : new TreeWalkerItemCollection(element, nextDefinition.itemcontrols);
       const items = createItems(definition);
       const fg = new FocusGroup(element, items, {
         definition,
@@ -148,8 +155,17 @@ export function polyfill(root) {
         },
       });
       elementPolyfillMap.set(element, fg);
+      // Walk ancestors rather than scanning every tracked owner, which would
+      // make initial polyfilling quadratic in the number of owners.
+      for (
+        let ancestor = getParentElement(element);
+        ancestor;
+        ancestor = getParentElement(ancestor)
+      ) {
+        elementPolyfillMap.get(ancestor)?.update();
+      }
     });
-  } while (walker.nextNode());
+  }
 }
 
 /**

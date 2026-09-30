@@ -144,6 +144,38 @@ test("should infer ARIA roles for items", async ({ page }, { project }) => {
   );
 });
 
+test("feed items preserve button semantics while generic items infer article", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="feed" data-testid="feed">
+        <button data-testid="button">Button item</button>
+        <div tabindex="0" data-testid="article">Generic item</div>
+      </div>
+    `,
+  );
+
+  await expect(page.getByTestId("button")).toHaveComputedRole("button");
+  await expect(page.getByTestId("button")).not.toHaveAttribute("role");
+  await expect(page.getByTestId("button")).not.toHaveAttribute("data-fg-ir");
+  await expect(page.getByTestId("article")).toHaveComputedRole("article");
+
+  await page
+    .getByTestId("feed")
+    .evaluate((element) => element.setAttribute("focusgroup", "tablist"));
+  await expect(page.getByTestId("button")).toHaveComputedRole("tab");
+  await page
+    .getByTestId("feed")
+    .evaluate((element) => element.setAttribute("focusgroup", "feed"));
+  await expect(page.getByTestId("button")).toHaveComputedRole("button");
+  await expect(page.getByTestId("button")).not.toHaveAttribute("role");
+  await expect(page.getByTestId("button")).not.toHaveAttribute("data-fg-ir");
+  await expect(page.getByTestId("article")).toHaveComputedRole("article");
+});
+
 test("owner and items with a non-generic native role do not get inferred roles", async ({
   page,
 }, { project }) => {

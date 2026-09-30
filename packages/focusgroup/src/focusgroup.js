@@ -2,12 +2,26 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
-import { flushAllObservers } from "./observer-registry.js";
-import { nodeContains } from "./shadow-utils/index.js";
+import { state } from "./global-state.js";
 import {
+  managedTabindex,
+  releaseControl,
+  setControlActive,
+  setItemTabindex,
+} from "./item-controls.js";
+import { writeTabindex } from "./observer-registry.js";
+import {
+  createTreeWalker,
+  getParentElement,
+  nodeContains,
+} from "./shadow-utils/index.js";
+import {
+  checkVisibility,
   getNavigationDirection,
-  shouldPolyfillV2,
-  supportsFocusGroup,
+  isKeyboardFocusable,
+  isTopLayer,
+  parseDefinition,
+  shouldDeferToNative,
 } from "./utils.js";
 
 /**
@@ -33,6 +47,9 @@ export class FocusGroup {
    * @type {FocusGroupItemCollection}
    */
   #items;
+
+  /** @type {Set<HTMLElement>} */
+  #decoratedItems = new Set();
 
   /**
    * The focus group behavior.
@@ -67,6 +84,14 @@ export class FocusGroup {
    * @type {HTMLElement|null}
    */
   #current = null;
+
+  /**
+   * Sequentially eligible nested content and its owner-relative item.
+   * @type {Map<HTMLElement, HTMLElement>}
+   */
+  #itemControls = new Map();
+
+  #reverseTab = false;
 
   /**
    * Whether the owner currently has `tabindex=0` set as a Tab-entry proxy so
@@ -128,11 +153,7 @@ export class FocusGroup {
    * @param {FocusGroupOptions} [options]
    */
   constructor(owner, items, options = {}) {
-    const behavior = options.definition?.behavior;
-    if (
-      !owner ||
-      (!shouldPolyfillV2(behavior) && supportsFocusGroup(behavior))
-    ) {
+    if (!owner || shouldDeferToNative(options.definition)) {
       return;
     }
 
@@ -163,25 +184,36 @@ export class FocusGroup {
       this.#handleFocusout.bind(this),
       opts,
     );
+    this.#owner.ownerDocument.addEventListener(
+      "keydown",
+      (event) => {
+        this.#reverseTab = event.key === "Tab" && event.shiftKey;
+      },
+      { capture: true, ...opts },
+    );
+    this.#owner.ownerDocument.addEventListener(
+      "keyup",
+      () => {
+        this.#reverseTab = false;
+      },
+      { capture: true, ...opts },
+    );
     this.#items.observe?.(this);
   }
 
   /**
-   * Tears down the focus group: disables the owner proxy, removes all event
-   * listeners (via the abort signal), then disconnects the items collection
-   * if it supports it.
+   * Tears down listeners and the collection, then restores proxy/control
+   * tabindex. The collection adopts pending authored values before release.
    *
-   * Ordering matters: owner-proxy teardown can trigger `flushAllObservers()`,
-   * which expects the items' observer to still be in the global registry.
-   * The items' own `disconnect()` is therefore called last.
+   * Other registered collections still exclude the teardown's managed writes.
    *
-   * NOTE: This method does not undecorate the elements. Call it only after
-   * the focusgroup owner has been removed from the DOM.
+   * Restore decorations too so removed owners can be safely reinserted.
    */
   disconnect() {
-    this.#disableFocusabilityProxy();
     this.#abort.abort();
     this.#items?.disconnect?.();
+    this.#undecorateItems();
+    this.#decorateOwner?.(this.#owner, null);
     this.#owner = null;
   }
 
@@ -209,11 +241,15 @@ export class FocusGroup {
     // entirely. Applying the tabindex marker update up front ensures it's
     // never lost or overwritten by that swap.
     if (info.authorTabindexChanges) {
-      for (const el of info.authorTabindexChanges) {
-        el.setAttribute(
-          DatasetName.AUTHOR_TABINDEX,
-          el.getAttribute("tabindex") ?? "none",
-        );
+      for (const change of info.authorTabindexChanges) {
+        const el = Array.isArray(change) ? change[0] : change;
+        const saved = managedTabindex(el);
+        const value = Array.isArray(change)
+          ? change[1]
+          : saved === undefined
+            ? el.getAttribute("tabindex")
+            : saved;
+        el.setAttribute(DatasetName.AUTHOR_TABINDEX, value ?? "none");
       }
     }
 
@@ -221,9 +257,10 @@ export class FocusGroup {
       const behaviorChanged = info.definition.behavior !== this.#behavior;
 
       if (
-        behaviorChanged &&
-        !shouldPolyfillV2(info.definition.behavior) &&
-        supportsFocusGroup(info.definition.behavior)
+        (behaviorChanged ||
+          info.definition.itemcontrols !== this.#definition.itemcontrols ||
+          info.definition.noitemcontrols !== this.#definition.noitemcontrols) &&
+        shouldDeferToNative(info.definition)
       ) {
         // The behavior changed to one the browser now natively supports
         // (and that we don't force-polyfill). Tear down entirely instead of
@@ -240,9 +277,10 @@ export class FocusGroup {
       }
 
       const topologyChanged =
-        this.#behavior === "grid" &&
-        info.definition.behavior === "grid" &&
-        info.definition.manual !== this.#definition.manual;
+        (this.#behavior === "grid" &&
+          info.definition.behavior === "grid" &&
+          info.definition.manual !== this.#definition.manual) ||
+        info.definition.itemcontrols !== this.#definition.itemcontrols;
       if ((behaviorChanged || topologyChanged) && this.#createItems) {
         this.#undecorateItems();
         this.#items.disconnect?.();
@@ -280,15 +318,18 @@ export class FocusGroup {
     this.#items.decorate?.();
 
     for (const { element, segmentBoundary } of this.#items.items()) {
+      this.#decoratedItems.add(element);
       // Set role
       this.#decorateItem?.(element, this.#behavior);
 
       // Set tabindex
+      const saved = managedTabindex(element);
       element.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
-        element.getAttribute("tabindex") ?? "none",
+        (saved === undefined ? element.getAttribute("tabindex") : saved) ??
+          "none",
       );
-      element.tabIndex = segmentBoundary ? 0 : -1;
+      setItemTabindex(element, segmentBoundary ? "0" : "-1");
     }
 
     if (
@@ -301,25 +342,31 @@ export class FocusGroup {
       this.#current = null;
     }
 
+    this.#current = this.#activeItem() ?? this.#current;
+
     const startItem =
       this.#current ?? this.#items.start ?? this.#items.first?.() ?? null;
 
     if (startItem) {
-      startItem.tabIndex = 0;
+      setItemTabindex(startItem, "0");
       this.#start = startItem;
       this.#disableFocusabilityProxy();
       this.#enableFocusabilityProxy(startItem);
     }
+
+    this.#decorateItemControls();
 
     this.#items.flush?.();
   }
 
   #undecorateItems() {
     this.#disableFocusabilityProxy();
+    this.#undecorateItemControls();
 
     let undecorated = false;
 
-    for (const { element } of this.#items.items()) {
+    // Items can have left the flat tree (for example after slot reassignment).
+    for (const element of this.#decoratedItems) {
       undecorated = true;
 
       // Restore role
@@ -329,19 +376,131 @@ export class FocusGroup {
       const authorTabIndex = element.getAttribute(DatasetName.AUTHOR_TABINDEX);
       if (authorTabIndex) {
         if (authorTabIndex === "none") {
-          element.removeAttribute("tabindex");
+          setItemTabindex(element, null);
         } else {
-          element.setAttribute("tabindex", authorTabIndex);
+          setItemTabindex(element, authorTabIndex);
         }
         element.removeAttribute(DatasetName.AUTHOR_TABINDEX);
       }
     }
+    this.#decoratedItems.clear();
 
     this.#items.undecorate?.();
 
     if (undecorated) {
       this.#items.flush?.();
     }
+  }
+
+  #decorateItemControls() {
+    if (!this.#definition.itemcontrols || !this.#items.itemForNode) {
+      return;
+    }
+
+    const walker = createTreeWalker(
+      this.#owner.ownerDocument,
+      this.#owner,
+      NodeFilter.SHOW_ELEMENT,
+    );
+    while (walker.nextNode()) {
+      const element = /** @type {HTMLElement} */ (walker.currentNode);
+      const item = this.#associatedItem(element);
+      if (item && this.#isEligibleControl(element)) {
+        this.#itemControls.set(element, item);
+      }
+    }
+
+    this.#applyItemControls(this.#activeItem());
+  }
+
+  #undecorateItemControls() {
+    for (const element of this.#itemControls.keys()) {
+      releaseControl(element, this);
+    }
+    this.#itemControls.clear();
+  }
+
+  /** @param {HTMLElement|null} activeItem */
+  #applyItemControls(activeItem) {
+    for (const [element, item] of this.#itemControls) {
+      setControlActive(element, this, item === activeItem);
+    }
+    this.#items.flush?.();
+  }
+
+  #activeItem() {
+    let target = this.#owner.ownerDocument.activeElement;
+    while (target?.shadowRoot?.activeElement) {
+      target = target.shadowRoot.activeElement;
+    }
+    if (!target || !nodeContains(this.#owner, target)) {
+      return null;
+    }
+    return (
+      this.#associatedItem(target) ??
+      (this.#behavior === BehaviorToken.GRID && this.#items.contains(target)
+        ? this.#items.itemForNode?.(target)
+        : null) ??
+      (this.#items.isItem?.(target) ? target : null)
+    );
+  }
+
+  /** @param {HTMLElement} element */
+  #associatedItem(element) {
+    if (!this.#definition.itemcontrols || !nodeContains(this.#owner, element)) {
+      return null;
+    }
+    let nestedOwner = null;
+    let optOut = null;
+    for (
+      let ancestor = element;
+      ancestor && ancestor !== this.#owner;
+      ancestor = getParentElement(ancestor)
+    ) {
+      if (isTopLayer(ancestor) || ancestor.matches?.("[inert]")) {
+        return null;
+      }
+      if (ancestor.hasAttribute?.("focusgroup")) {
+        if (ancestor.getAttribute("focusgroup").split(/\s+/).includes("none")) {
+          optOut ??= ancestor;
+        } else if (parseDefinition(ancestor).behavior) {
+          nestedOwner ??= ancestor;
+        }
+      }
+    }
+    // A nested owner associates independently through all enclosing owners;
+    // otherwise this is the nearest parsed owner of the opted-out content.
+    const boundary = nestedOwner ?? optOut;
+    return boundary ? (this.#items.itemForNode?.(boundary) ?? null) : null;
+  }
+
+  /** @param {HTMLElement} element */
+  #isEligibleControl(element) {
+    for (
+      let parent = element;
+      parent && parent !== this.#owner;
+      parent = getParentElement(parent)
+    ) {
+      if (state.m?.has(parent) && !state.m.get(parent)) {
+        return false;
+      }
+    }
+    // Nested rovers can change while an enclosing owner suppresses them.
+    // Track their underlying tab stops, including the currently inactive ones.
+    if (element.hasAttribute(DatasetName.AUTHOR_TABINDEX)) {
+      return !element.disabled && checkVisibility(element, this.#owner);
+    }
+    const saved = managedTabindex(element);
+    if (saved === undefined) {
+      return (
+        (!element.hasAttribute("tabindex") || element.tabIndex >= 0) &&
+        isKeyboardFocusable(element, this.#owner, true)
+      );
+    }
+    return (
+      (saved === null || Number(saved) >= 0) &&
+      isKeyboardFocusable(element, this.#owner, true, saved)
+    );
   }
 
   /** @param {KeyboardEvent} evt */
@@ -395,6 +554,7 @@ export class FocusGroup {
       // Focus events don't cross shadow boundaries for moves within the
       // same shadow tree, so update #current directly here.
       this.#current = target;
+      this.#applyItemControls(this.#current);
       evt.preventDefault();
     }
   }
@@ -419,7 +579,23 @@ export class FocusGroup {
       return;
     }
 
-    if (!this.#items.contains(target)) {
+    const associatedItem =
+      this.#associatedItem(target) ??
+      (this.#behavior === BehaviorToken.GRID && this.#items.contains(target)
+        ? this.#items.itemForNode?.(target)
+        : null);
+    if (!associatedItem && !this.#items.contains(target)) {
+      this.#applyItemControls(null);
+      return;
+    }
+
+    if (
+      associatedItem &&
+      this.#reverseTab &&
+      evt.relatedTarget &&
+      !nodeContains(this.#owner, evt.relatedTarget)
+    ) {
+      associatedItem.focus();
       return;
     }
 
@@ -430,13 +606,21 @@ export class FocusGroup {
     }
 
     const prev = this.#current;
-    this.#current = target;
+    this.#current = associatedItem ?? target;
 
-    if (prev === target) {
+    if (prev === this.#current) {
+      this.#applyItemControls(this.#activeItem());
       return;
     }
 
-    if (target.tabIndex < 0) {
+    this.#applyItemControls(this.#current);
+
+    if (associatedItem && associatedItem.tabIndex < 0) {
+      const transferFrom = prev ?? this.#start;
+      if (transferFrom && transferFrom !== associatedItem) {
+        this.#advanceFocus(transferFrom, associatedItem);
+      }
+    } else if (!associatedItem && target.tabIndex < 0) {
       const transferFrom = prev ?? this.#start;
       if (transferFrom) {
         this.#advanceFocus(transferFrom, target);
@@ -452,6 +636,7 @@ export class FocusGroup {
     // When focus leaves the group, re-enable the owner as a Tab-entry proxy
     // so Tab can re-enter the group to reach the tab stop.
     if (focusLeavingGroup) {
+      this.#applyItemControls(null);
       const tabStop = this.#memory ? this.#current || this.#start : this.#start;
       if (tabStop) {
         this.#enableFocusabilityProxy(tabStop);
@@ -480,11 +665,11 @@ export class FocusGroup {
 
     if (prev !== this.#start || nextStart !== this.#start) {
       for (const { element, segmentBoundary } of this.#items.items()) {
-        element.tabIndex = segmentBoundary ? 0 : -1;
+        setItemTabindex(element, segmentBoundary ? "0" : "-1");
       }
 
       if (nextStart) {
-        nextStart.tabIndex = 0;
+        setItemTabindex(nextStart, "0");
         this.#start = nextStart;
       }
 
@@ -509,10 +694,8 @@ export class FocusGroup {
     }
 
     this.#ownerTabindexBeforeProxy = this.#owner.getAttribute("tabindex");
-    this.#owner.tabIndex = 0;
+    writeTabindex(this.#owner, "0");
     this.#ownerIsProxy = true;
-
-    flushAllObservers();
   }
 
   /** Undoes `#enableFocusabilityProxy`. */
@@ -521,17 +704,11 @@ export class FocusGroup {
       return;
     }
 
-    if (this.#ownerTabindexBeforeProxy !== null) {
-      this.#owner.setAttribute("tabindex", this.#ownerTabindexBeforeProxy);
-    } else {
-      this.#owner.removeAttribute("tabindex");
-    }
+    writeTabindex(this.#owner, this.#ownerTabindexBeforeProxy);
 
     this.#ownerIsProxy = false;
     this.#ownerTabindexBeforeProxy = null;
     this.#items.flush?.();
-
-    flushAllObservers();
   }
 
   /**
@@ -547,17 +724,18 @@ export class FocusGroup {
    *     call `focus()` on the target element.
    */
   #advanceFocus(prev, next, shouldCallFocus = false) {
-    next.tabIndex = 0;
+    setItemTabindex(next, "0");
     if (shouldCallFocus) {
       next.focus();
     }
-    prev.tabIndex = (this.#items.sameSegment?.(prev, next) ?? true) ? -1 : 0;
+    setItemTabindex(
+      prev,
+      (this.#items.sameSegment?.(prev, next) ?? true) ? "-1" : "0",
+    );
 
     // Focus is moving within the group, so the owner proxy should stay
     // disabled (it was disabled in #handleFocusin). Just clear in case any
     // lingered.
     this.#disableFocusabilityProxy();
-
-    flushAllObservers();
   }
 }

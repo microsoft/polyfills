@@ -3,10 +3,12 @@
 
 import { DatasetName } from "./constants.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
+import { authoredTabindex } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
+  nodeContains,
 } from "./shadow-utils/index.js";
 import {
   getGridNavigationDirection,
@@ -258,6 +260,14 @@ export class GridItemCollection {
   isItem(element) {
     return this.#entries.some((e) => e.element === element);
   }
+  /** @param {Element} node */
+  itemForNode(node) {
+    return (
+      (this.#valid
+        ? this.#entries.find((entry) => nodeContains(entry.cell, node))?.element
+        : null) ?? null
+    );
+  }
   #isNavigable(element) {
     const entry = this.#entries.find((item) => item.element === element);
     if (!entry) {
@@ -390,14 +400,19 @@ export class GridItemCollection {
     this.#observable.startObserving(
       this.#owner,
       (records) => {
-        const authorTabindexChanges = records
-          .filter(
-            (record) =>
-              record.type === "attributes" &&
-              record.attributeName === "tabindex" &&
-              this.#entries.some((entry) => entry.element === record.target),
-          )
-          .map((record) => record.target);
+        const authorTabindexChanges = new Map(
+          records
+            .filter(
+              (record) =>
+                record.type === "attributes" &&
+                record.attributeName === "tabindex" &&
+                this.#entries.some((entry) => entry.element === record.target),
+            )
+            .map((record) => [
+              /** @type {HTMLElement} */ (record.target),
+              authoredTabindex(record),
+            ]),
+        );
         const definition = records.some(
           (record) =>
             record.type === "attributes" &&
@@ -410,6 +425,7 @@ export class GridItemCollection {
       },
       {
         attributes: true,
+        attributeOldValue: true,
         childList: true,
         subtree: true,
         attributeFilter: [
@@ -422,6 +438,10 @@ export class GridItemCollection {
           "href",
           "hidden",
           "inert",
+          "class",
+          "style",
+          "slot",
+          "name",
           "rowspan",
           "colspan",
           "tabindex",
