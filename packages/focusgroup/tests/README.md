@@ -1,8 +1,62 @@
-Tests in this directory are converted from Web Platform Tests:
+Tests in this directory exercise keyboard navigation and computed accessibility
+semantics. They are converted from Web Platform Tests, with V2 cases for behavior
+not yet covered there:
 https://github.com/web-platform-tests/wpt/blob/master/html/interaction/focus/focusgroup/
 
-## Item controls regressions
+`itemcontrols.spec.js` checks actual Tab/Shift+Tab entry, active-item controls,
+`noitemcontrols`, nested control eligibility, and grid roles after mutations.
+Assertions do not depend on polyfill-added roles, tabindex values, or markers.
 
+Run the same E2E fixtures without importing any polyfill to compare with a native
+implementation (requires a Canary installation with focusgroup enabled):
+
+```sh
+FOCUSGROUP_NATIVE_ONLY=1 npm test -- --project="Google Chrome Canary" '/focusgroup/tests/'
+```
+
+Native-only mode does not replace feature detection or relax expectations.
+Canary 157.0.8102.0 with experimental web platform features enabled reports the
+tokens as supported, but differs from the current explainers in these fixtures:
+
+- `itemcontrols.spec.js`: Tab visits inactive items/actions; reverse entry lands
+  on an action rather than the selected item boundary. V2's
+  [itemcontrols rules](https://open-ui.org/components/focusgroup-v2.explainer/#itemcontrols)
+  require active-item filtering and boundary entry.
+- `grid.spec.js`: directional navigation is a no-op in the compared fixtures.
+  The [V2 directional operations](https://open-ui.org/components/focusgroup-v2.explainer/#grid-directional-navigation)
+  remain the expected behavior.
+- `itemcontrols.spec.js`: hiding the sole target inside a rendered cell leaves
+  the native owner exposed as `grid`, contrary to the
+  [invalid-state rules](https://open-ui.org/components/focusgroup-v2.explainer/#grid-state-and-invalid-structures).
+  Hiding an entire structural cell is different: exclusion precedes
+  rectangularity and can leave a smaller valid grid. That is not a browser
+  discrepancy; the tests cover both cases separately.
+- `role-inference.spec.js`: a button in an inferred listbox remains `button`.
+  V1 permits the mapped `option` role, which appears in the current
+  [ARIA-in-HTML button allowlist](https://www.w3.org/TR/html-aria/#el-button).
+
+These are reproducible differences from the cited proposals, not an assertion
+that every failure establishes a Chromium defect. Keep failures visible when
+comparing engines; the ordinary test mode retains the package's native-deferral
+policy, including for a toolbar whose reported modifier support is sufficient.
+
+`pressTab()` uses Option on macOS WebKit only for sequences that include native
+buttons/controls. Polyfilled item boundaries with explicit tabindex work with
+plain Tab; the helper also needs to visit unmodified controls and outside
+buttons, which Safari otherwise skips.
+
+## Polyfill implementation regressions
+
+Implementation-specific tests live in [`../src/polyfill-tests`](../src/polyfill-tests/),
+separately from these browser-behavior fixtures. Their shared setup deliberately
+disables native support detection so even Canary tests the polyfill itself;
+native feature-policy tests install their own support matrices with own-property
+`focusGroup` stubs rather than assigning to its native PutForwards setter.
+All six standard/shadowless projects include these tests.
+
+`review-feedback.spec.js` covers mixed-bundle detached cleanup, authored tabindex
+parsing against native IDL behavior, and a model-backed `FocusGroup` whose
+item controls do not require any DOM tree walking.
 `review-lifecycle.spec.js` checks detached reparenting/reinsertion, slot assignment
 changes for shadow-owned items and controls, and native button semantics in grids.
 Removal cleanup restores authored attributes; connected moves retain ownership.
@@ -32,11 +86,14 @@ are explicitly skipped; no historical code is downloaded during normal tests.
 Both load orders exercise sibling and nested owners, arrow keys, and pending
 author records during legacy focus handling. The review regression was measured
 against bundles built from `f71d77b` using the same library build commands.
+Set `FOCUSGROUP_TEST_BUILD` to a separately built revision to reproduce a
+regression against that revision instead of the working tree; test helpers
+serve its emitted modules without modifying the checkout.
 
 Run the isolated Chromium mutation benchmark from this package:
 
 ```sh
-npm test -- --project=chromium tests/itemcontrols-performance.spec.js --workers=1 --repeat-each=3 --reporter=line
+npm test -- --project=chromium src/polyfill-tests/itemcontrols-performance.spec.js --workers=1 --repeat-each=3 --reporter=line
 ```
 
 The fixture has 1,000 articles and opted-out buttons. Each of the class and inline

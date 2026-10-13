@@ -23,15 +23,11 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
   /** @type {Map<HTMLElement, FocusGroup>} */
   elementPolyfillMap = state.m ??= new Map();
 
-  if (!state.g) {
-    // Observe shadow trees too: custom elements commonly render their
-    // `focusgroup` element into a shadow root *after* the polyfill is
-    // installed (e.g. Lit renders in a microtask following the upgrade), and
-    // a plain `MutationObserver` never sees those additions. The shadowless
-    // build swaps this for a plain `MutationObserver`.
-    const observer = createMutationObserver((entries) => {
+  // Legacy bundles may already own `g`; install the current removal protocol
+  // independently so their containment-based cleanup cannot suppress it.
+  if (!state.r) {
+    const removalObserver = createMutationObserver((entries) => {
       if (entries.some((entry) => entry.removedNodes.length)) {
-        // The task may have moved owners out of the removed wrapper again.
         for (const [owner, group] of elementPolyfillMap) {
           if (!owner.isConnected) {
             group?.disconnect();
@@ -39,6 +35,17 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
           }
         }
       }
+    });
+    removalObserver.observe(document.body, { childList: true, subtree: true });
+    state.r = removalObserver;
+  }
+  if (!state.g) {
+    // Observe shadow trees too: custom elements commonly render their
+    // `focusgroup` element into a shadow root *after* the polyfill is
+    // installed (e.g. Lit renders in a microtask following the upgrade), and
+    // a plain `MutationObserver` never sees those additions. The shadowless
+    // build swaps this for a plain `MutationObserver`.
+    const observer = createMutationObserver((entries) => {
       for (const entry of entries) {
         if (entry.type === "attributes") {
           if (state.b) {

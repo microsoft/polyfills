@@ -9,7 +9,12 @@ import { expect as baseExpect } from "@playwright/test";
  * @param {import('@playwright/test').FullProject} project
  * @param {string} html - HTML body content to set
  */
-export async function setupPage(page, project, html) {
+export async function setupPage(
+  page,
+  project,
+  html,
+  { forcePolyfill = false } = {},
+) {
   // A fresh document avoids Firefox cancelling a same-URL navigation after
   // setContent() replaced the previous document.
   await page.goto("about:blank");
@@ -18,18 +23,34 @@ export async function setupPage(page, project, html) {
   const specifier = project.name.endsWith("Shadowless")
     ? "/build/index-shadowless.mjs"
     : "/build/index.mjs";
-  await page.evaluate(async (specifier) => {
-    const { polyfill } = await import(specifier);
-    polyfill();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-  }, specifier);
+  await page.evaluate(
+    async ({ specifier, forcePolyfill, nativeOnly }) => {
+      if (forcePolyfill) {
+        Object.defineProperty(document.body, "focusGroup", {
+          configurable: true,
+          value: { supports: () => false },
+        });
+      }
+      if (!nativeOnly || forcePolyfill) {
+        const { polyfill } = await import(specifier);
+        polyfill();
+      }
+    },
+    {
+      specifier,
+      forcePolyfill,
+      nativeOnly: process.env.FOCUSGROUP_NATIVE_ONLY === "1",
+    },
+  );
   await page.evaluate(
     () => new Promise((resolve) => requestAnimationFrame(() => resolve())),
   );
 }
 
 export async function pressTab(page, project, reverse = false) {
-  // Safari's default macOS setting skips native buttons unless Option is held.
+  // Items managed by the polyfill have explicit tabindex and work with Tab.
+  // These sequences also visit unmodified native buttons outside the group
+  // and in opted-out controls; macOS WebKit needs Option to include those.
   const modifiers = project.name.startsWith("webkit") ? "Alt+" : "";
   await page.keyboard.press(`${modifiers}${reverse ? "Shift+" : ""}Tab`);
 }

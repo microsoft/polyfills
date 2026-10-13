@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
+import { DOMItemControls } from "./dom-item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
 import { authoredTabindex } from "./observer-registry.js";
 import {
@@ -11,6 +12,7 @@ import {
   nodeContains,
 } from "./shadow-utils/index.js";
 import {
+  checkVisibility,
   getGridNavigationDirection,
   hasGenericRole,
   isKeyboardFocusable,
@@ -32,6 +34,8 @@ function flatChildren(element) {
  * explicitly enrolled direct-child rows.
  */
 export class GridItemCollection {
+  /** @type {DOMItemControls} */
+  controls;
   #owner;
   #manual;
   #entries = [];
@@ -60,7 +64,15 @@ export class GridItemCollection {
   constructor(owner, manual) {
     this.#owner = owner;
     this.#manual = manual;
+    this.controls = new DOMItemControls(owner, this);
     this.#build();
+  }
+
+  #participates(element) {
+    return (
+      !getClosestElement(element, "[inert]") &&
+      checkVisibility(element, this.#owner)
+    );
   }
 
   #build() {
@@ -70,7 +82,7 @@ export class GridItemCollection {
     this.#colCount = 0;
     this.#sources = new Map();
     const children = flatChildren(this.#owner);
-    const rows = this.#manual
+    const structuralRows = this.#manual
       ? children.filter((el) => el.hasAttribute("focusgrouprow"))
       : children.flatMap((child) =>
           child.tagName === "TR"
@@ -79,6 +91,8 @@ export class GridItemCollection {
               ? [...child.children].filter((row) => row.tagName === "TR")
               : [],
         );
+    // Exclusion precedes rectangularity: hiding a column can narrow the grid.
+    const rows = structuralRows.filter((row) => this.#participates(row));
     if (
       !rows.length ||
       (!this.#manual && !["TABLE"].includes(this.#owner.tagName))
@@ -87,7 +101,9 @@ export class GridItemCollection {
     }
     const cells = rows.map((row) =>
       flatChildren(row).filter(
-        (cell) => this.#manual || ["TD", "TH"].includes(cell.tagName),
+        (cell) =>
+          (this.#manual || ["TD", "TH"].includes(cell.tagName)) &&
+          this.#participates(cell),
       ),
     );
     if (
@@ -118,6 +134,9 @@ export class GridItemCollection {
         );
         while (walker.nextNode()) {
           const child = walker.currentNode;
+          if (!this.#participates(child)) {
+            continue;
+          }
           const scope = getClosestElement(child, "[focusgroup]");
           const table = getClosestElement(child, "table");
           const inScope =
@@ -162,7 +181,7 @@ export class GridItemCollection {
     this.#rowCount = rows.length;
     this.#colCount = cells[0].length;
 
-    if (!this.#validateFullScope(rows, cells)) {
+    if (!this.#validateFullScope(structuralRows, cells)) {
       this.#entries = [];
       this.#sources = new Map();
       this.#valid = false;
@@ -215,7 +234,7 @@ export class GridItemCollection {
         return false;
       }
 
-      if (rowSet.has(node) || cellSet.has(node)) {
+      if (rowSet.has(node) || cellSet.has(node) || !this.#participates(node)) {
         continue;
       }
 

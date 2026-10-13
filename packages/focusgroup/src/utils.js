@@ -6,6 +6,7 @@ import {
   BehaviorMap,
   BehaviorToken,
   DatasetName,
+  ModifierToken,
 } from "./constants.js";
 import { createTreeWalker, getParentElement } from "./shadow-utils/index.js";
 
@@ -25,7 +26,7 @@ export function hasDocument() {
  * `shouldPolyfillV2()` below for why — so this only reports native support
  * for the V1 surface (`document.body.focusGroup`).
  *
- * @param {BehaviorToken | null} [behavior]
+ * @param {BehaviorToken | ModifierToken | null} [behavior]
  * @returns {boolean}
  */
 export function supportsFocusGroup(behavior) {
@@ -80,10 +81,10 @@ export function shouldDeferToNative(definition) {
   return (
     !shouldPolyfillV2(behavior) &&
     supportsFocusGroup(behavior) &&
-    (!itemcontrols || supportsFocusGroup(BehaviorToken.ITEMCONTROLS)) &&
+    (!itemcontrols || supportsFocusGroup(ModifierToken.ITEMCONTROLS)) &&
     (!noitemcontrols ||
-      !supportsFocusGroup(BehaviorToken.ITEMCONTROLS) ||
-      supportsFocusGroup(BehaviorToken.NOITEMCONTROLS))
+      !supportsFocusGroup(ModifierToken.ITEMCONTROLS) ||
+      supportsFocusGroup(ModifierToken.NOITEMCONTROLS))
   );
 }
 
@@ -115,10 +116,8 @@ export function parseDefinition(owner) {
   const behavior =
     tokens.find((token) => BEHAVIOR_TOKENS.includes(token)) ?? null;
   const base = BehaviorMap[behavior];
-  const hasItemControls = tokens.includes(BehaviorToken.ITEMCONTROLS);
-  const hasNoItemControls = tokens.includes(BehaviorToken.NOITEMCONTROLS);
-  const defaultItemControls =
-    behavior === BehaviorToken.FEED || behavior === BehaviorToken.GRID;
+  const hasItemControls = tokens.includes(ModifierToken.ITEMCONTROLS);
+  const hasNoItemControls = tokens.includes(ModifierToken.NOITEMCONTROLS);
   let wrap = base?.wrap ?? false;
   if (tokens.includes("wrap")) {
     wrap = true;
@@ -151,7 +150,7 @@ export function parseDefinition(owner) {
     axis,
     memory: !tokens.includes("nomemory"),
     itemcontrols:
-      !hasNoItemControls && (hasItemControls || defaultItemControls),
+      !hasNoItemControls && (hasItemControls || (base?.itemControls ?? false)),
     noitemcontrols: hasNoItemControls,
   };
   if (behavior === BehaviorToken.GRID) {
@@ -294,6 +293,50 @@ export function generateUniqueId() {
 }
 
 /**
+ * HTML integer parsing accepts an optional sign and a leading digit sequence,
+ * not JavaScript number syntax (hex, exponents, or whitespace-only zero).
+ * Out-of-range values use the element's default tabindex.
+ * @param {string|null} value
+ * @returns {number|null}
+ */
+function parseTabIndex(value) {
+  const digits = value?.match(/^[\t\n\f\r ]*([+-]?\d+)/)?.[1];
+  if (digits === undefined) {
+    return null;
+  }
+  const parsed = Number(digits);
+  return parsed >= -2147483648 && parsed <= 2147483647 ? parsed : null;
+}
+
+/**
+ * @param {HTMLElement} element
+ * @param {string|null} [authored]
+ */
+export function hasNegativeTabIndex(element, authored) {
+  return (
+    (parseTabIndex(
+      authored === undefined ? element.getAttribute("tabindex") : authored,
+    ) ?? 0) < 0
+  );
+}
+
+/**
+ * Resolve an authored tabindex without mutating a currently suppressed node.
+ * @param {HTMLElement} element
+ * @param {string|null} authored
+ */
+function unsuppressedTabIndex(element, authored) {
+  return (
+    parseTabIndex(authored) ??
+    (element.matches(
+      "button, input, select, textarea, a[href], area[href], summary, iframe, object, embed",
+    )
+      ? 0
+      : -1)
+  );
+}
+
+/**
  * Whether the given element is keyboard focusable (tabbable).
  *
  * @param {HTMLElement} element
@@ -310,14 +353,8 @@ export function isKeyboardFocusable(
   authoredTabindex = undefined,
 ) {
   let tabIndex = element.tabIndex;
-  if (authoredTabindex === null) {
-    tabIndex = element.matches(
-      "button, input, select, textarea, a[href], area[href], summary, iframe, object, embed",
-    )
-      ? 0
-      : -1;
-  } else if (authoredTabindex !== undefined) {
-    tabIndex = Number(authoredTabindex);
+  if (authoredTabindex !== undefined) {
+    tabIndex = unsuppressedTabIndex(element, authoredTabindex);
   }
   return (
     // Is content editable
@@ -330,7 +367,10 @@ export function isKeyboardFocusable(
       (ignorePolyfillTabindex &&
         element.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
         element.getAttribute(DatasetName.AUTHOR_TABINDEX) !== "none" &&
-        Number(element.getAttribute(DatasetName.AUTHOR_TABINDEX)) > -1)) &&
+        unsuppressedTabIndex(
+          element,
+          element.getAttribute(DatasetName.AUTHOR_TABINDEX),
+        ) > -1)) &&
     !(
       // Not disabled
       (
@@ -539,8 +579,16 @@ export function checkVisibility(element, ancestor) {
 export function inferRole(element, behavior, kind) {
   const cfg = BehaviorMap[behavior];
   const mappedRole = kind === "owner" ? cfg?.ownerRole : cfg?.childRole;
+  const genericTag =
+    ["DIV", "SPAN"].includes(element.nodeName) ||
+    element.nodeName.includes("-");
   const allowRoleInferring =
     hasGenericRole(element) ||
+    // Repeated decoration must not mistake our own role for authored semantics.
+    (genericTag && element.hasAttribute(DatasetName.INFERRED_ROLE)) ||
+    // Native inference on generic tags can disappear when we rove tabindex.
+    (["DIV", "SPAN"].includes(element.nodeName) &&
+      element.computedRole === mappedRole) ||
     // Only mapped roles permitted on buttons by ARIA in HTML.
     (kind === "child" &&
       element.nodeName === "BUTTON" &&

@@ -4,109 +4,90 @@
 import { test } from "@playwright/test";
 import { expect, setupPage } from "./utils.js";
 
-test("polyfills grid unconditionally, even when the browser claims native grid support", async ({
-  page,
-}, { project }) => {
-  await page.goto("/test.html");
-  await page.evaluate(() => {
-    Object.defineProperty(HTMLElement.prototype, "focusGroup", {
-      configurable: true,
-      get() {
-        return { supports: () => true };
-      },
+for (const manual of [false, true]) {
+  for (const attribute of ["hidden", "style", "class", "inert"]) {
+    test(`${manual ? "manual" : "automatic"} grids resolve ${attribute} exclusions before rectangularity`, async ({
+      page,
+    }, { project }) => {
+      const rowTag = manual ? "div focusgrouprow" : "tr";
+      const rowEnd = manual ? "div" : "tr";
+      const cellTag = manual ? "div" : "td";
+      const rows = ["a", "b", "c"]
+        .map(
+          (row) => `<${rowTag} data-testid="${row}">
+          ${[1, 2, 3]
+            .map(
+              (col) =>
+                `<${cellTag} tabindex="0" data-testid="${row}${col}">${row}${col}</${cellTag}>`,
+            )
+            .join("")}</${rowEnd}>`,
+        )
+        .join("");
+      await setupPage(
+        page,
+        project,
+        `<style>.unavailable { display: none; }</style>
+        ${manual ? '<div focusgroup="grid manual">' : '<table focusgroup="grid"><tbody>'}
+        ${rows}
+        ${manual ? "</div>" : "</tbody></table>"}`,
+      );
+      const exclude = async (ids, excluded) => {
+        await page.evaluate(
+          ({ ids, excluded, attribute }) => {
+            for (const id of ids) {
+              const el = document.querySelector(`[data-testid="${id}"]`);
+              if (excluded) {
+                el.setAttribute(
+                  attribute,
+                  attribute === "style"
+                    ? "display: none"
+                    : attribute === "class"
+                      ? "unavailable"
+                      : "",
+                );
+              } else {
+                el.removeAttribute(attribute);
+              }
+            }
+            return new Promise(requestAnimationFrame);
+          },
+          { ids, excluded, attribute },
+        );
+      };
+      const navigate = async (from, key, to) => {
+        await page.getByTestId(from).focus();
+        await page.keyboard.press(key);
+        await expect(page.getByTestId(to)).toBeFocused();
+      };
+
+      await navigate("a1", "ArrowRight", "a2");
+      await exclude(["a2", "b2", "c2"], true);
+      await navigate("a1", "ArrowRight", "a3");
+      await navigate("a3", "ArrowDown", "b3");
+      await exclude(["b"], true);
+      await navigate("a3", "ArrowDown", "c3");
+      await exclude(["b"], false);
+      await navigate("a3", "ArrowDown", "b3");
+
+      // Restoring only one row's middle cell makes the shape ragged.
+      await exclude(["b2"], false);
+      await navigate("a1", "ArrowRight", "a1");
+      await exclude(["a2", "c2"], false);
+      await navigate("a1", "ArrowRight", "a2");
+
+      // An empty rendered row is invalid; an excluded row contributes nothing.
+      await exclude(["b1", "b2", "b3"], true);
+      await navigate("a1", "ArrowRight", "a1");
+      await exclude(["b"], true);
+      await navigate("a1", "ArrowDown", "c1");
     });
-  });
-  await page.setContent(`
-    <table role="grid" focusgroup="grid">
-      <tbody>
-        <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
-        <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" data-testid="b2">B2</td></tr>
-      </tbody>
-    </table>
-  `);
-  const specifier = project.name.endsWith("Shadowless")
-    ? "/build/index-shadowless.mjs"
-    : "/build/index.mjs";
-  await page.evaluate(async (moduleSpecifier) => {
-    const { polyfill } = await import(moduleSpecifier);
-    polyfill();
-  }, specifier);
+  }
+}
 
-  await expect(page.getByTestId("b1")).toHaveAttribute("tabindex", "-1");
-  await page.getByTestId("a1").focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(page.getByTestId("b1")).toBeFocused();
-});
-
-test("polyfills a grid when an observed native owner changes behavior", async ({
-  page,
-}, { project }) => {
-  await page.goto("/test.html");
-  await page.evaluate(() => {
-    Object.defineProperty(HTMLElement.prototype, "focusGroup", {
-      configurable: true,
-      get() {
-        return { supports: () => true };
-      },
-    });
-  });
-  await page.setContent(`
-    <table role="grid" focusgroup="toolbar">
-      <tbody>
-        <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
-        <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" data-testid="b2">B2</td></tr>
-      </tbody>
-    </table>
-  `);
-  const specifier = project.name.endsWith("Shadowless")
-    ? "/build/index-shadowless.mjs"
-    : "/build/index.mjs";
-  await page.evaluate(async (moduleSpecifier) => {
-    const { polyfillBodyAndObserve } = await import(moduleSpecifier);
-    polyfillBodyAndObserve();
-  }, specifier);
-
-  await page.locator("table").evaluate((node) => {
-    node.setAttribute("focusgroup", "grid");
-  });
-  await expect(page.getByTestId("b1")).toHaveAttribute("tabindex", "-1");
-  await page.getByTestId("a1").focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(page.getByTestId("b1")).toBeFocused();
-});
-
-test("defers to native grid support when the compatibility opt-out flag is set", async ({
-  page,
-}, { project }) => {
-  await page.goto("/test.html");
-  await page.evaluate(() => {
-    Object.defineProperty(HTMLElement.prototype, "focusGroup", {
-      configurable: true,
-      get() {
-        return { supports: () => true };
-      },
-    });
-    globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__ = true;
-  });
-  await page.setContent(`
-    <table role="grid" focusgroup="grid">
-      <tbody>
-        <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
-        <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" data-testid="b2">B2</td></tr>
-      </tbody>
-    </table>
-  `);
-  const specifier = project.name.endsWith("Shadowless")
-    ? "/build/index-shadowless.mjs"
-    : "/build/index.mjs";
-  await page.evaluate(async (moduleSpecifier) => {
-    const { polyfill } = await import(moduleSpecifier);
-    polyfill();
-  }, specifier);
-
-  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
-});
-
+// Native-only Canary 157.0.8102.0 reports grid/manual support but does not
+// perform the directional operations in these fixtures. Keep the V2
+// expectations visible rather than skipping or matching the observed no-op:
+// https://open-ui.org/components/focusgroup-v2.explainer/#grid-directional-navigation
 test("native tables support two-dimensional navigation", async ({ page }, {
   project,
 }) => {
@@ -146,12 +127,11 @@ test("manual grids enroll focusgrouprow rows", async ({ page }, {
     `,
   );
 
-  await expect(page.getByTestId("a1")).toHaveAttribute("role", "gridcell");
+  await expect(page.getByTestId("a1")).toHaveComputedRole("gridcell");
   await page.getByTestId("a2").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("b1")).toBeFocused();
-  await expect(page.locator("[focusgrouprow]").first()).toHaveAttribute(
-    "role",
+  await expect(page.locator("[focusgrouprow]").first()).toHaveComputedRole(
     "row",
   );
 });
@@ -176,7 +156,6 @@ test("manual grids discover rows and cells in shadow roots @shadow", async ({
     `,
   );
 
-  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();
@@ -203,7 +182,6 @@ test("manual grids discover slotted rows and cells @shadow", async ({ page }, {
     `,
   );
 
-  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a2")).toBeFocused();
@@ -230,9 +208,10 @@ test("a disabled sole cell target invalidates the grid", async ({ page }, {
 
   // A disabled control is not a valid candidate. With no other candidate in
   // that cell, the grid has an empty cell and is invalid — none of the
-  // items should be decorated.
-  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
-  await expect(page.getByTestId("a3")).not.toHaveAttribute("data-fg-item");
+  // items should participate in grid navigation.
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("a1")).toBeFocused();
 });
 
 test("a disabled control alongside a valid target still yields a single candidate", async ({
@@ -253,8 +232,6 @@ test("a disabled control alongside a valid target still yields a single candidat
 
   // The disabled descendant should not count as a candidate, so the cell
   // still resolves to its single valid target.
-  await expect(page.getByTestId("a1")).toHaveAttribute("data-fg-item", "");
-  await expect(page.getByTestId("a2")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a2")).toBeFocused();
@@ -356,8 +333,9 @@ test("a focusable descendant outside the resolved cell targets invalidates the g
   // "stray" is keyboard-focusable, positive tabindex, and not the resolved
   // single candidate for its cell (a2 is). A full-scope walk should find it
   // and invalidate the whole grid rather than silently ignoring it.
-  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
-  await expect(page.getByTestId("a2")).not.toHaveAttribute("data-fg-item");
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("a1")).toBeFocused();
 });
 
 test("a focusgrouprow marker outside the enrolled rows invalidates a manual grid", async ({
@@ -383,8 +361,9 @@ test("a focusgrouprow marker outside the enrolled rows invalidates a manual grid
 
   // The nested focusgrouprow marker is not one of the top-level enrolled
   // rows in the resolved topology, so the whole grid should be invalidated.
-  await expect(page.getByTestId("a1")).not.toHaveAttribute("data-fg-item");
-  await expect(page.getByTestId("b1")).not.toHaveAttribute("data-fg-item");
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("a1")).toBeFocused();
 });
 
 test("a negative-tabindex descendant can initiate navigation from its cell without being a destination", async ({
@@ -425,7 +404,6 @@ test("invalid ragged grids do not take over navigation", async ({ page }, {
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a1")).toBeFocused();
-  await expect(page.getByTestId("a2")).toHaveAttribute("tabindex", "0");
 });
 
 test("spanned tables are rejected as grid topology", async ({ page }, {
@@ -447,7 +425,6 @@ test("spanned tables are rejected as grid topology", async ({ page }, {
   await page.getByTestId("spanned").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("spanned")).toBeFocused();
-  await expect(page.getByTestId("spanned")).toHaveAttribute("tabindex", "0");
 });
 
 test("grid state is rebuilt after adding a row", async ({ page }, {
@@ -469,7 +446,6 @@ test("grid state is rebuilt after adding a row", async ({ page }, {
     next.innerHTML = '<div tabindex="0" data-testid="b1">B1</div>';
     row.parentElement.append(next);
   });
-  await expect(page.getByTestId("b1")).toHaveAttribute("data-fg-item", "");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("b1")).toBeFocused();
@@ -494,9 +470,9 @@ test("editable grid targets keep their native arrow-key behavior", async ({
   await expect(page.getByTestId("input")).toBeFocused();
 });
 
-test("grid decoration is cleaned up after removing a row", async ({ page }, {
-  project,
-}) => {
+test("removed grid rows return to normal sequential navigation", async ({
+  page,
+}, { project }) => {
   await setupPage(
     page,
     project,
@@ -512,17 +488,12 @@ test("grid decoration is cleaned up after removing a row", async ({ page }, {
     .locator("[focusgrouprow]")
     .last()
     .evaluate((row) => {
-      window.removedCell = row.firstElementChild;
       row.remove();
+      document.body.append(row.firstElementChild);
     });
-  await expect
-    .poll(() =>
-      page.evaluate(() => [
-        window.removedCell.getAttribute("data-fg-item"),
-        window.removedCell.getAttribute("tabindex"),
-      ]),
-    )
-    .toEqual([null, "0"]);
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("b1")).toBeFocused();
 });
 
 test("author tabindex changes are preserved during reconciliation", async ({
@@ -542,7 +513,6 @@ test("author tabindex changes are preserved during reconciliation", async ({
   await page
     .getByTestId("b1")
     .evaluate((cell) => cell.setAttribute("tabindex", "-1"));
-  await expect(page.getByTestId("b1")).toHaveAttribute("tabindex", "-1");
   await page.getByTestId("a1").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("a1")).toBeFocused();
@@ -559,7 +529,7 @@ test("nested tables do not become outer-grid rows", async ({ page }, {
         <tbody>
           <tr>
             <td tabindex="0" data-testid="outer">Outer</td>
-            <td tabindex="0">
+            <td tabindex="0" data-testid="other">
               <table><tbody><tr><td tabindex="0" data-testid="nested">Nested</td></tr></tbody></table>
             </td>
           </tr>
@@ -568,8 +538,12 @@ test("nested tables do not become outer-grid rows", async ({ page }, {
     `,
   );
 
-  await expect(page.getByTestId("outer")).toHaveAttribute("data-fg-item", "");
-  await expect(page.getByTestId("nested")).not.toHaveAttribute("data-fg-item");
+  await page.getByTestId("outer").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("other")).toBeFocused();
+  await page.getByTestId("nested").focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("nested")).toBeFocused();
 });
 
 test("vertical writing modes map physical arrows to grid axes", async ({
