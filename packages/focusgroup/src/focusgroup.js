@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
-import { state } from "./global-state.js";
 import {
   managedTabindex,
   releaseControl,
@@ -10,19 +9,8 @@ import {
   setItemTabindex,
 } from "./item-controls.js";
 import { writeTabindex } from "./observer-registry.js";
-import {
-  createTreeWalker,
-  getParentElement,
-  nodeContains,
-} from "./shadow-utils/index.js";
-import {
-  checkVisibility,
-  getNavigationDirection,
-  isKeyboardFocusable,
-  isTopLayer,
-  parseDefinition,
-  shouldDeferToNative,
-} from "./utils.js";
+import { nodeContains } from "./shadow-utils/index.js";
+import { getNavigationDirection, shouldDeferToNative } from "./utils.js";
 
 /**
  * @import {
@@ -165,7 +153,6 @@ export class FocusGroup {
     this.#onNativeTakeover = options.onNativeTakeover;
 
     this.#updateDefinition(options.definition);
-    this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
     this.#decorateItems();
 
     const opts = { signal: this.#abort.signal };
@@ -286,13 +273,11 @@ export class FocusGroup {
         this.#items.disconnect?.();
         this.#items = this.#createItems(info.definition);
         this.#updateDefinition(info.definition);
-        this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
         this.#decorateItems();
         this.#items.observe?.(this);
         return;
       }
       this.#updateDefinition(info.definition);
-      this.#decorateOwner?.(this.#owner, this.#behavior, this.#items?.valid);
     }
 
     this.#undecorateItems();
@@ -312,10 +297,12 @@ export class FocusGroup {
   #decorateItems() {
     if (!this.#behavior || this.#behavior === BehaviorToken.NONE) {
       this.#undecorateItems();
+      this.#decorateOwner?.(this.#owner, null);
       return;
     }
 
     this.#items.decorate?.();
+    this.#decorateOwner?.(this.#owner, this.#behavior, this.#items.valid);
 
     for (const { element, segmentBoundary } of this.#items.items()) {
       this.#decoratedItems.add(element);
@@ -374,7 +361,7 @@ export class FocusGroup {
 
       // Restore tabindex
       const authorTabIndex = element.getAttribute(DatasetName.AUTHOR_TABINDEX);
-      if (authorTabIndex) {
+      if (authorTabIndex !== null) {
         if (authorTabIndex === "none") {
           setItemTabindex(element, null);
         } else {
@@ -393,21 +380,12 @@ export class FocusGroup {
   }
 
   #decorateItemControls() {
-    if (!this.#definition.itemcontrols || !this.#items.itemForNode) {
+    if (!this.#definition.itemcontrols || !this.#items.controls) {
       return;
     }
 
-    const walker = createTreeWalker(
-      this.#owner.ownerDocument,
-      this.#owner,
-      NodeFilter.SHOW_ELEMENT,
-    );
-    while (walker.nextNode()) {
-      const element = /** @type {HTMLElement} */ (walker.currentNode);
-      const item = this.#associatedItem(element);
-      if (item && this.#isEligibleControl(element)) {
-        this.#itemControls.set(element, item);
-      }
+    for (const { element, item } of this.#items.controls.items()) {
+      this.#itemControls.set(element, item);
     }
 
     this.#applyItemControls(this.#activeItem());
@@ -447,60 +425,9 @@ export class FocusGroup {
 
   /** @param {HTMLElement} element */
   #associatedItem(element) {
-    if (!this.#definition.itemcontrols || !nodeContains(this.#owner, element)) {
-      return null;
-    }
-    let nestedOwner = null;
-    let optOut = null;
-    for (
-      let ancestor = element;
-      ancestor && ancestor !== this.#owner;
-      ancestor = getParentElement(ancestor)
-    ) {
-      if (isTopLayer(ancestor) || ancestor.matches?.("[inert]")) {
-        return null;
-      }
-      if (ancestor.hasAttribute?.("focusgroup")) {
-        if (ancestor.getAttribute("focusgroup").split(/\s+/).includes("none")) {
-          optOut ??= ancestor;
-        } else if (parseDefinition(ancestor).behavior) {
-          nestedOwner ??= ancestor;
-        }
-      }
-    }
-    // A nested owner associates independently through all enclosing owners;
-    // otherwise this is the nearest parsed owner of the opted-out content.
-    const boundary = nestedOwner ?? optOut;
-    return boundary ? (this.#items.itemForNode?.(boundary) ?? null) : null;
-  }
-
-  /** @param {HTMLElement} element */
-  #isEligibleControl(element) {
-    for (
-      let parent = element;
-      parent && parent !== this.#owner;
-      parent = getParentElement(parent)
-    ) {
-      if (state.m?.has(parent) && !state.m.get(parent)) {
-        return false;
-      }
-    }
-    // Nested rovers can change while an enclosing owner suppresses them.
-    // Track their underlying tab stops, including the currently inactive ones.
-    if (element.hasAttribute(DatasetName.AUTHOR_TABINDEX)) {
-      return !element.disabled && checkVisibility(element, this.#owner);
-    }
-    const saved = managedTabindex(element);
-    if (saved === undefined) {
-      return (
-        (!element.hasAttribute("tabindex") || element.tabIndex >= 0) &&
-        isKeyboardFocusable(element, this.#owner, true)
-      );
-    }
-    return (
-      (saved === null || Number(saved) >= 0) &&
-      isKeyboardFocusable(element, this.#owner, true, saved)
-    );
+    return this.#definition.itemcontrols
+      ? (this.#items.controls?.itemForNode(element) ?? null)
+      : null;
   }
 
   /** @param {KeyboardEvent} evt */

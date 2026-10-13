@@ -22,7 +22,7 @@
  * @property {FocusGroupDefinition} [definition] - Behavior config. Plain
  *   data; FocusGroup just consumes it. Apps either build it themselves or call
  *   `parseDefinition(owner)` to derive it from the HTML `focusgroup` attribute.
- * @property {(element: HTMLElement, behavior: BehaviorToken|null) => void} [decorateOwner] -
+ * @property {(element: HTMLElement, behavior: BehaviorToken|null, valid?: boolean) => void} [decorateOwner] -
  *   Optional hook called during owner (un)decoration. Receives the behavior
  *   token, or `null` when undecorating. Apps that don't need owner decoration
  *   omit this option, allowing the role-inference module to be tree-shaken.
@@ -31,6 +31,8 @@
  *   token, or `null` when undecorating.
  * @property {(definition: FocusGroupDefinition) => FocusGroupItemCollection} [createItems] -
  *   Optional factory used when the focusgroup behavior changes.
+ * @property {(owner: HTMLElement) => void} [onNativeTakeover] -
+ *   Optional notification after this instance defers to native support.
  */
 
 /**
@@ -161,6 +163,16 @@
  * @property {(node: Element) => (HTMLElement | null)} [itemForNode]
  *   Optional V2 hook resolving an associated nested node to its owned item.
  *   For grids this maps a node inside a cell to that cell's target.
+ *
+ * @property {{items: () => Iterable<{element: HTMLElement, item: HTMLElement}>, itemForNode: (node: Element) => (HTMLElement|null)}} [controls]
+ *   Optional itemcontrols discovery and association. `items()` supplies
+ *   sequentially eligible controls and their owned item boundaries;
+ *   `itemForNode()` also resolves pointer/script focus on ineligible controls.
+ *   The built-in collections discover these from the DOM. Applications can
+ *   supply them from their model without importing DOM discovery code.
+ *
+ * @property {boolean} [valid] Post-decoration structural validity, passed to
+ *   the owner-decoration hook after every rebuild.
  *
  * @property {() => void} [disconnect] Optional. Called defensively from
  *   `FocusGroup#disconnect()` (`items.disconnect?.()`). Use it to detach any

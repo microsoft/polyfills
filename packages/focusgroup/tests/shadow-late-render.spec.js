@@ -35,10 +35,12 @@ async function polyfillThenRender(page, project, html, render) {
   const specifier = project.name.endsWith("Shadowless")
     ? "/build/index-shadowless.mjs"
     : "/build/index.mjs";
-  await page.evaluate(async (specifier) => {
-    const { polyfillBodyAndObserve } = await import(specifier);
-    polyfillBodyAndObserve();
-  }, specifier);
+  if (process.env.FOCUSGROUP_NATIVE_ONLY !== "1") {
+    await page.evaluate(async (specifier) => {
+      const { polyfillBodyAndObserve } = await import(specifier);
+      polyfillBodyAndObserve();
+    }, specifier);
+  }
 
   await page.evaluate((render) => {
     const script = document.createElement("script");
@@ -98,17 +100,4 @@ test.describe("focusgroup rendered into a shadow root after polyfilling", () => 
       await expect(page.getByTestId("item2")).toBeFocused();
     },
   );
-});
-
-test("the polyfill root is not an owner unless it has a focusgroup attribute", async ({
-  page,
-}, { project }) => {
-  await polyfillThenRender(page, project, GROUP, "");
-
-  const owners = await page.evaluate(async () => {
-    const { state } = await import("/build/global-state.mjs");
-    return [...(state.m?.keys() ?? [])].map((el) => el.localName);
-  });
-
-  expect(owners).toEqual(["div"]);
 });

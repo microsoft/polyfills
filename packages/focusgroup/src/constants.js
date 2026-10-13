@@ -31,6 +31,10 @@ export const BehaviorToken = {
   FEED: "feed",
   GRID: "grid",
   NONE: "none",
+};
+
+/** @enum {string} */
+export const ModifierToken = {
   ITEMCONTROLS: "itemcontrols",
   NOITEMCONTROLS: "noitemcontrols",
 };
@@ -52,6 +56,7 @@ export const BEHAVIOR_TOKENS = [
  * @property {(string|null)} childRole
  * @property {boolean} wrap
  * @property {("inline"|"block"|undefined)} axis
+ * @property {boolean} itemControls
  */
 
 /** @type {Record<BehaviorToken, Behavior>} */
@@ -61,47 +66,55 @@ export const BehaviorMap = {
     childRole: null,
     wrap: false,
     axis: "inline",
+    itemControls: false,
   },
   tablist: {
     ownerRole: "tablist",
     childRole: "tab",
     wrap: true,
     axis: "inline",
+    itemControls: false,
   },
   radiogroup: {
     ownerRole: "radiogroup",
     childRole: "radio",
     wrap: true,
     axis: undefined,
+    itemControls: false,
   },
   listbox: {
     ownerRole: "listbox",
     childRole: "option",
     wrap: false,
     axis: "block",
+    itemControls: false,
   },
   menu: {
     ownerRole: "menu",
     childRole: "menuitem",
     wrap: true,
     axis: "block",
+    itemControls: false,
   },
   menubar: {
     ownerRole: "menubar",
     childRole: "menuitem",
     wrap: true,
     axis: "inline",
+    itemControls: false,
   },
   feed: {
     ownerRole: "feed",
     childRole: "article",
     wrap: false,
     axis: "block",
+    itemControls: true,
   },
   grid: {
     ownerRole: "grid",
     childRole: "gridcell",
     wrap: false,
     axis: undefined,
+    itemControls: true,
   },
 };

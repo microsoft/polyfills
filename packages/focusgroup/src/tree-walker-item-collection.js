@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
+import { DOMItemControls } from "./dom-item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
 import { authoredTabindex } from "./observer-registry.js";
 import {
@@ -45,6 +46,9 @@ export class TreeWalkerItemCollection {
    */
   id = generateUniqueId();
 
+  /** @type {DOMItemControls} */
+  controls;
+
   /** @type {Set<Element>} */
   #decorated = new Set();
 
@@ -82,6 +86,7 @@ export class TreeWalkerItemCollection {
   constructor(owner, itemcontrols = false) {
     this.#owner = owner;
     this.#itemcontrols = itemcontrols;
+    this.controls = new DOMItemControls(owner, this);
 
     this.#walker = createTreeWalker(
       document,
