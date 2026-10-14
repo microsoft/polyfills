@@ -227,6 +227,12 @@ the DOM to discover controls or parse their enclosing owners. The built-in linea
 and grid collections supply a shared DOM adapter. Custom collections that do not
 use it avoid importing its tree-walking and eligibility code.
 
+When multiple bundle versions coexist, controls inside a nested owner with a
+legacy observer protocol remain unfiltered by enclosing itemcontrols owners.
+Legacy observers cannot distinguish suppression writes from authored tabindex
+changes; preserving their own navigation takes precedence over outer filtering.
+Use the same current bundle version for all owners to get full nested filtering.
+
 ### Constructing a `FocusGroup`
 
 ```js

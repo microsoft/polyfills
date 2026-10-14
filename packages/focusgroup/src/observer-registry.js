@@ -37,6 +37,14 @@ export function authoredTabindex(record) {
   return tabindexValues.get(record);
 }
 
+// Adopt every overlapping observer's pending author values before a managed
+// rover changes the shared underlying tabindex.
+export function captureObservers() {
+  for (const observer of observers) {
+    observer.capture();
+  }
+}
+
 /**
  * Exclude only this exact managed write from every overlapping observer.
  * Pending author records (including same-value tabindex writes) are retained.

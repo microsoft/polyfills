@@ -2,7 +2,11 @@
 // Licensed under the MIT License.
 
 import { state } from "./global-state.js";
-import { authoredTabindex, writeTabindex } from "./observer-registry.js";
+import {
+  authoredTabindex,
+  captureObservers,
+  writeTabindex,
+} from "./observer-registry.js";
 
 /**
  * Multiple enclosing focusgroups can filter the same nested boundary. Keep
@@ -17,6 +21,7 @@ export function managedTabindex(element) {
 }
 
 export function setItemTabindex(element, value) {
+  captureObservers();
   const entry = controls.get(element);
   if (entry) {
     entry.tabindex = value;
@@ -54,6 +59,7 @@ export function setControlActive(element, owner, active) {
 }
 
 export function releaseControl(element, owner) {
+  captureObservers();
   const entry = controls.get(element);
   if (!entry) {
     return;

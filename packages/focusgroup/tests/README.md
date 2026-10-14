@@ -57,6 +57,13 @@ All six standard/shadowless projects include these tests.
 `review-feedback.spec.js` covers mixed-bundle detached cleanup, authored tabindex
 parsing against native IDL behavior, and a model-backed `FocusGroup` whose
 item controls do not require any DOM tree walking.
+`adversarial.spec.js` covers reverse grid entry followed by Tab, shadow-internal
+script/pointer focus and listener teardown, overlapping observer registration
+orders, and current feeds enclosing actual legacy toolbars. Legacy-owned
+subtrees retain their own navigation without ancestor control suppression;
+current owners continue to use full nested filtering. Set
+`FOCUSGROUP_LEGACY_BUILD` to built bundles from `53d8a15` to exercise the original
+grid/V1 observer protocol in both load orders.
 `review-lifecycle.spec.js` checks detached reparenting/reinsertion, slot assignment
 changes for shadow-owned items and controls, and native button semantics in grids.
 Removal cleanup restores authored attributes; connected moves retain ownership.

@@ -18,6 +18,12 @@ export class ObservableItemCollection {
   /** @type {MutationObserver | null} */
   #observer = null;
 
+  #owner = null;
+
+  observes(owner) {
+    return this.#owner === owner;
+  }
+
   /** @type {Map<HTMLElement, boolean>|null} */
   #rendering = null;
 
@@ -37,6 +43,7 @@ export class ObservableItemCollection {
    * @param {(cb: MutationCallback) => MutationObserver} createObserver
    */
   startObserving(owner, onRecords, options, createObserver) {
+    this.#owner = owner;
     const captureRendering = () => {
       const result = new Map();
       const walker = createTreeWalker(
@@ -76,7 +83,6 @@ export class ObservableItemCollection {
         }
       }
       this.#rendering = null;
-      adoptControlWrites(records);
       onRecords(records);
       if (renderingOnly) {
         this.#rendering = captureRendering();
@@ -100,7 +106,6 @@ export class ObservableItemCollection {
 
   stopObserving() {
     this.capture();
-    adoptControlWrites(this.#pending);
     for (const record of this.#pending) {
       const element = /** @type {HTMLElement} */ (record.target);
       if (
@@ -116,6 +121,7 @@ export class ObservableItemCollection {
     observers.delete(this);
     this.#observer?.disconnect();
     this.#observer = null;
+    this.#owner = null;
     this.#rendering = null;
     this.#pending = [];
     this.#deliver = null;
@@ -165,6 +171,9 @@ export class ObservableItemCollection {
     if (!remembered) {
       rememberTabindexValues(records);
     }
+    // Adoption belongs to capture, not delivery: another owner may reconcile
+    // the shared rover before this observer's deferred callback runs.
+    adoptControlWrites(records);
     if (!this.#pending.length) {
       queueMicrotask(() => this.#deliver?.());
     }
