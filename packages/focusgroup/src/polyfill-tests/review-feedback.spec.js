@@ -278,6 +278,9 @@ test("model-backed item controls need no DOM discovery", async ({ page }, {
   await pressTab(page, project);
   await expect(page.locator("#action")).toBeFocused();
   await page.locator("#one").focus();
+  await pressTab(page, project);
+  await expect(page.locator("#action")).toBeFocused();
+  await page.locator("#one").focus();
   await page.keyboard.press("ArrowDown");
   await expect(page.locator("#two")).toBeFocused();
 });

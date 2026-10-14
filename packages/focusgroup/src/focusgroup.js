@@ -81,6 +81,11 @@ export class FocusGroup {
 
   #reverseTab = false;
 
+  /** @type {Map<ShadowRoot, AbortController>} */
+  #focusRoots = new Map();
+
+  #handledFocusEvents = new WeakSet();
+
   /**
    * Whether the owner currently has `tabindex=0` set as a Tab-entry proxy so
    * sequential focus navigation can reach a tab stop inside a shadow root.
@@ -342,11 +347,16 @@ export class FocusGroup {
     }
 
     this.#decorateItemControls();
+    this.#observeFocusRoots();
 
     this.#items.flush?.();
   }
 
   #undecorateItems() {
+    for (const controller of this.#focusRoots.values()) {
+      controller.abort();
+    }
+    this.#focusRoots.clear();
     this.#disableFocusabilityProxy();
     this.#undecorateItemControls();
 
@@ -419,8 +429,39 @@ export class FocusGroup {
       (this.#behavior === BehaviorToken.GRID && this.#items.contains(target)
         ? this.#items.itemForNode?.(target)
         : null) ??
-      (this.#items.isItem?.(target) ? target : null)
+      ((this.#items.isItem?.(target) ?? this.#items.contains(target))
+        ? target
+        : null)
     );
+  }
+
+  #observeFocusRoots() {
+    const ownerRoot = this.#owner.getRootNode();
+    for (const element of [
+      ...this.#decoratedItems,
+      ...this.#itemControls.keys(),
+    ]) {
+      let root = element.getRootNode();
+      while (root instanceof ShadowRoot && root !== ownerRoot) {
+        if (!this.#focusRoots.has(root)) {
+          const controller = new AbortController();
+          this.#focusRoots.set(root, controller);
+          const opts = { signal: controller.signal };
+          // Internal transitions retarget to one host and never reach the owner.
+          root.addEventListener(
+            "focusin",
+            this.#handleFocusin.bind(this),
+            opts,
+          );
+          root.addEventListener(
+            "focusout",
+            this.#handleFocusout.bind(this),
+            opts,
+          );
+        }
+        root = root.host.getRootNode();
+      }
+    }
   }
 
   /** @param {HTMLElement} element */
@@ -488,6 +529,10 @@ export class FocusGroup {
 
   /** @param {FocusEvent} evt */
   #handleFocusin(evt) {
+    if (this.#handledFocusEvents.has(evt)) {
+      return;
+    }
+    this.#handledFocusEvents.add(evt);
     const target = evt.composedPath()[0];
 
     // When the owner is acting as a Tab-entry proxy, redirect focus to the
@@ -518,6 +563,7 @@ export class FocusGroup {
 
     if (
       associatedItem &&
+      associatedItem !== target &&
       this.#reverseTab &&
       evt.relatedTarget &&
       !nodeContains(this.#owner, evt.relatedTarget)
@@ -557,6 +603,10 @@ export class FocusGroup {
 
   /** @param {FocusEvent} evt */
   #handleFocusout(evt) {
+    if (this.#handledFocusEvents.has(evt)) {
+      return;
+    }
+    this.#handledFocusEvents.add(evt);
     const focusLeavingGroup =
       !evt.relatedTarget || !nodeContains(this.#owner, evt.relatedTarget);
 
