@@ -189,6 +189,33 @@ test("manual grids discover slotted rows and cells @shadow", async ({ page }, {
   await expect(page.getByTestId("b2")).toBeFocused();
 });
 
+test("manual grids accept shadow-internal cells with slotted targets @shadow", async ({
+  page,
+}, { project }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="grid manual">
+        <div focusgrouprow>
+          <template shadowrootmode="open">
+            <div><slot name="a"></slot></div><div><slot name="b"></slot></div>
+          </template>
+          <button slot="a" data-testid="a1">A1</button>
+          <button slot="b" data-testid="a2">A2</button>
+        </div>
+      </div>
+    `,
+  );
+
+  await page.getByTestId("a1").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("a2")).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test("a disabled sole cell target invalidates the grid", async ({ page }, {
   project,
 }) => {

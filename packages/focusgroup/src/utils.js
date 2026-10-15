@@ -8,6 +8,7 @@ import {
   DatasetName,
   ModifierToken,
 } from "./constants.js";
+import { managedTabindex } from "./item-controls.js";
 import { createTreeWalker, getParentElement } from "./shadow-utils/index.js";
 
 /**
@@ -352,6 +353,12 @@ export function isKeyboardFocusable(
   ignorePolyfillTabindex = false,
   authoredTabindex = undefined,
 ) {
+  // An enclosing itemcontrols owner may hold this element at -1 while its
+  // item is inactive; judge it by the tabindex it would otherwise have.
+  // null is meaningful (no authored attribute), so only fill in undefined.
+  if (authoredTabindex === undefined) {
+    authoredTabindex = managedTabindex(element);
+  }
   let tabIndex = element.tabIndex;
   if (authoredTabindex !== undefined) {
     tabIndex = unsuppressedTabIndex(element, authoredTabindex);

@@ -44,7 +44,8 @@ export class DOMItemControls {
     while (walker.nextNode()) {
       const element = /** @type {HTMLElement} */ (walker.currentNode);
       const item = this.itemForNode(element);
-      if (item && this.#isEligible(element)) {
+      // A focusable nested owner can be the item itself (its entry point).
+      if (item && item !== element && this.#isEligible(element)) {
         yield { element, item };
       }
     }
