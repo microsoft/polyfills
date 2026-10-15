@@ -115,6 +115,12 @@ test("arrowing from a negative-tabindex grid source remembers the destination ce
     <button data-testid="after">After</button>`,
   );
   await page.getByTestId("a1-source").focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("a1")).toBeFocused();
+  await page.getByTestId("before").focus();
+  await pressTab(page, project);
+  await expect(page.getByTestId("a1")).toBeFocused();
+  await page.getByTestId("a1-source").focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("a2")).toBeFocused();
   await page.getByTestId("before").focus();
