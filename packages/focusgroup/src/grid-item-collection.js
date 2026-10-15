@@ -169,6 +169,8 @@ export class GridItemCollection {
           row: r,
           col: c,
           cell,
+          // A shadow-internal cell's parent is its row's shadow root.
+          rowElement: rows[r],
           nativelyTabbable: isKeyboardFocusable(
             candidates[0],
             this.#owner,
@@ -332,7 +334,7 @@ export class GridItemCollection {
     }
     for (const entry of this.#entries) {
       entry.element.setAttribute(DatasetName.ITEM, "");
-      const row = entry.cell.parentElement;
+      const row = entry.rowElement;
       if (this.#manual && hasGenericRole(row) && !row.hasAttribute("role")) {
         row.setAttribute("role", "row");
         row.setAttribute(DatasetName.INFERRED_ROLE, "");
@@ -346,7 +348,7 @@ export class GridItemCollection {
   undecorate() {
     for (const entry of this.#entries) {
       entry.element.removeAttribute(DatasetName.ITEM);
-      for (const el of [entry.cell, entry.cell.parentElement]) {
+      for (const el of [entry.cell, entry.rowElement]) {
         if (el?.hasAttribute(DatasetName.INFERRED_ROLE)) {
           el.removeAttribute("role");
           el.removeAttribute(DatasetName.INFERRED_ROLE);

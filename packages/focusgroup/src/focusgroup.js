@@ -234,6 +234,10 @@ export class FocusGroup {
    * Restore decorations too so removed owners can be safely reinserted.
    */
   disconnect() {
+    // Deferred-to-native and already disconnected instances have no state.
+    if (!this.#owner) {
+      return;
+    }
     batchWrites(() => {
       this.#abort.abort();
       this.#items?.disconnect?.();
@@ -519,26 +523,39 @@ export class FocusGroup {
       ...this.#decoratedItems,
       ...this.#itemControls.keys(),
     ]) {
-      let root = element.getRootNode();
-      while (root instanceof ShadowRoot && root !== ownerRoot) {
-        if (!this.#focusRoots.has(root)) {
-          const controller = new AbortController();
-          this.#focusRoots.set(root, controller);
-          const opts = { signal: controller.signal };
-          // Internal transitions retarget to one host and never reach the owner.
-          root.addEventListener(
-            "focusin",
-            (evt) => batchWrites(() => this.#handleFocusin(evt)),
-            opts,
-          );
-          root.addEventListener(
-            "focusout",
-            (evt) => batchWrites(() => this.#handleFocusout(evt)),
-            opts,
-          );
-        }
-        root = root.host.getRootNode();
+      for (
+        let node = element;
+        node;
+        node = /** @type {HTMLElement} */ (node.assignedSlot)
+      ) {
+        this.#observeFocusRoot(node.getRootNode(), ownerRoot);
       }
+    }
+  }
+
+  /**
+   * @param {Node} root
+   * @param {Node} ownerRoot
+   */
+  #observeFocusRoot(root, ownerRoot) {
+    while (root instanceof ShadowRoot && root !== ownerRoot) {
+      if (!this.#focusRoots.has(root)) {
+        const controller = new AbortController();
+        this.#focusRoots.set(root, controller);
+        const opts = { signal: controller.signal };
+        // Internal transitions retarget to one host and never reach the owner.
+        root.addEventListener(
+          "focusin",
+          (evt) => batchWrites(() => this.#handleFocusin(evt)),
+          opts,
+        );
+        root.addEventListener(
+          "focusout",
+          (evt) => batchWrites(() => this.#handleFocusout(evt)),
+          opts,
+        );
+      }
+      root = root.host.getRootNode();
     }
   }
 
@@ -595,8 +612,19 @@ export class FocusGroup {
       }
     }
 
+    // A grid source can be a non-item node inside a cell; its cell target
+    // holds the tab stop and is the one to demote.
+    const source =
+      this.#behavior === BehaviorToken.GRID && !this.#items.isItem?.(current)
+        ? (this.#items.itemForNode?.(current) ?? current)
+        : current;
     if (target && target !== current) {
-      this.#advanceFocus(current, target, true);
+      if (source === target) {
+        setItemTabindex(target, "0");
+        target.focus();
+      } else {
+        this.#advanceFocus(source, target, true);
+      }
       // Focus events don't cross shadow boundaries for moves within the
       // same shadow tree, so update #current directly here.
       this.#current = target;
