@@ -186,3 +186,48 @@ test("1000-article feed with nested toolbars reconciles in linear time", async (
   expect(median(results.samples.arrow)).toBeLessThan(16);
   await expect(page.getByTestId("item-507")).toBeFocused();
 });
+
+test("grid reconciliation scales linearly with per-cell controls", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Chromium benchmark");
+  const measure = async (rowCount) => {
+    await setupPage(
+      page,
+      testInfo.project,
+      `<table focusgroup="grid"><tbody>${Array.from(
+        { length: rowCount },
+        (_, r) =>
+          `<tr>${Array.from(
+            { length: 10 },
+            (_, c) =>
+              `<td><button data-testid="c${r}-${c}">${r},${c}</button><button focusgroup="none">More</button></td>`,
+          ).join("")}</tr>`,
+      ).join("")}</tbody></table>`,
+    );
+    await page.getByTestId("c0-0").focus();
+    return page.evaluate(async () => {
+      const frame = () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => setTimeout(resolve, 0)),
+        );
+      const samples = [];
+      for (let i = 0; i < 7; i++) {
+        const start = performance.now();
+        document.querySelector("td").append("!");
+        await frame();
+        samples.push(performance.now() - start);
+      }
+      return samples.sort((a, b) => a - b)[3];
+    });
+  };
+  const small = await measure(50);
+  const large = await measure(200);
+  console.log(JSON.stringify({ small, large }));
+  // 4x the cells: linear work is ~4x; per-control scans over every cell
+  // made this ~11x and 2,000 cells took ~850 ms.
+  expect(large / Math.max(small, 1)).toBeLessThan(8);
+  expect(large).toBeLessThan(400);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("c0-1")).toBeFocused();
+});

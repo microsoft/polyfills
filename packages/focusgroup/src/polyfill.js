@@ -27,15 +27,42 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
   // Legacy bundles may already own `g`; install the current removal protocol
   // independently so their containment-based cleanup cannot suppress it.
   if (!state.r) {
+    // Owners torn down while detached. Detached DOM is often reinserted later
+    // (cached tabs, `<KeepAlive>`, virtualized lists), and `polyfill()` alone
+    // does not observe additions, so reinstate exactly these owners when they
+    // return. Weak references let permanently removed subtrees be collected.
+    /** @type {Set<WeakRef<HTMLElement>>} */
+    const swept = new Set();
     const removalObserver = createMutationObserver((entries) => {
       if (entries.some((entry) => entry.removedNodes.length)) {
         for (const [owner, group] of elementPolyfillMap) {
           if (!owner.isConnected) {
             group?.disconnect();
             elementPolyfillMap.delete(owner);
+            swept.add(new WeakRef(owner));
           }
         }
       }
+      if (!swept.size || !entries.some((entry) => entry.addedNodes.length)) {
+        return;
+      }
+      const restored = [];
+      for (const ref of swept) {
+        const owner = ref.deref();
+        if (!owner) {
+          swept.delete(ref);
+        } else if (owner.isConnected) {
+          swept.delete(ref);
+          restored.push(owner);
+        }
+      }
+      // Ancestors first, matching the walker order `queueOwners()` expects.
+      restored.sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
+          ? -1
+          : 1,
+      );
+      queueOwners(restored);
     });
     removalObserver.observe(document.body, { childList: true, subtree: true });
     state.r = removalObserver;
@@ -99,10 +126,20 @@ export function polyfill(root) {
         : NodeFilter.FILTER_SKIP,
   );
 
-  const pending = [];
+  const candidates = [];
   do {
-    const element = walker.currentNode;
+    candidates.push(/** @type {HTMLElement} */ (walker.currentNode));
+  } while (walker.nextNode());
+  queueOwners(candidates);
+}
 
+/**
+ * Reserves and schedules FocusGroups for `elements`, given in tree order.
+ * @param {HTMLElement[]} elements
+ */
+function queueOwners(elements) {
+  const pending = [];
+  for (const element of elements) {
     // The walker's filter never runs on its own root, so `root` has to be
     // vetted here — otherwise every element passed to `polyfill()` (including
     // the default `<body>` and every node reported by the mutation observer)
@@ -123,7 +160,7 @@ export function polyfill(root) {
     // FocusGroup before the rAF callback below installs the real instance.
     elementPolyfillMap.set(element, null);
     pending.push(element);
-  } while (walker.nextNode());
+  }
 
   // Descendants must establish their own tab stops before an ancestor can
   // decide which nested boundaries to filter.
