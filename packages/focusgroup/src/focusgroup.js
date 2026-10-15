@@ -8,9 +8,39 @@ import {
   setControlActive,
   setItemTabindex,
 } from "./item-controls.js";
-import { writeTabindex } from "./observer-registry.js";
+import { batchWrites, writeTabindex } from "./observer-registry.js";
 import { nodeContains } from "./shadow-utils/index.js";
 import { getNavigationDirection, shouldDeferToNative } from "./utils.js";
+
+/**
+ * Whether the latest Tab keydown in each document had Shift held. One shared
+ * listener pair per document, rather than per FocusGroup instance.
+ * @type {WeakMap<Document, {reverse: boolean}>}
+ */
+const tabDirections = new WeakMap();
+
+/** @param {Document} doc */
+function trackTabDirection(doc) {
+  let direction = tabDirections.get(doc);
+  if (!direction) {
+    direction = { reverse: false };
+    tabDirections.set(doc, direction);
+    const reset = () => {
+      direction.reverse = false;
+    };
+    doc.addEventListener(
+      "keydown",
+      (event) => {
+        direction.reverse = event.key === "Tab" && event.shiftKey;
+      },
+      true,
+    );
+    doc.addEventListener("keyup", reset, true);
+    // A keyup can be delivered to another window (e.g. after Alt+Tab).
+    doc.defaultView?.addEventListener("blur", reset);
+  }
+  return direction;
+}
 
 /**
  * @import {
@@ -79,7 +109,22 @@ export class FocusGroup {
    */
   #itemControls = new Map();
 
-  #reverseTab = false;
+  /**
+   * Controls grouped by their item, so a focus move only touches the
+   * controls of the previously and newly active items.
+   * @type {Map<HTMLElement, HTMLElement[]>}
+   */
+  #controlsByItem = new Map();
+
+  /**
+   * The item whose controls were last activated; `undefined` when no
+   * activity has been applied since the controls were (re)discovered.
+   * @type {HTMLElement|null|undefined}
+   */
+  #appliedActiveItem = undefined;
+
+  /** @type {{reverse: boolean}} */
+  #tabDirection = { reverse: false };
 
   /** @type {Map<ShadowRoot, AbortController>} */
   #focusRoots = new Map();
@@ -158,38 +203,25 @@ export class FocusGroup {
     this.#onNativeTakeover = options.onNativeTakeover;
 
     this.#updateDefinition(options.definition);
-    this.#decorateItems();
+    batchWrites(() => this.#decorateItems());
 
     const opts = { signal: this.#abort.signal };
     this.#owner.addEventListener(
       "keydown",
-      this.#handleKeydown.bind(this),
+      (evt) => batchWrites(() => this.#handleKeydown(evt)),
       opts,
     );
     this.#owner.addEventListener(
       "focusin",
-      this.#handleFocusin.bind(this),
+      (evt) => batchWrites(() => this.#handleFocusin(evt)),
       opts,
     );
     this.#owner.addEventListener(
       "focusout",
-      this.#handleFocusout.bind(this),
+      (evt) => batchWrites(() => this.#handleFocusout(evt)),
       opts,
     );
-    this.#owner.ownerDocument.addEventListener(
-      "keydown",
-      (event) => {
-        this.#reverseTab = event.key === "Tab" && event.shiftKey;
-      },
-      { capture: true, ...opts },
-    );
-    this.#owner.ownerDocument.addEventListener(
-      "keyup",
-      () => {
-        this.#reverseTab = false;
-      },
-      { capture: true, ...opts },
-    );
+    this.#tabDirection = trackTabDirection(this.#owner.ownerDocument);
     this.#items.observe?.(this);
   }
 
@@ -202,11 +234,13 @@ export class FocusGroup {
    * Restore decorations too so removed owners can be safely reinserted.
    */
   disconnect() {
-    this.#abort.abort();
-    this.#items?.disconnect?.();
-    this.#undecorateItems();
-    this.#decorateOwner?.(this.#owner, null);
-    this.#owner = null;
+    batchWrites(() => {
+      this.#abort.abort();
+      this.#items?.disconnect?.();
+      this.#undecorateItems();
+      this.#decorateOwner?.(this.#owner, null);
+      this.#owner = null;
+    });
   }
 
   /**
@@ -225,7 +259,11 @@ export class FocusGroup {
     if (!this.#owner) {
       return;
     }
+    batchWrites(() => this.#update(info));
+  }
 
+  /** @param {FocusGroupUpdateInfo} info */
+  #update(info) {
     // Apply author tabindex changes first: a behavior/topology change and an
     // author tabindex change can arrive in the same mutation batch, and the
     // definition-changed branch below may swap/undecorate the items
@@ -285,7 +323,10 @@ export class FocusGroup {
       this.#updateDefinition(info.definition);
     }
 
-    this.#undecorateItems();
+    // Keep item controls suppressed across the rebuild: releasing and
+    // re-suppressing every control would rewrite each one's tabindex twice.
+    // `#decorateItemControls()` releases only controls that are gone.
+    this.#undecorateItems(true);
     this.#decorateItems();
   }
 
@@ -352,13 +393,16 @@ export class FocusGroup {
     this.#items.flush?.();
   }
 
-  #undecorateItems() {
+  /** @param {boolean} [keepControls] */
+  #undecorateItems(keepControls = false) {
     for (const controller of this.#focusRoots.values()) {
       controller.abort();
     }
     this.#focusRoots.clear();
     this.#disableFocusabilityProxy();
-    this.#undecorateItemControls();
+    if (!keepControls) {
+      this.#undecorateItemControls();
+    }
 
     let undecorated = false;
 
@@ -391,13 +435,30 @@ export class FocusGroup {
 
   #decorateItemControls() {
     if (!this.#definition.itemcontrols || !this.#items.controls) {
+      this.#undecorateItemControls();
       return;
     }
 
+    const previous = this.#itemControls;
+    this.#itemControls = new Map();
+    this.#controlsByItem = new Map();
     for (const { element, item } of this.#items.controls.items()) {
       this.#itemControls.set(element, item);
+      let controls = this.#controlsByItem.get(item);
+      if (!controls) {
+        controls = [];
+        this.#controlsByItem.set(item, controls);
+      }
+      controls.push(element);
+    }
+    for (const element of previous.keys()) {
+      if (!this.#itemControls.has(element)) {
+        releaseControl(element, this);
+      }
     }
 
+    // Items and their controls may have changed: reapply every control.
+    this.#appliedActiveItem = undefined;
     this.#applyItemControls(this.#activeItem());
   }
 
@@ -406,13 +467,30 @@ export class FocusGroup {
       releaseControl(element, this);
     }
     this.#itemControls.clear();
+    this.#controlsByItem.clear();
+    this.#appliedActiveItem = undefined;
   }
 
   /** @param {HTMLElement|null} activeItem */
   #applyItemControls(activeItem) {
-    for (const [element, item] of this.#itemControls) {
-      setControlActive(element, this, item === activeItem);
+    if (activeItem === this.#appliedActiveItem) {
+      return;
     }
+    if (this.#appliedActiveItem === undefined) {
+      for (const [element, item] of this.#itemControls) {
+        setControlActive(element, this, item === activeItem);
+      }
+    } else {
+      // Only the previously and newly active items' controls change.
+      for (const element of this.#controlsByItem.get(this.#appliedActiveItem) ??
+        []) {
+        setControlActive(element, this, false);
+      }
+      for (const element of this.#controlsByItem.get(activeItem) ?? []) {
+        setControlActive(element, this, true);
+      }
+    }
+    this.#appliedActiveItem = activeItem;
     this.#items.flush?.();
   }
 
@@ -450,12 +528,12 @@ export class FocusGroup {
           // Internal transitions retarget to one host and never reach the owner.
           root.addEventListener(
             "focusin",
-            this.#handleFocusin.bind(this),
+            (evt) => batchWrites(() => this.#handleFocusin(evt)),
             opts,
           );
           root.addEventListener(
             "focusout",
-            this.#handleFocusout.bind(this),
+            (evt) => batchWrites(() => this.#handleFocusout(evt)),
             opts,
           );
         }
@@ -564,7 +642,7 @@ export class FocusGroup {
     if (
       associatedItem &&
       associatedItem !== target &&
-      this.#reverseTab &&
+      this.#tabDirection.reverse &&
       evt.relatedTarget &&
       !nodeContains(this.#owner, evt.relatedTarget)
     ) {

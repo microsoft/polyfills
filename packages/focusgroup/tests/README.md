@@ -111,3 +111,14 @@ managed role/tabindex/item-marker writes for measured cosmetic toggles. Raw
 samples are logged and attached to the test result. Run without concurrent tests
 for comparable timings; these are local interaction measurements, not a Core Web
 Vitals score or a guarantee about slower devices.
+
+The nested-toolbar benchmark adds 1,000 article owners with three controls each.
+It measures text-mutation reconciliation, appending twenty nested toolbars, and
+arrow navigation, including observer capture counts as the feed grows. Managed
+writes capture overlapping owner observers through a root index, preserving
+synchronous author reactions and the previous `beginWrite`/`endWrite` protocol.
+The fixed-depth fixture requires fewer than sixteen captures per registered
+observer per reconciliation; latency medians must stay below 500 ms for
+reconciliation, 800 ms for append, and 16 ms for directional dispatch.
+`batched-writes.spec.js` covers interleaved author reactions that repeat a
+managed old/new value pair, and calls from the previous observer protocol.

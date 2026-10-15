@@ -5,8 +5,9 @@ import { DatasetName } from "./constants.js";
 import { adoptControlWrites } from "./item-controls.js";
 import {
   authoredTabindex,
-  observers,
+  registerObserver,
   rememberTabindexValues,
+  unregisterObserver,
 } from "./observer-registry.js";
 import { createTreeWalker } from "./shadow-utils/index.js";
 import { checkVisibility } from "./utils.js";
@@ -15,6 +16,8 @@ import { checkVisibility } from "./utils.js";
  * Shared observer lifecycle for focusgroup item collections.
  */
 export class ObservableItemCollection {
+  indexedWrites = true;
+
   /** @type {MutationObserver | null} */
   #observer = null;
 
@@ -101,7 +104,7 @@ export class ObservableItemCollection {
       this.#deliver?.();
     });
     this.#observer.observe(owner, options);
-    observers.add(this);
+    registerObserver(owner, this);
   }
 
   stopObserving() {
@@ -118,7 +121,7 @@ export class ObservableItemCollection {
         );
       }
     }
-    observers.delete(this);
+    unregisterObserver(this.#owner, this);
     this.#observer?.disconnect();
     this.#observer = null;
     this.#owner = null;
@@ -128,11 +131,7 @@ export class ObservableItemCollection {
     this.#managedWrites.clear();
   }
 
-  /**
-   * Mark the write before touching the DOM: custom element reactions can
-   * synchronously re-enter focus handling and drain observers again.
-   * @param {{element: HTMLElement, oldValue: string|null}} write
-   */
+  /** @param {{element: HTMLElement, oldValue: string|null}} write */
   beginWrite(write) {
     this.capture();
     this.#managedWrites.add(write);
