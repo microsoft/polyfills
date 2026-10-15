@@ -86,6 +86,8 @@ export class GridItemCollection {
 
   #build() {
     this.#entries = [];
+    this.#indexByElement.clear();
+    this.#indexByCell.clear();
     this.#valid = false;
     this.#rowCount = 0;
     this.#colCount = 0;

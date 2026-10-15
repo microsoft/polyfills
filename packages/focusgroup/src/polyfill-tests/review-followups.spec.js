@@ -118,6 +118,42 @@ test(
   },
 );
 
+test("an invalidated grid clears its lookup indexes", async ({ page }, {
+  project,
+}) => {
+  await setupPage(
+    page,
+    project,
+    `<table id="grid"><tbody><tr><td><button id="first">A</button></td><td><button>B</button></td></tr></tbody></table>`,
+  );
+  const result = await page.evaluate(async () => {
+    const { GridItemCollection } = await import("/src/grid-item-collection.js");
+    const owner = document.getElementById("grid");
+    const collection = new GridItemCollection(owner, false);
+    const first = document.getElementById("first");
+    const initiallyValid = collection.valid;
+    owner.tBodies[0].insertAdjacentHTML(
+      "beforeend",
+      "<tr><td><button>C</button></td></tr>",
+    );
+    collection.decorate();
+    return {
+      initiallyValid,
+      validAfterInvalidation: collection.valid,
+      isItem: collection.isItem(first),
+      contains: collection.contains(first),
+      itemForNode: collection.itemForNode(first),
+    };
+  });
+  expect(result).toEqual({
+    initiallyValid: true,
+    validAfterInvalidation: false,
+    isItem: false,
+    contains: false,
+    itemForNode: null,
+  });
+});
+
 // Cached views (tabs, `<KeepAlive>`, virtualized lists) detach DOM and
 // reinsert it in a later task. `polyfill()` alone does not observe additions,
 // so owners torn down while detached must be reinstated when they return.
