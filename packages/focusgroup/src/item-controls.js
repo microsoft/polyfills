@@ -21,7 +21,7 @@ export function managedTabindex(element) {
 }
 
 export function setItemTabindex(element, value) {
-  captureObservers();
+  captureObservers(element);
   const entry = controls.get(element);
   if (entry) {
     entry.tabindex = value;
@@ -49,6 +49,7 @@ export function adoptControlWrites(records) {
 }
 
 export function setControlActive(element, owner, active) {
+  captureObservers(element);
   let entry = controls.get(element);
   if (!entry) {
     entry = { tabindex: element.getAttribute("tabindex"), owners: new Map() };
@@ -59,7 +60,7 @@ export function setControlActive(element, owner, active) {
 }
 
 export function releaseControl(element, owner) {
-  captureObservers();
+  captureObservers(element);
   const entry = controls.get(element);
   if (!entry) {
     return;

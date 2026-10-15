@@ -4,7 +4,7 @@
 import { DatasetName } from "./constants.js";
 import { state } from "./global-state.js";
 import { managedTabindex } from "./item-controls.js";
-import { observers } from "./observer-registry.js";
+import { hasIndexedObserver } from "./observer-registry.js";
 import {
   createTreeWalker,
   getParentElement,
@@ -87,12 +87,9 @@ export class DOMItemControls {
       parent = getParentElement(parent)
     ) {
       if (state.m?.has(parent)) {
-        // Legacy observers cannot distinguish filtering from author writes.
-        // Preserve their nested rovers rather than suppressing their controls.
-        if (
-          !state.m.get(parent) ||
-          ![...observers].some((observer) => observer.observes?.(parent))
-        ) {
+        // Older observers do not share the indexed batching protocol.
+        // Preserve their rovers rather than mixing control reconciliation.
+        if (!state.m.get(parent) || !hasIndexedObserver(parent)) {
           return false;
         }
       }

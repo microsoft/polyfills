@@ -4,6 +4,7 @@
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
 import { GridItemCollection } from "./grid-item-collection.js";
+import { batchWrites } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -126,42 +127,38 @@ export function polyfill(root) {
 
   // Descendants must establish their own tab stops before an ancestor can
   // decide which nested boundaries to filter.
-  for (const element of pending.reverse()) {
-    requestAnimationFrame(() => {
-      // The element may have been removed (and its slot deleted) before the
-      // rAF fired; bail out so we don't resurrect a tracking entry.
-      if (!elementPolyfillMap.has(element)) {
-        return;
+  initQueue.push(...pending.reverse());
+  if (pending.length && !initScheduled) {
+    initScheduled = true;
+    requestAnimationFrame(initPending);
+  }
+}
+
+/** @type {HTMLElement[]} */
+let initQueue = [];
+let initScheduled = false;
+
+/**
+ * Creates every FocusGroup queued in this frame in one batch of managed
+ * writes, then reconciles each affected ancestor once. Updating ancestors
+ * per created descendant would rebuild a feed once per nested toolbar.
+ */
+function initPending() {
+  const queue = initQueue;
+  initQueue = [];
+  initScheduled = false;
+  batchWrites(() => {
+    /** @type {Map<HTMLElement, number>} */
+    const created = new Map();
+    for (const element of queue) {
+      const fg = createFocusGroup(element);
+      if (fg) {
+        created.set(element, created.size);
       }
-      const definition = parseDefinition(element);
-      if (shouldDeferToNative(definition)) {
-        elementPolyfillMap.delete(element);
-        return;
-      }
-      const createItems = (nextDefinition) =>
-        nextDefinition.behavior === "grid"
-          ? new GridItemCollection(element, nextDefinition.manual)
-          : new TreeWalkerItemCollection(element, nextDefinition.itemcontrols);
-      const items = createItems(definition);
-      const fg = new FocusGroup(element, items, {
-        definition,
-        createItems,
-        onNativeTakeover: (owner) => {
-          elementPolyfillMap.delete(owner);
-        },
-        decorateOwner: (el, behavior, valid) =>
-          inferRole(
-            el,
-            behavior === "grid" && valid === false ? null : behavior,
-            "owner",
-          ),
-        decorateItem: (el, behavior) => {
-          if (behavior !== "grid") {
-            inferRole(el, behavior, "child");
-          }
-        },
-      });
-      elementPolyfillMap.set(element, fg);
+    }
+    // An ancestor created after its descendant already saw it.
+    const stale = new Set();
+    for (const [element, index] of created) {
       // Walk ancestors rather than scanning every tracked owner, which would
       // make initial polyfilling quadratic in the number of owners.
       for (
@@ -169,10 +166,57 @@ export function polyfill(root) {
         ancestor;
         ancestor = getParentElement(ancestor)
       ) {
-        elementPolyfillMap.get(ancestor)?.update();
+        if (
+          elementPolyfillMap.get(ancestor) &&
+          !((created.get(ancestor) ?? -1) > index)
+        ) {
+          stale.add(ancestor);
+        }
       }
-    });
+    }
+    for (const ancestor of stale) {
+      elementPolyfillMap.get(ancestor)?.update();
+    }
+  });
+}
+
+/** @param {HTMLElement} element */
+function createFocusGroup(element) {
+  // The element may have been removed (and its slot deleted) before the
+  // rAF fired; bail out so we don't resurrect a tracking entry.
+  if (!elementPolyfillMap.has(element) || elementPolyfillMap.get(element)) {
+    return null;
   }
+  const definition = parseDefinition(element);
+  if (shouldDeferToNative(definition)) {
+    elementPolyfillMap.delete(element);
+    return null;
+  }
+  const createItems = (nextDefinition) =>
+    nextDefinition.behavior === "grid"
+      ? new GridItemCollection(element, nextDefinition.manual)
+      : new TreeWalkerItemCollection(element, nextDefinition.itemcontrols);
+  const items = createItems(definition);
+  const fg = new FocusGroup(element, items, {
+    definition,
+    createItems,
+    onNativeTakeover: (owner) => {
+      elementPolyfillMap.delete(owner);
+    },
+    decorateOwner: (el, behavior, valid) =>
+      inferRole(
+        el,
+        behavior === "grid" && valid === false ? null : behavior,
+        "owner",
+      ),
+    decorateItem: (el, behavior) => {
+      if (behavior !== "grid") {
+        inferRole(el, behavior, "child");
+      }
+    },
+  });
+  elementPolyfillMap.set(element, fg);
+  return fg;
 }
 
 /**

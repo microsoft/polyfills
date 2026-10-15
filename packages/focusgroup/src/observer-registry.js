@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { state } from "./global-state.js";
+import { getParentElement } from "./shadow-utils/index.js";
 
 state.p ??= new Set();
 export const observers = state.p;
@@ -37,11 +38,88 @@ export function authoredTabindex(record) {
   return tabindexValues.get(record);
 }
 
-// Adopt every overlapping observer's pending author values before a managed
-// rover changes the shared underlying tabindex.
-export function captureObservers() {
-  for (const observer of observers) {
+/**
+ * Index observers by root so each write captures only overlapping collections.
+ * Unindexed observers from older bundles retain the original write protocol.
+ * @type {{depth: number, roots: WeakMap<Element, Set<import("./observable-item-collection.js").ObservableItemCollection>>, unindexed: import("./observable-item-collection.js").ObservableItemCollection[]}}
+ */
+state.w ??= { depth: 0, roots: new WeakMap(), unindexed: [] };
+const batch = state.w;
+
+export function registerObserver(owner, observer) {
+  let collections = batch.roots.get(owner);
+  if (!collections) {
+    collections = new Set();
+    batch.roots.set(owner, collections);
+  }
+  collections.add(observer);
+  observers.add(observer);
+}
+
+export function unregisterObserver(owner, observer) {
+  batch.roots.get(owner)?.delete(observer);
+  observers.delete(observer);
+}
+
+export function hasIndexedObserver(owner) {
+  return !!batch.roots.get(owner)?.size;
+}
+
+function observersFor(element) {
+  const result = new Set(
+    batch.depth
+      ? batch.unindexed.filter((observer) => observers.has(observer))
+      : [...observers].filter((observer) => !observer.indexedWrites),
+  );
+  // Include both DOM ancestors and assigned-slot/host ancestors.
+  const visited = new Set();
+  const pending = [element];
+  while (pending.length) {
+    const node = pending.pop();
+    if (!node || visited.has(node)) {
+      continue;
+    }
+    visited.add(node);
+    for (const observer of batch.roots.get(node) ?? []) {
+      result.add(observer);
+    }
+    pending.push(node.parentElement, getParentElement(node));
+  }
+  return result;
+}
+
+/** @param {HTMLElement} [element] */
+export function captureObservers(element) {
+  for (const observer of element ? observersFor(element) : observers) {
     observer.capture();
+  }
+}
+
+/**
+ * Runs `fn` as one batch of managed writes. Observers are captured once when
+ * the outermost batch opens and closes. Individual writes capture only their
+ * overlapping owners, rather than every sibling collection in the document.
+ * @template T
+ * @param {() => T} fn
+ * @returns {T}
+ */
+export function batchWrites(fn) {
+  if (!batch.depth) {
+    batch.unindexed = [...observers].filter(
+      (observer) => !observer.indexedWrites,
+    );
+    captureObservers();
+  }
+  batch.depth++;
+  try {
+    return fn();
+  } finally {
+    if (!--batch.depth) {
+      for (const observer of observers) {
+        observer.capture();
+      }
+      batch.unindexed = [];
+    }
   }
 }
 
@@ -52,22 +130,26 @@ export function captureObservers() {
  * @param {string|null} value
  */
 export function writeTabindex(element, value) {
-  if (element.getAttribute("tabindex") === value) {
+  const oldValue = element.getAttribute("tabindex");
+  if (oldValue === value) {
     return;
   }
-  const write = { element, oldValue: element.getAttribute("tabindex") };
-  for (const observer of observers) {
-    observer.beginWrite(write);
-  }
-  try {
-    if (value === null) {
-      element.removeAttribute("tabindex");
-    } else {
-      element.setAttribute("tabindex", value);
+  batchWrites(() => {
+    const write = { element, oldValue };
+    const affected = observersFor(element);
+    for (const observer of affected) {
+      observer.beginWrite(write);
     }
-  } finally {
-    for (const observer of observers) {
-      observer.endWrite(write);
+    try {
+      if (value === null) {
+        element.removeAttribute("tabindex");
+      } else {
+        element.setAttribute("tabindex", value);
+      }
+    } finally {
+      for (const observer of affected) {
+        observer.endWrite(write);
+      }
     }
-  }
+  });
 }
