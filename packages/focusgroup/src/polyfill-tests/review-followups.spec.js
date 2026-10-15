@@ -117,3 +117,58 @@ test(
     await expect(page.getByTestId("a2")).toBeFocused();
   },
 );
+
+// Cached views (tabs, `<KeepAlive>`, virtualized lists) detach DOM and
+// reinsert it in a later task. `polyfill()` alone does not observe additions,
+// so owners torn down while detached must be reinstated when they return.
+for (const detachBeforeInit of [false, true]) {
+  test(`owners in a detached and reinserted subtree keep working${detachBeforeInit ? " (detached before init)" : ""}`, async ({
+    page,
+  }, { project }) => {
+    await setupPage(page, project, `<main id="host"></main>`);
+    const specifier = project.name.endsWith("Shadowless")
+      ? "/build/index-shadowless.mjs"
+      : "/build/index.mjs";
+    await page.evaluate(
+      async ({ detachBeforeInit, specifier }) => {
+        const frame = () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => setTimeout(resolve)),
+          );
+        const host = document.getElementById("host");
+        host.innerHTML = `
+        <section id="panel">
+          <div focusgroup="feed">
+            <article tabindex="0" data-testid="one">
+              One
+              <div focusgroup="toolbar">
+                <button data-testid="a">A</button><button data-testid="b">B</button>
+              </div>
+            </article>
+            <article tabindex="0" data-testid="two">Two</article>
+          </div>
+        </section>`;
+        const { polyfill } = await import(specifier);
+        polyfill(host);
+        if (!detachBeforeInit) {
+          await frame();
+        }
+        const panel = document.getElementById("panel");
+        document.createElement("div").append(panel);
+        await frame();
+        host.append(panel);
+        await frame();
+        await frame();
+      },
+      { detachBeforeInit, specifier },
+    );
+    await page.getByTestId("one").focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("two")).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("b")).toBeFocused();
+  });
+}
