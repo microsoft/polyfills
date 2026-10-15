@@ -15,6 +15,10 @@ class ShadowMutationObserver {
   #subObservers;
   #isObserving = false;
 
+  // Slot reassignment changes the flat tree without a mutation under the
+  // observed owner. An empty batch signals that topology needs refreshing.
+  #onSlotChange = () => this.#callback([], this);
+
   static #overrideAttachShadow(win) {
     const origAttachShadow = win.Element.prototype.attachShadow;
 
@@ -42,6 +46,11 @@ class ShadowMutationObserver {
   }
 
   #callbackWrapper = (mutations, observer) => {
+    this.#trackShadows(mutations);
+    this.#callback(mutations, observer);
+  };
+
+  #trackShadows(mutations) {
     for (const mutation of mutations) {
       if (mutation.type === "childList") {
         const removed = mutation.removedNodes;
@@ -56,9 +65,7 @@ class ShadowMutationObserver {
         }
       }
     }
-
-    this.#callback(mutations, observer);
-  };
+  }
 
   #addSubObserver(shadowRoot) {
     if (
@@ -76,6 +83,7 @@ class ShadowMutationObserver {
 
       if (this.#isObserving) {
         subObserver.observe(shadowRoot, this.#options);
+        shadowRoot.addEventListener("slotchange", this.#onSlotChange);
       }
 
       this.#walkShadows(shadowRoot);
@@ -86,6 +94,7 @@ class ShadowMutationObserver {
     const observer = this.#subObservers.get(shadowRoot);
 
     if (observer) {
+      shadowRoot.removeEventListener("slotchange", this.#onSlotChange);
       observer.disconnect();
       this.#subObservers.delete(shadowRoot);
     }
@@ -107,6 +116,7 @@ class ShadowMutationObserver {
     }
 
     this.#observer.disconnect();
+    this.#root?.removeEventListener("slotchange", this.#onSlotChange);
   }
 
   observe(target, options) {
@@ -127,6 +137,9 @@ class ShadowMutationObserver {
     this.#isObserving = true;
 
     this.#observer.observe(target, options);
+    if (options.subtree) {
+      target.addEventListener("slotchange", this.#onSlotChange);
+    }
 
     this.#walkShadows(target);
   }
@@ -146,12 +159,8 @@ class ShadowMutationObserver {
 
       if (shadowRoot) {
         if (remove) {
-          const subObserver = this.#subObservers.get(shadowRoot);
-
-          if (subObserver) {
-            subObserver.disconnect();
-            this.#subObservers.delete(shadowRoot);
-          }
+          this.#walkShadows(shadowRoot, true);
+          this.#removeSubObserver(shadowRoot);
         } else {
           this.#addSubObserver(shadowRoot);
         }
@@ -164,11 +173,9 @@ class ShadowMutationObserver {
       acceptNode: (node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
           if (remove) {
-            const subObserver = this.#subObservers.get(node);
-
-            if (subObserver) {
-              subObserver.disconnect();
-              this.#subObservers.delete(node);
+            if (node.shadowRoot) {
+              this.#walkShadows(node.shadowRoot, true);
+              this.#removeSubObserver(node.shadowRoot);
             }
           } else {
             const shadowRoot = node.shadowRoot;
@@ -193,6 +200,7 @@ class ShadowMutationObserver {
       records.push(...subObserver.takeRecords());
     }
 
+    this.#trackShadows(records);
     return records;
   }
 }

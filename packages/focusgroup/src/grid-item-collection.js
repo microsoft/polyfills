@@ -2,13 +2,17 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
+import { DOMItemControls } from "./dom-item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
+import { authoredTabindex } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
+  nodeContains,
 } from "./shadow-utils/index.js";
 import {
+  checkVisibility,
   getGridNavigationDirection,
   hasGenericRole,
   isKeyboardFocusable,
@@ -30,6 +34,8 @@ function flatChildren(element) {
  * explicitly enrolled direct-child rows.
  */
 export class GridItemCollection {
+  /** @type {DOMItemControls} */
+  controls;
   #owner;
   #manual;
   #entries = [];
@@ -58,7 +64,15 @@ export class GridItemCollection {
   constructor(owner, manual) {
     this.#owner = owner;
     this.#manual = manual;
+    this.controls = new DOMItemControls(owner, this);
     this.#build();
+  }
+
+  #participates(element) {
+    return (
+      !getClosestElement(element, "[inert]") &&
+      checkVisibility(element, this.#owner)
+    );
   }
 
   #build() {
@@ -68,7 +82,7 @@ export class GridItemCollection {
     this.#colCount = 0;
     this.#sources = new Map();
     const children = flatChildren(this.#owner);
-    const rows = this.#manual
+    const structuralRows = this.#manual
       ? children.filter((el) => el.hasAttribute("focusgrouprow"))
       : children.flatMap((child) =>
           child.tagName === "TR"
@@ -77,6 +91,8 @@ export class GridItemCollection {
               ? [...child.children].filter((row) => row.tagName === "TR")
               : [],
         );
+    // Exclusion precedes rectangularity: hiding a column can narrow the grid.
+    const rows = structuralRows.filter((row) => this.#participates(row));
     if (
       !rows.length ||
       (!this.#manual && !["TABLE"].includes(this.#owner.tagName))
@@ -85,7 +101,9 @@ export class GridItemCollection {
     }
     const cells = rows.map((row) =>
       flatChildren(row).filter(
-        (cell) => this.#manual || ["TD", "TH"].includes(cell.tagName),
+        (cell) =>
+          (this.#manual || ["TD", "TH"].includes(cell.tagName)) &&
+          this.#participates(cell),
       ),
     );
     if (
@@ -116,6 +134,9 @@ export class GridItemCollection {
         );
         while (walker.nextNode()) {
           const child = walker.currentNode;
+          if (!this.#participates(child)) {
+            continue;
+          }
           const scope = getClosestElement(child, "[focusgroup]");
           const table = getClosestElement(child, "table");
           const inScope =
@@ -148,6 +169,8 @@ export class GridItemCollection {
           row: r,
           col: c,
           cell,
+          // A shadow-internal cell's parent is its row's shadow root.
+          rowElement: rows[r],
           nativelyTabbable: isKeyboardFocusable(
             candidates[0],
             this.#owner,
@@ -160,7 +183,7 @@ export class GridItemCollection {
     this.#rowCount = rows.length;
     this.#colCount = cells[0].length;
 
-    if (!this.#validateFullScope(rows, cells)) {
+    if (!this.#validateFullScope(structuralRows, cells)) {
       this.#entries = [];
       this.#sources = new Map();
       this.#valid = false;
@@ -213,7 +236,7 @@ export class GridItemCollection {
         return false;
       }
 
-      if (rowSet.has(node) || cellSet.has(node)) {
+      if (rowSet.has(node) || cellSet.has(node) || !this.#participates(node)) {
         continue;
       }
 
@@ -258,6 +281,14 @@ export class GridItemCollection {
   isItem(element) {
     return this.#entries.some((e) => e.element === element);
   }
+  /** @param {Element} node */
+  itemForNode(node) {
+    return (
+      (this.#valid
+        ? this.#entries.find((entry) => nodeContains(entry.cell, node))?.element
+        : null) ?? null
+    );
+  }
   #isNavigable(element) {
     const entry = this.#entries.find((item) => item.element === element);
     if (!entry) {
@@ -278,7 +309,7 @@ export class GridItemCollection {
     }
     for (const entry of this.#entries) {
       entry.element.setAttribute(DatasetName.ITEM, "");
-      const row = entry.cell.parentElement;
+      const row = entry.rowElement;
       if (this.#manual && hasGenericRole(row) && !row.hasAttribute("role")) {
         row.setAttribute("role", "row");
         row.setAttribute(DatasetName.INFERRED_ROLE, "");
@@ -292,7 +323,7 @@ export class GridItemCollection {
   undecorate() {
     for (const entry of this.#entries) {
       entry.element.removeAttribute(DatasetName.ITEM);
-      for (const el of [entry.cell, entry.cell.parentElement]) {
+      for (const el of [entry.cell, entry.rowElement]) {
         if (el?.hasAttribute(DatasetName.INFERRED_ROLE)) {
           el.removeAttribute("role");
           el.removeAttribute(DatasetName.INFERRED_ROLE);
@@ -390,14 +421,19 @@ export class GridItemCollection {
     this.#observable.startObserving(
       this.#owner,
       (records) => {
-        const authorTabindexChanges = records
-          .filter(
-            (record) =>
-              record.type === "attributes" &&
-              record.attributeName === "tabindex" &&
-              this.#entries.some((entry) => entry.element === record.target),
-          )
-          .map((record) => record.target);
+        const authorTabindexChanges = new Map(
+          records
+            .filter(
+              (record) =>
+                record.type === "attributes" &&
+                record.attributeName === "tabindex" &&
+                this.#entries.some((entry) => entry.element === record.target),
+            )
+            .map((record) => [
+              /** @type {HTMLElement} */ (record.target),
+              authoredTabindex(record),
+            ]),
+        );
         const definition = records.some(
           (record) =>
             record.type === "attributes" &&
@@ -410,6 +446,7 @@ export class GridItemCollection {
       },
       {
         attributes: true,
+        attributeOldValue: true,
         childList: true,
         subtree: true,
         attributeFilter: [
@@ -422,6 +459,10 @@ export class GridItemCollection {
           "href",
           "hidden",
           "inert",
+          "class",
+          "style",
+          "slot",
+          "name",
           "rowspan",
           "colspan",
           "tabindex",
