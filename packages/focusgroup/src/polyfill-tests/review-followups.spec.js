@@ -31,7 +31,10 @@ test("disconnect() is safe on deferred and already disconnected instances", asyn
       } catch (error) {
         errors.push(`deferred: ${error.message}`);
       }
-      delete document.body.focusGroup;
+      Object.defineProperty(document.body, "focusGroup", {
+        configurable: true,
+        value: { supports: () => false },
+      });
       const decorated = [];
       const fg = new FocusGroup(
         owner,
@@ -54,6 +57,13 @@ test("disconnect() is safe on deferred and already disconnected instances", asyn
       }
       if (decorated.some(([element]) => !element)) {
         errors.push("decorateOwner received a null owner");
+      }
+      if (
+        decorated.length !== 2 ||
+        decorated[0][1] !== "toolbar" ||
+        decorated[1][1] !== null
+      ) {
+        errors.push("Expected one decoration and one teardown");
       }
       return errors;
     },
