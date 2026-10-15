@@ -57,11 +57,19 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
         }
       }
       // Ancestors first, matching the walker order `queueOwners()` expects.
-      restored.sort((a, b) =>
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING
-          ? -1
-          : 1,
-      );
+      const depths = new Map();
+      for (const owner of restored) {
+        let depth = 0;
+        for (
+          let ancestor = getParentElement(owner);
+          ancestor;
+          ancestor = getParentElement(ancestor)
+        ) {
+          depth++;
+        }
+        depths.set(owner, depth);
+      }
+      restored.sort((a, b) => depths.get(a) - depths.get(b));
       queueOwners(restored);
     });
     removalObserver.observe(document.body, { childList: true, subtree: true });
