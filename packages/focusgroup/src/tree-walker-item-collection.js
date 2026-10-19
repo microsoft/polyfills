@@ -259,6 +259,9 @@ export class TreeWalkerItemCollection {
    */
   undecorate() {
     for (const node of this.#decorated) {
+      if (!this.isItem(node)) {
+        continue;
+      }
       node.removeAttribute(DatasetName.ITEM);
       node.removeAttribute(DatasetName.SEGMENT);
       node.removeAttribute(DatasetName.SEGMENT_START);

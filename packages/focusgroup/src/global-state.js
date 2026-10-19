@@ -18,8 +18,9 @@
 //   b: boolean — whether the global observer should also polyfill new nodes.
 //   c: Map<HTMLElement, *> — shared itemcontrols filter for nested owners.
 //   w: {depth, roots, unindexed} — write batching and observer-root index.
+//   d: WeakMap<Element, FocusGroup> — current behavioral decoration owner.
 /**
- * @type {{ o: Set<MutationObserver>, p?: Set<import("./observable-item-collection.js").ObservableItemCollection>, m?: Map<HTMLElement, *>, g?: MutationObserver, r?: MutationObserver, b: boolean, c?: Map<HTMLElement, *>, w?: {depth: number, roots: WeakMap<Element, Set<import("./observable-item-collection.js").ObservableItemCollection>>, unindexed: import("./observable-item-collection.js").ObservableItemCollection[]} }}
+ * @type {{ o: Set<MutationObserver>, p?: Set<import("./observable-item-collection.js").ObservableItemCollection>, m?: Map<HTMLElement, *>, g?: MutationObserver, r?: MutationObserver, b: boolean, c?: Map<HTMLElement, *>, d?: WeakMap<Element, import("./focusgroup.js").FocusGroup>, w?: {depth: number, roots: WeakMap<Element, Set<import("./observable-item-collection.js").ObservableItemCollection>>, unindexed: import("./observable-item-collection.js").ObservableItemCollection[]} }}
  * @global
  */
 globalThis.__FOCUSGROUP_POLYFILL__ ??= {

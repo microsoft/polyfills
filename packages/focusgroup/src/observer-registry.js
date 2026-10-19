@@ -61,6 +61,19 @@ export function unregisterObserver(owner, observer) {
   observers.delete(observer);
 }
 
+export function registerRemovedSubtree(element, observer) {
+  let collections = batch.roots.get(element);
+  if (!collections) {
+    collections = new Set();
+    batch.roots.set(element, collections);
+  }
+  if (!collections.has(observer)) {
+    collections.add(observer);
+    // Native subtree observers retain removed descendants until delivery.
+    queueMicrotask(() => collections.delete(observer));
+  }
+}
+
 export function hasIndexedObserver(owner) {
   return !!batch.roots.get(owner)?.size;
 }

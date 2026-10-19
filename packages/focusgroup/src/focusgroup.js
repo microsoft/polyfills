@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
+import { state } from "./global-state.js";
 import {
   managedTabindex,
   releaseControl,
@@ -11,6 +12,9 @@ import {
 import { batchWrites, writeTabindex } from "./observer-registry.js";
 import { nodeContains } from "./shadow-utils/index.js";
 import { getNavigationDirection, shouldDeferToNative } from "./utils.js";
+
+state.d ??= new WeakMap();
+const itemOwners = state.d;
 
 /**
  * Whether the latest Tab keydown in each document had Shift held. One shared
@@ -277,6 +281,9 @@ export class FocusGroup {
     if (info.authorTabindexChanges) {
       for (const change of info.authorTabindexChanges) {
         const el = Array.isArray(change) ? change[0] : change;
+        if (itemOwners.has(el) && itemOwners.get(el) !== this) {
+          continue;
+        }
         const saved = managedTabindex(el);
         const value = Array.isArray(change)
           ? change[1]
@@ -356,6 +363,7 @@ export class FocusGroup {
 
     for (const { element, segmentBoundary } of this.#items.items()) {
       this.#decoratedItems.add(element);
+      itemOwners.set(element, this);
       // Set role
       this.#decorateItem?.(element, this.#behavior);
 
@@ -363,7 +371,8 @@ export class FocusGroup {
       const saved = managedTabindex(element);
       element.setAttribute(
         DatasetName.AUTHOR_TABINDEX,
-        (saved === undefined ? element.getAttribute("tabindex") : saved) ??
+        element.getAttribute(DatasetName.AUTHOR_TABINDEX) ??
+          (saved === undefined ? element.getAttribute("tabindex") : saved) ??
           "none",
       );
       setItemTabindex(element, segmentBoundary ? "0" : "-1");
@@ -412,6 +421,10 @@ export class FocusGroup {
 
     // Items can have left the flat tree (for example after slot reassignment).
     for (const element of this.#decoratedItems) {
+      if (itemOwners.get(element) !== this) {
+        continue;
+      }
+      itemOwners.delete(element);
       undecorated = true;
 
       // Restore role
@@ -625,10 +638,15 @@ export class FocusGroup {
       } else {
         this.#advanceFocus(source, target, true);
       }
-      // Focus events don't cross shadow boundaries for moves within the
-      // same shadow tree, so update #current directly here.
-      this.#current = target;
-      this.#applyItemControls(this.#current);
+      // Author focus handlers may synchronously redirect to another item.
+      const active = this.#activeItem();
+      if (active) {
+        if (active !== target) {
+          this.#advanceFocus(target, active);
+        }
+        this.#current = active;
+      }
+      this.#applyItemControls(active);
       evt.preventDefault();
     }
   }
@@ -808,9 +826,6 @@ export class FocusGroup {
    */
   #advanceFocus(prev, next, shouldCallFocus = false) {
     setItemTabindex(next, "0");
-    if (shouldCallFocus) {
-      next.focus();
-    }
     setItemTabindex(
       prev,
       (this.#items.sameSegment?.(prev, next) ?? true) ? "-1" : "0",
@@ -820,5 +835,8 @@ export class FocusGroup {
     // disabled (it was disabled in #handleFocusin). Just clear in case any
     // lingered.
     this.#disableFocusabilityProxy();
+    if (shouldCallFocus) {
+      next.focus();
+    }
   }
 }

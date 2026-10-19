@@ -584,6 +584,16 @@ export function checkVisibility(element, ancestor) {
  * @param {"owner" | "child"} kind - Which role to look up from RoleMap.
  */
 export function inferRole(element, behavior, kind) {
+  const inferredKind = element.getAttribute(DatasetName.INFERRED_ROLE);
+  if (kind === "child") {
+    const ownBehavior = parseDefinition(element).behavior;
+    if (
+      inferredKind === "owner" ||
+      (ownBehavior && ownBehavior !== BehaviorToken.NONE)
+    ) {
+      return;
+    }
+  }
   const cfg = BehaviorMap[behavior];
   const mappedRole = kind === "owner" ? cfg?.ownerRole : cfg?.childRole;
   const genericTag =
@@ -608,7 +618,7 @@ export function inferRole(element, behavior, kind) {
       element.hasAttribute(DatasetName.INFERRED_ROLE)
     ) {
       element.setAttribute("role", role);
-      element.setAttribute(DatasetName.INFERRED_ROLE, "");
+      element.setAttribute(DatasetName.INFERRED_ROLE, kind);
     }
   } else if (element.hasAttribute(DatasetName.INFERRED_ROLE)) {
     element.removeAttribute("role");

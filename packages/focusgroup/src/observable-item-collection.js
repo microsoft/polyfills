@@ -6,6 +6,7 @@ import { adoptControlWrites } from "./item-controls.js";
 import {
   authoredTabindex,
   registerObserver,
+  registerRemovedSubtree,
   rememberTabindexValues,
   unregisterObserver,
 } from "./observer-registry.js";
@@ -109,18 +110,6 @@ export class ObservableItemCollection {
 
   stopObserving() {
     this.capture();
-    for (const record of this.#pending) {
-      const element = /** @type {HTMLElement} */ (record.target);
-      if (
-        record.attributeName === "tabindex" &&
-        element.hasAttribute(DatasetName.AUTHOR_TABINDEX)
-      ) {
-        element.setAttribute(
-          DatasetName.AUTHOR_TABINDEX,
-          authoredTabindex(record) ?? "none",
-        );
-      }
-    }
     unregisterObserver(this.#owner, this);
     this.#observer?.disconnect();
     this.#observer = null;
@@ -173,6 +162,25 @@ export class ObservableItemCollection {
     // Adoption belongs to capture, not delivery: another owner may reconcile
     // the shared rover before this observer's deferred callback runs.
     adoptControlWrites(records);
+    for (const record of records) {
+      if (record.type === "childList") {
+        for (const node of record.removedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            registerRemovedSubtree(node, this);
+          }
+        }
+      }
+      const element = /** @type {HTMLElement} */ (record.target);
+      if (
+        record.attributeName === "tabindex" &&
+        element.hasAttribute(DatasetName.AUTHOR_TABINDEX)
+      ) {
+        element.setAttribute(
+          DatasetName.AUTHOR_TABINDEX,
+          authoredTabindex(record) ?? "none",
+        );
+      }
+    }
     if (!this.#pending.length) {
       queueMicrotask(() => this.#deliver?.());
     }
