@@ -21,6 +21,7 @@ test("a focusable nested owner used as a feed item remains its Tab entry point",
     <button data-testid="after">After</button>`,
   );
   await page.getByTestId("before").focus();
+  await expect(page.getByTestId("one")).toHaveComputedRole("toolbar");
   await pressTab(page, project);
   await expect(page.getByTestId("one")).toBeFocused();
 });

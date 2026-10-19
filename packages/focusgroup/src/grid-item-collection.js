@@ -13,6 +13,7 @@ import {
 } from "./shadow-utils/index.js";
 import {
   checkVisibility,
+  generateUniqueId,
   getGridNavigationDirection,
   hasGenericRole,
   isKeyboardFocusable,
@@ -34,6 +35,7 @@ function flatChildren(element) {
  * explicitly enrolled direct-child rows.
  */
 export class GridItemCollection {
+  id = generateUniqueId();
   /** @type {DOMItemControls} */
   controls;
   #owner;
@@ -342,7 +344,7 @@ export class GridItemCollection {
       return;
     }
     for (const entry of this.#entries) {
-      entry.element.setAttribute(DatasetName.ITEM, "");
+      entry.element.setAttribute(DatasetName.ITEM, this.id);
       const row = entry.rowElement;
       if (this.#manual && hasGenericRole(row) && !row.hasAttribute("role")) {
         row.setAttribute("role", "row");
@@ -356,6 +358,9 @@ export class GridItemCollection {
   }
   undecorate() {
     for (const entry of this.#entries) {
+      if (entry.element.getAttribute(DatasetName.ITEM) !== this.id) {
+        continue;
+      }
       entry.element.removeAttribute(DatasetName.ITEM);
       for (const el of [entry.cell, entry.rowElement]) {
         if (el?.hasAttribute(DatasetName.INFERRED_ROLE)) {

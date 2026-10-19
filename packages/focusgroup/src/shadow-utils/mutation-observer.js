@@ -13,11 +13,19 @@ class ShadowMutationObserver {
   #callback;
   #observer;
   #subObservers;
+  #assignedObservers = new Map();
   #isObserving = false;
 
   // Slot reassignment changes the flat tree without a mutation under the
   // observed owner. An empty batch signals that topology needs refreshing.
-  #onSlotChange = () => this.#callback([], this);
+  #onSlotChange = () => {
+    const records = this.takeRecords();
+    records.push(...this.#observeAssigned());
+    if (records.length) {
+      this.#callback(records, this);
+    }
+    this.#callback([], this);
+  };
 
   static #overrideAttachShadow(win) {
     const origAttachShadow = win.Element.prototype.attachShadow;
@@ -47,8 +55,61 @@ class ShadowMutationObserver {
 
   #callbackWrapper = (mutations, observer) => {
     this.#trackShadows(mutations);
+    if (this.#changesAssignment(mutations)) {
+      mutations.push(...this.#observeAssigned());
+    }
     this.#callback(mutations, observer);
   };
+
+  #changesAssignment(records) {
+    return records.some(
+      (record) =>
+        record.type === "childList" ||
+        (record.type === "attributes" &&
+          (record.attributeName === "slot" || record.attributeName === "name")),
+    );
+  }
+
+  #observeAssigned() {
+    const records = [];
+    if (!this.#options?.subtree || !this.#isObserving) {
+      return records;
+    }
+    const roots = [this.#root, ...this.#subObservers.keys()];
+    const assigned = new Set();
+    for (const root of roots) {
+      const slots = [
+        ...(root.matches?.("slot") ? [root] : []),
+        ...root.querySelectorAll("slot"),
+      ];
+      for (const slot of slots) {
+        for (const node of slot.assignedElements({ flatten: true })) {
+          if (!roots.some((observedRoot) => observedRoot.contains(node))) {
+            assigned.add(node);
+          }
+        }
+      }
+    }
+    for (const [node, observer] of this.#assignedObservers) {
+      if (!assigned.has(node)) {
+        records.push(...observer.takeRecords());
+        observer.disconnect();
+        this.#assignedObservers.delete(node);
+        if (!nodeContains(this.#root, node)) {
+          this.#walkShadows(node, true);
+        }
+      }
+    }
+    for (const node of assigned) {
+      if (!this.#assignedObservers.has(node)) {
+        const observer = new MutationObserver(this.#callbackWrapper);
+        observer.observe(node, this.#options);
+        this.#assignedObservers.set(node, observer);
+        this.#walkShadows(node);
+      }
+    }
+    return records;
+  }
 
   #trackShadows(mutations) {
     for (const mutation of mutations) {
@@ -116,6 +177,10 @@ class ShadowMutationObserver {
     }
 
     this.#observer.disconnect();
+    for (const observer of this.#assignedObservers.values()) {
+      observer.disconnect();
+    }
+    this.#assignedObservers.clear();
     this.#root?.removeEventListener("slotchange", this.#onSlotChange);
   }
 
@@ -142,6 +207,7 @@ class ShadowMutationObserver {
     }
 
     this.#walkShadows(target);
+    this.#observeAssigned();
   }
 
   #walkShadows(target, remove) {
@@ -199,8 +265,14 @@ class ShadowMutationObserver {
     for (const subObserver of this.#subObservers.values()) {
       records.push(...subObserver.takeRecords());
     }
+    for (const observer of this.#assignedObservers.values()) {
+      records.push(...observer.takeRecords());
+    }
 
     this.#trackShadows(records);
+    if (this.#changesAssignment(records)) {
+      records.push(...this.#observeAssigned());
+    }
     return records;
   }
 }

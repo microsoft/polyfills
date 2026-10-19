@@ -69,6 +69,12 @@ changes for shadow-owned items and controls, and native button semantics in grid
 Removal cleanup restores authored attributes; connected moves retain ownership.
 The shadow-aware observer reports an empty batch for `slotchange`, since no DOM
 mutation record exists under a shadow-owned group for light-DOM reassignment.
+It also observes assigned subtrees for attribute mutations, preserving authored
+tabindex changes even when the assigned content is outside the owner's DOM
+subtree; subscriptions are released on reassignment and disconnect.
+`review-transfers.spec.js` covers destination-first transfer of decorated items,
+synchronous author focus redirection (including opted-out controls and exits),
+nested owner role preservation, and same-value writes to slotted controls.
 
 `itemcontrols-rendering.spec.js` covers class/style visibility changes (including
 sibling selectors), ownership state, and native control eligibility.
