@@ -63,7 +63,10 @@ synchronous author focus redirection (including opted-out controls and exits),
 and overlapping observer registration orders for nested owners.
 `itemcontrols-shadow.spec.js` covers shadow-internal script/pointer focus and
 listener teardown, focus inside slotted grid cells, and slot assignment changes
-for shadow-owned items and controls. The shadow-aware observer reports an empty
+for shadow-owned items and controls. A Chromium fullscreen regression checks that
+shadow-internal fullscreen content remains a top-layer boundary even though
+`document.fullscreenElement` is retargeted to its host.
+The shadow-aware observer reports an empty
 batch for `slotchange`, since no DOM mutation record exists under a shadow-owned
 group for light-DOM reassignment. It also observes assigned subtrees for
 attribute mutations, preserving authored tabindex changes (including same-value
