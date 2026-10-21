@@ -137,3 +137,48 @@ test("removing noitemcontrols hands off to native and toggling back reinstalls o
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("two")).toBeFocused();
 });
+
+test("itemcontrols on a V1 behavior is polyfilled despite native support unless native V2 is allowed", async ({
+  page,
+}, { project }) => {
+  const specifier = project.name.endsWith("Shadowless")
+    ? "/build/index-shadowless.mjs"
+    : "/build/index.mjs";
+  for (const { attr, allowNative, polyfilled } of [
+    { attr: "toolbar itemcontrols", allowNative: false, polyfilled: true },
+    { attr: "toolbar noitemcontrols", allowNative: false, polyfilled: true },
+    { attr: "toolbar itemcontrols", allowNative: true, polyfilled: false },
+    { attr: "toolbar", allowNative: false, polyfilled: false },
+  ]) {
+    await page.goto("about:blank");
+    await page.goto("/test.html");
+    await page.setContent(`
+      <div focusgroup="${attr}">
+        <div tabindex="0" data-testid="one">One
+          <button focusgroup="none" data-testid="one-action">Action</button>
+        </div>
+        <div tabindex="0" data-testid="two">Two</div>
+      </div>`);
+    await page.evaluate(
+      async ({ allowNative, specifier }) => {
+        globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__ = allowNative;
+        Object.defineProperty(document.body, "focusGroup", {
+          configurable: true,
+          value: {
+            supports: (token) =>
+              ["toolbar", "itemcontrols", "noitemcontrols"].includes(token),
+          },
+        });
+        const { polyfill } = await import(specifier);
+        polyfill();
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      },
+      { allowNative, specifier },
+    );
+    if (polyfilled) {
+      await expect(page.getByTestId("two")).toHaveAttribute("data-fg-item");
+    } else {
+      await expect(page.getByTestId("two")).not.toHaveAttribute("data-fg-item");
+    }
+  }
+});

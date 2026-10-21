@@ -58,21 +58,30 @@ export function supportsFocusGroup(behavior) {
  * site, or test that needs to exercise the native behavior — by setting
  * `globalThis.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__` to `true`.
  *
- * @param {BehaviorToken | null} [behavior]
+ * The V2 `itemcontrols` and `noitemcontrols` modifiers follow the same rule on
+ * any behavior, so `toolbar itemcontrols` and `feed` behave consistently on
+ * the same page.
+ *
+ * @param {FocusGroupDefinition} [definition]
  * @returns {boolean}
  */
-export function shouldPolyfillV2(behavior) {
+export function shouldPolyfillV2(definition) {
+  const { behavior, itemcontrols, noitemcontrols } = definition ?? {};
   return (
-    (behavior === BehaviorToken.GRID || behavior === BehaviorToken.FEED) &&
+    (behavior === BehaviorToken.GRID ||
+      behavior === BehaviorToken.FEED ||
+      !!itemcontrols ||
+      !!noitemcontrols) &&
     !globalThis?.__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__
   );
 }
 
 /**
- * Whether an owner should be left to the native implementation: its behavior
- * is natively supported and not force-polyfilled, and every modifier that
- * changes its semantics is natively supported too. `noitemcontrols` only
- * matters when the user agent could otherwise apply `itemcontrols`.
+ * Whether an owner should be left to the native implementation: it uses no
+ * force-polyfilled V2 surface, its behavior is natively supported, and every
+ * modifier that changes its semantics is natively supported too. With native
+ * V2 allowed, `noitemcontrols` only matters when the user agent could
+ * otherwise apply `itemcontrols`.
  *
  * @param {FocusGroupDefinition} [definition]
  * @returns {boolean}
@@ -80,7 +89,7 @@ export function shouldPolyfillV2(behavior) {
 export function shouldDeferToNative(definition) {
   const { behavior, itemcontrols, noitemcontrols } = definition ?? {};
   return (
-    !shouldPolyfillV2(behavior) &&
+    !shouldPolyfillV2(definition) &&
     supportsFocusGroup(behavior) &&
     (!itemcontrols || supportsFocusGroup(ModifierToken.ITEMCONTROLS)) &&
     (!noitemcontrols ||

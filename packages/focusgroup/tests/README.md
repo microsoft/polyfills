@@ -38,7 +38,8 @@ tokens as supported, but differs from the current explainers in these fixtures:
 These are reproducible differences from the cited proposals, not an assertion
 that every failure establishes a Chromium defect. Keep failures visible when
 comparing engines; the ordinary test mode retains the package's native-deferral
-policy, including for a toolbar whose reported modifier support is sufficient.
+policy, which polyfills V2 behaviors and the `itemcontrols`/`noitemcontrols`
+modifiers even where the browser reports support for them.
 
 `pressTab()` uses Option on macOS WebKit only for sequences that include native
 buttons/controls. Polyfilled item boundaries with explicit tabindex work with
@@ -86,7 +87,8 @@ records actual feature detection and uses a deterministic toolbar-only support
 stub when the browser either lacks V1 or already supports V2; an ordinary native
 toolbar remains untouched by the polyfill. It also covers native takeover and
 observer cleanup when `noitemcontrols` is removed, and reinstallation when it
-returns.
+returns. A support matrix covers `itemcontrols` and `noitemcontrols` on a V1
+behavior being polyfilled unless `__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__` is set.
 
 `itemcontrols-lifecycle.spec.js` covers pending authored tabindex on subtree
 removal (including shared nested controls), and native deferral changing between
