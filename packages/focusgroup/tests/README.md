@@ -55,27 +55,28 @@ native feature-policy tests install their own support matrices with own-property
 `focusGroup` stubs rather than assigning to its native PutForwards setter.
 All six standard/shadowless projects include these tests.
 
-`review-feedback.spec.js` covers mixed-bundle detached cleanup, authored tabindex
-parsing against native IDL behavior, and a model-backed `FocusGroup` whose
-item controls do not require any DOM tree walking.
-`adversarial.spec.js` covers reverse grid entry followed by Tab, shadow-internal
-script/pointer focus and listener teardown, overlapping observer registration
-orders, and current feeds enclosing actual legacy toolbars. Legacy-owned
-subtrees retain their own navigation without ancestor control suppression;
-current owners continue to use full nested filtering. Set
-`FOCUSGROUP_LEGACY_BUILD` to built bundles from `53d8a15` to exercise the original
-grid/V1 observer protocol in both load orders.
-`review-lifecycle.spec.js` checks detached reparenting/reinsertion, slot assignment
-changes for shadow-owned items and controls, and native button semantics in grids.
-Removal cleanup restores authored attributes; connected moves retain ownership.
-The shadow-aware observer reports an empty batch for `slotchange`, since no DOM
-mutation record exists under a shadow-owned group for light-DOM reassignment.
-It also observes assigned subtrees for attribute mutations, preserving authored
-tabindex changes even when the assigned content is outside the owner's DOM
-subtree; subscriptions are released on reassignment and disconnect.
-`review-transfers.spec.js` covers destination-first transfer of decorated items,
+`itemcontrols-config.spec.js` covers behavior/modifier configuration, authored
+tabindex parsing against native IDL behavior, the demo examples, and a
+model-backed `FocusGroup` whose item controls do not require any DOM tree walking.
+`itemcontrols-focus.spec.js` covers reverse grid entry followed by Tab,
 synchronous author focus redirection (including opted-out controls and exits),
-nested owner role preservation, and same-value writes to slotted controls.
+and overlapping observer registration orders for nested owners.
+`itemcontrols-shadow.spec.js` covers shadow-internal script/pointer focus and
+listener teardown, focus inside slotted grid cells, and slot assignment changes
+for shadow-owned items and controls. The shadow-aware observer reports an empty
+batch for `slotchange`, since no DOM mutation record exists under a shadow-owned
+group for light-DOM reassignment. It also observes assigned subtrees for
+attribute mutations, preserving authored tabindex changes (including same-value
+writes) even when the assigned content is outside the owner's DOM subtree;
+subscriptions are released on reassignment and disconnect.
+`role-inference.spec.js` covers native button semantics in grids and nested
+owner roles across parent reconciliation and teardown.
+`bundle-compatibility.spec.js` also covers mixed-bundle detached cleanup and
+current feeds enclosing actual legacy toolbars. Legacy-owned subtrees retain
+their own navigation without ancestor control suppression; current owners
+continue to use full nested filtering. Set `FOCUSGROUP_LEGACY_BUILD` to built
+bundles from `53d8a15` to exercise the original grid/V1 observer protocol in
+both load orders.
 
 `itemcontrols-rendering.spec.js` covers class/style visibility changes (including
 sibling selectors), ownership state, and native control eligibility.
@@ -91,8 +92,11 @@ returns. A support matrix covers `itemcontrols` and `noitemcontrols` on a V1
 behavior being polyfilled unless `__FOCUSGROUP_POLYFILL_ALLOW_NATIVE_V2__` is set.
 
 `itemcontrols-lifecycle.spec.js` covers pending authored tabindex on subtree
-removal (including shared nested controls), and native deferral changing between
-reservation and frame-delayed installation. `bundle-compatibility.spec.js`
+removal (including shared nested controls), native deferral changing between
+reservation and frame-delayed installation, detached reparenting and
+reinsertion, connected moves (which retain ownership), safe repeated
+`disconnect()`, grid invalidation, and destination-first transfer of decorated
+items between owners. Removal cleanup restores authored attributes. `bundle-compatibility.spec.js`
 always checks the legacy observer protocol. Its additional real-bundle cases
 need a separately built pre-provenance version: set `FOCUSGROUP_LEGACY_BUILD` to
 the absolute directory containing its `index.min.mjs` and
