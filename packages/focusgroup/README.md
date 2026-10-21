@@ -41,8 +41,15 @@ a native V2 implementation that follows an older iteration of the spec than
 the one your site (and the polyfill) has moved on to, **the polyfill always
 polyfills `feed` and `grid`, even when the browser reports native support**, until
 there's confidence the API has stabilized (e.g. once a browser ships it).
-On V1 behaviors, `itemcontrols` is polyfilled when the browser supports the
-behavior but not the `itemcontrols` token.
+The same applies to the `itemcontrols` and `noitemcontrols` modifiers on any
+behavior: `focusgroup="toolbar itemcontrols"` is polyfilled even when the
+browser supports both `toolbar` and `itemcontrols`.
+
+When polyfilling one of these owners in a browser that natively supports its
+V1 behavior (for example `toolbar`), the native and polyfilled behaviors both
+see the element. The polyfill handles and cancels the arrow keys it navigates
+with, but this combination has not been verified against a shipping native
+implementation yet.
 
 If you need to exercise a browser's native implementation directly — for
 example, for an origin trial, a demo site, or a test — opt back into deferring
