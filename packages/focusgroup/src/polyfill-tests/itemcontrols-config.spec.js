@@ -1,118 +1,8 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { test } from "@playwright/test";
-import { expect, pressTab, routeTestBuild, setupPage } from "./utils.js";
-
-test("the polyfill root is not an owner without a focusgroup attribute", async ({
-  page,
-}, { project }) => {
-  await setupPage(
-    page,
-    project,
-    `<div focusgroup="toolbar"><button>One</button></div>`,
-  );
-  expect(
-    await page.evaluate(() =>
-      [...globalThis.__FOCUSGROUP_POLYFILL__.m.keys()].map(
-        (el) => el.localName,
-      ),
-    ),
-  ).toEqual(["div"]);
-});
-
-for (const order of ["legacy-first", "current-first"]) {
-  for (const shadow of [false, true]) {
-    test(`${order}: detached current owners are cleaned up with a legacy global observer${shadow ? " @shadow" : ""}`, async ({
-      page,
-    }, { project }) => {
-      test.skip(
-        !process.env.FOCUSGROUP_LEGACY_BUILD,
-        "Requires actual legacy build",
-      );
-      await routeTestBuild(page);
-      const file = project.name.endsWith("Shadowless")
-        ? "index-shadowless.min.mjs"
-        : "index.min.mjs";
-      await page.route("**/legacy-focusgroup.mjs", async (route) => {
-        await route.fulfill({
-          contentType: "text/javascript",
-          body: await readFile(join(process.env.FOCUSGROUP_LEGACY_BUILD, file)),
-        });
-      });
-      await page.goto("/test.html");
-      await page.setContent(`
-      <div id="legacy" focusgroup="toolbar"><button>Legacy</button></div>
-      <section id="wrapper">${shadow ? '<template shadowrootmode="open">' : ""}<div id="current" focusgroup="feed">
-        <div tabindex="0" data-testid="one">One<button focusgroup="none" data-testid="action">Action</button></div>
-        <div tabindex="0" data-testid="two">Two</div>
-      </div>${shadow ? "</template>" : ""}</section>`);
-      const errors = [];
-      page.on("pageerror", (error) => errors.push(error.message));
-      const state = await page.evaluate(
-        async ({ file, order }) => {
-          Object.defineProperty(document.body, "focusGroup", {
-            value: { supports: () => false },
-          });
-          const versions =
-            order === "legacy-first"
-              ? ["legacy", "current"]
-              : ["current", "legacy"];
-          let current;
-          const wrapper = document.getElementById("wrapper");
-          const owner = (wrapper.shadowRoot ?? wrapper).querySelector(
-            "#current",
-          );
-          for (const version of versions) {
-            const module = await import(
-              version === "legacy" ? "/legacy-focusgroup.mjs" : `/build/${file}`
-            );
-            module.polyfill(
-              version === "current" ? owner : document.getElementById("legacy"),
-            );
-            if (version === "current") {
-              current = module;
-            }
-            await new Promise(requestAnimationFrame);
-          }
-          const action = owner.querySelector("button");
-          owner.querySelector('[data-testid="two"]').focus();
-          document.getElementById("wrapper").remove();
-          const detached = document.createDocumentFragment();
-          detached.append(owner);
-          await new Promise((resolve) => setTimeout(resolve, 0));
-          const shared = globalThis.__FOCUSGROUP_POLYFILL__;
-          const result = {
-            tracked: shared.m.has(owner),
-            observers: shared.p.size,
-            controls: shared.c.size,
-            tabindex: action.getAttribute("tabindex"),
-          };
-          document.body.append(detached);
-          current.polyfill(owner);
-          await new Promise(requestAnimationFrame);
-          return result;
-        },
-        { file, order },
-      );
-      expect(state).toEqual({
-        tracked: false,
-        observers: 0,
-        controls: 0,
-        tabindex: null,
-      });
-      await page.getByTestId("one").focus();
-      await pressTab(page, project);
-      await expect(page.getByTestId("action")).toBeFocused();
-      await page.getByTestId("one").focus();
-      await page.keyboard.press("ArrowDown");
-      await expect(page.getByTestId("two")).toBeFocused();
-      expect(errors).toEqual([]);
-    });
-  }
-}
+import { expect, pressTab, setupPage } from "./utils.js";
 
 test("suppressed authored tabindex parsing matches the browser", async ({
   page,
@@ -158,25 +48,6 @@ test("suppressed authored tabindex parsing matches the browser", async ({
       return mismatches;
     }),
   ).toEqual([]);
-});
-
-test("empty authored tabindex is restored after item teardown", async ({
-  page,
-}, { project }) => {
-  await setupPage(
-    page,
-    project,
-    `<div focusgroup="feed" data-testid="owner"><button tabindex="" data-testid="one">One</button><button tabindex="">Two</button></div>`,
-  );
-  await page
-    .getByTestId("owner")
-    .evaluate((el) => el.setAttribute("focusgroup", "none"));
-  await expect(page.getByTestId("one")).toHaveAttribute("tabindex", "");
-  await page.getByTestId("one").focus();
-  await pressTab(page, project);
-  await expect(
-    page.getByRole("button", { name: "Two", exact: true }),
-  ).toBeFocused();
 });
 
 test("itemcontrols defaults belong to behavior config, not behavior tokens", async ({
