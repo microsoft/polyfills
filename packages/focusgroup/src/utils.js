@@ -329,12 +329,34 @@ export function hasNegativeTabIndex(element, authored) {
 function unsuppressedTabIndex(element, authored) {
   return (
     parseTabIndex(authored) ??
-    (element.matches(
-      "button, input, select, textarea, a[href], area[href], summary, iframe, object, embed",
-    )
+    (NATIVE_TABBABLE.has(element.localName) ||
+    (isLink(element) && element.hasAttribute("href"))
       ? 0
       : -1)
   );
+}
+
+// Tag checks instead of `matches()`: these run for every element in an owner
+// on each reconciliation, where selector matching dominated the profile.
+const NATIVE_TABBABLE = new Set([
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "summary",
+  "iframe",
+  "object",
+  "embed",
+]);
+
+/** @param {Element} element */
+function isLink(element) {
+  return element.localName === "a" || element.localName === "area";
+}
+
+/** @param {Element} element */
+function isMedia(element) {
+  return element.localName === "audio" || element.localName === "video";
 }
 
 /**
@@ -368,7 +390,7 @@ export function isKeyboardFocusable(
     (element.isContentEditable ||
       // A media element with controls, this check is necessary because
       // `tabIndex` is `-1` in WebKit in this case
-      element.matches(":is(audio, video)[controls]") ||
+      (isMedia(element) && element.hasAttribute("controls")) ||
       // Is tabbable
       tabIndex > -1 ||
       (ignorePolyfillTabindex &&
@@ -384,13 +406,13 @@ export function isKeyboardFocusable(
         element.disabled ||
         element.hasAttribute("disabled") ||
         // Not an anchor or area without href
-        element.matches(":is(a, area):not([href])") ||
+        (isLink(element) && !element.hasAttribute("href")) ||
         // Not inert
         element.inert ||
         // Not hidden
         !checkVisibility(element, owner) ||
         // Not a media element without controls
-        element.matches(":is(audio, video):not([controls])") ||
+        (isMedia(element) && !element.hasAttribute("controls")) ||
         // Has not been assigned a tabindex by the polyfill
         (!ignorePolyfillTabindex &&
           element.hasAttribute(DatasetName.AUTHOR_TABINDEX))
@@ -509,10 +531,21 @@ let topLayerSelector;
  * engine doesn't support are skipped, since an unsupported selector would make
  * `matches()` throw (e.g. `:popover-open` before Safari 17 / Firefox 125).
  *
+ * Called for every ancestor during item-control discovery, so only the
+ * elements that can match (dialogs, popovers and the fullscreen element, which
+ * `:modal` also matches) pay for selector matching.
+ *
  * @param {Element} element
  * @returns {boolean}
  */
 export function isTopLayer(element) {
+  if (
+    element.localName !== "dialog" &&
+    !element.hasAttribute?.("popover") &&
+    element.ownerDocument?.fullscreenElement !== element
+  ) {
+    return false;
+  }
   topLayerSelector ??= [":modal", ":popover-open"]
     .filter((selector) => {
       try {
