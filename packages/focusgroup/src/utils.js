@@ -551,7 +551,11 @@ export function isTopLayer(element) {
   if (
     element.localName !== "dialog" &&
     !element.hasAttribute?.("popover") &&
-    element.ownerDocument?.fullscreenElement !== element
+    !(
+      element.ownerDocument?.fullscreenElement &&
+      /** @type {Document|ShadowRoot} */ (element.getRootNode())
+        .fullscreenElement === element
+    )
   ) {
     return false;
   }
