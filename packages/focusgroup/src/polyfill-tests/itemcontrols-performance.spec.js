@@ -176,13 +176,14 @@ test("1000-article feed with nested toolbars reconciles in linear time", async (
   const median = (values) =>
     [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   // Capture overlapping owners around writes to preserve synchronous author
-  // reactions. With fixed-depth toolbars this remains linear (~14 per owner),
-  // rather than capturing every sibling observer on every write (~13 million).
+  // reactions. With fixed-depth toolbars this remains linear (~8 per owner,
+  // since unchanged stops skip capture), rather than capturing every sibling
+  // observer on every write (~13 million).
   for (const { captures, observers } of results.captureCounts) {
-    expect(captures).toBeLessThan(observers * 16);
+    expect(captures).toBeLessThan(observers * 10);
   }
-  expect(median(results.samples.reconcile)).toBeLessThan(500);
-  expect(median(results.samples.append)).toBeLessThan(800);
+  expect(median(results.samples.reconcile)).toBeLessThan(250);
+  expect(median(results.samples.append)).toBeLessThan(400);
   expect(median(results.samples.arrow)).toBeLessThan(16);
   await expect(page.getByTestId("item-507")).toBeFocused();
 });

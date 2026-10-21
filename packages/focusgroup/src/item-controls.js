@@ -21,8 +21,18 @@ export function managedTabindex(element) {
 }
 
 export function setItemTabindex(element, value) {
-  captureObservers(element);
   const entry = controls.get(element);
+  // Rebuilds reapply every item's stop; an unchanged one needs no write and
+  // therefore no observer capture, which walks the element's ancestors.
+  if (
+    entry
+      ? entry.tabindex === value &&
+        element.getAttribute("tabindex") === effectiveTabindex(entry)
+      : element.getAttribute("tabindex") === value
+  ) {
+    return;
+  }
+  captureObservers(element);
   if (entry) {
     entry.tabindex = value;
     apply(element, entry);
@@ -49,8 +59,16 @@ export function adoptControlWrites(records) {
 }
 
 export function setControlActive(element, owner, active) {
-  captureObservers(element);
   let entry = controls.get(element);
+  // Rebuilds reapply every control; skip those whose state and DOM value are
+  // already current.
+  if (
+    entry?.owners.get(owner) === active &&
+    element.getAttribute("tabindex") === effectiveTabindex(entry)
+  ) {
+    return;
+  }
+  captureObservers(element);
   if (!entry) {
     entry = { tabindex: element.getAttribute("tabindex"), owners: new Map() };
     controls.set(element, entry);
@@ -72,9 +90,15 @@ export function releaseControl(element, owner) {
   }
 }
 
+function effectiveTabindex(entry) {
+  for (const active of entry.owners.values()) {
+    if (!active) {
+      return "-1";
+    }
+  }
+  return entry.tabindex;
+}
+
 function apply(element, entry) {
-  const value = [...entry.owners.values()].every(Boolean)
-    ? entry.tabindex
-    : "-1";
-  writeTabindex(element, value);
+  writeTabindex(element, effectiveTabindex(entry));
 }

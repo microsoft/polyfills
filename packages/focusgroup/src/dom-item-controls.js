@@ -19,6 +19,22 @@ import {
 } from "./utils.js";
 
 /**
+ * @typedef {Object} ControlContext
+ * @property {Element|null} nestedOwner - Nearest independent nested owner.
+ * @property {Element|null} optOut - Nearest `focusgroup="none"` boundary.
+ * @property {boolean} legacy - Inside an owner from an incompatible bundle.
+ * @property {Element|null} boundary - The association path's starting point.
+ */
+
+/** @type {ControlContext} */
+const ROOT_CONTEXT = {
+  nestedOwner: null,
+  optOut: null,
+  legacy: false,
+  boundary: null,
+};
+
+/**
  * DOM-backed item-control discovery for the built-in collections. Applications
  * with their own item model can supply the same interface without tree walking.
  */
@@ -41,9 +57,24 @@ export class DOMItemControls {
       this.#owner,
       NodeFilter.SHOW_ELEMENT,
     );
+    // One walk resolves every element's ancestor context. Sharing it between
+    // siblings keeps discovery linear rather than walking each element's
+    // ancestors again, which dominated reconciliation in large feeds.
+    const contexts = new Map();
+    /** @type {Map<Element, HTMLElement|null>} */
+    const boundaryItems = new Map();
     while (walker.nextNode()) {
       const element = /** @type {HTMLElement} */ (walker.currentNode);
-      const item = this.itemForNode(element);
+      const context = this.#context(element, contexts);
+      const boundary = context?.boundary;
+      if (!boundary || context.legacy) {
+        continue;
+      }
+      let item = boundaryItems.get(boundary);
+      if (item === undefined) {
+        item = this.#items.itemForNode?.(boundary) ?? null;
+        boundaryItems.set(boundary, item);
+      }
       // A focusable nested owner can be the item itself (its entry point).
       if (item && item !== element && this.#isEligible(element)) {
         yield { element, item };
@@ -56,45 +87,83 @@ export class DOMItemControls {
     if (!nodeContains(this.#owner, element)) {
       return null;
     }
-    let nestedOwner = null;
-    let optOut = null;
+    const boundary = this.#context(element, new Map())?.boundary;
+    return boundary ? (this.#items.itemForNode?.(boundary) ?? null) : null;
+  }
+
+  /**
+   * Resolves the nearest nested owner and opt-out between `element` and the
+   * owner, reusing contexts already computed for its ancestors.
+   * @param {Element} element
+   * @param {Map<Element, ControlContext|null>} contexts
+   * @returns {ControlContext|null} `null` when top-layer or inert content
+   *   separates the element from the owner.
+   */
+  #context(element, contexts) {
+    const chain = [];
+    let context = ROOT_CONTEXT;
     for (
       let ancestor = element;
-      ancestor && ancestor !== this.#owner;
+      ancestor !== this.#owner;
       ancestor = getParentElement(ancestor)
     ) {
-      if (isTopLayer(ancestor) || ancestor.matches?.("[inert]")) {
+      if (!ancestor) {
         return null;
       }
-      if (ancestor.hasAttribute?.("focusgroup")) {
-        if (ancestor.getAttribute("focusgroup").split(/\s+/).includes("none")) {
-          optOut ??= ancestor;
-        } else if (parseDefinition(ancestor).behavior) {
-          nestedOwner ??= ancestor;
-        }
+      if (contexts.has(ancestor)) {
+        context = contexts.get(ancestor);
+        break;
       }
+      chain.push(ancestor);
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const ancestor = chain[i];
+      if (context) {
+        context = this.#extend(context, ancestor);
+      }
+      contexts.set(ancestor, context);
+    }
+    return context;
+  }
+
+  /**
+   * @param {ControlContext} parent
+   * @param {Element} element
+   * @returns {ControlContext|null}
+   */
+  #extend(parent, element) {
+    if (isTopLayer(element) || element.hasAttribute?.("inert")) {
+      return null;
+    }
+    // Older observers do not share the indexed batching protocol. Preserve
+    // their rovers rather than mixing control reconciliation.
+    const legacy =
+      parent.legacy ||
+      (!!state.m?.has(element) &&
+        (!state.m.get(element) || !hasIndexedObserver(element)));
+    let { nestedOwner, optOut } = parent;
+    const tokens = element.getAttribute?.("focusgroup");
+    if (tokens != null) {
+      if (tokens.split(/\s+/).includes("none")) {
+        optOut = element;
+      } else if (parseDefinition(element).behavior) {
+        nestedOwner = element;
+      }
+    }
+    if (
+      legacy === parent.legacy &&
+      nestedOwner === parent.nestedOwner &&
+      optOut === parent.optOut
+    ) {
+      return parent;
     }
     // Nested owners associate through every enclosing owner; opt-outs stop
     // at their nearest owner.
-    const boundary = nestedOwner ?? optOut;
-    return boundary ? (this.#items.itemForNode?.(boundary) ?? null) : null;
+    return { nestedOwner, optOut, legacy, boundary: nestedOwner ?? optOut };
   }
 
   /** @param {HTMLElement} element */
   #isEligible(element) {
-    for (
-      let parent = element;
-      parent && parent !== this.#owner;
-      parent = getParentElement(parent)
-    ) {
-      if (state.m?.has(parent)) {
-        // Older observers do not share the indexed batching protocol.
-        // Preserve their rovers rather than mixing control reconciliation.
-        if (!state.m.get(parent) || !hasIndexedObserver(parent)) {
-          return false;
-        }
-      }
-    }
     // Include inactive nested rovers: their underlying stop can change while
     // an enclosing owner suppresses them.
     if (element.hasAttribute(DatasetName.AUTHOR_TABINDEX)) {
