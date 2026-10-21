@@ -121,6 +121,7 @@ While one of the polyfill’s principles is “correctness”, it’s still boun
     * Built-in elements that have key conflict (e.g. `<input>`): cancelling default arrow/home/end key behavior won’t enable the polyfill to add directional navigation
 * If an item’s keyboard focusability is changed by a method that doesn’t reflect on any attribute changes, polyfill will not be able to exclude the item from continuing participating the directional navigation
     * For example, a custom element (as a focusgroup item) gets disabled through a property change or other mechanism without reflecting its disabled state in a `disabled` attribute
+* Adding or removing items reconciles the whole group, so the cost of an append grows with the number of items already in it. For feeds with thousands of rendered articles, prefer virtualization, as the explainer's feed guidance also anticipates.
 * Visibility reconciliation observes `hidden` and `inert` changes within all owners, and `class`/`style` changes within itemcontrols owners and grids.
     * Other linear groups do not observe `class`/`style`: revealing a nested menu through CSS alone may leave its segment boundaries unchanged until the next relevant mutation.
     * Changes outside the observed owner, stylesheet edits, media queries, and animations do not themselves trigger reconciliation. Applications with their own collections can call `FocusGroup.update()` when such changes affect their items.
