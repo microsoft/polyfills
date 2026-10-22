@@ -12,37 +12,51 @@ const items = `
     <button focusgroup="none" data-testid="action-two">Action two</button>
   </div>`;
 
-test("fullscreen content in a shadow root remains a top-layer boundary @shadow", async ({
+test("fullscreen content in a shadow root remains outside its feed owner @shadow", async ({
   page,
 }, { project }) => {
   test.skip(project.name !== "chromium", "Chromium fullscreen regression");
   await setupPage(
     page,
     project,
-    `<div><template shadowrootmode="open">
-      <section data-testid="fullscreen"><button>Fullscreen content</button></section>
-    </template></div>`,
+    `
+    <div focusgroup="feed">
+      <article tabindex="0" data-testid="one">
+        <div><template shadowrootmode="open">
+          <section data-testid="fullscreen"><button focusgroup="none" data-testid="fullscreen-button">Fullscreen content</button></section>
+        </template></div>
+        <button focusgroup="none" data-testid="ordinary-button">Ordinary action</button>
+      </article>
+      <article tabindex="0" data-testid="two">Second article</article>
+    </div>`,
   );
-  const result = await page
-    .getByTestId("fullscreen")
-    .evaluate(async (element) => {
-      const { isTopLayer } = await import("/build/utils.mjs");
-      await element.requestFullscreen();
-      const result = {
-        documentRetargeted: document.fullscreenElement !== element,
-        rootMatches: element.getRootNode().fullscreenElement === element,
-        modal: element.matches(":modal"),
-        topLayer: isTopLayer(element),
-      };
-      await document.exitFullscreen();
-      return result;
-    });
-  expect(result).toEqual({
-    documentRetargeted: true,
-    rootMatches: true,
-    modal: true,
-    topLayer: true,
+  await page.getByTestId("two").focus();
+  await expect(page.getByTestId("fullscreen-button")).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+  await expect(page.getByTestId("ordinary-button")).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+  await page.getByTestId("fullscreen").evaluate(async (element) => {
+    await element.requestFullscreen();
+    document
+      .querySelector('[data-testid="two"]')
+      .insertAdjacentHTML(
+        "afterend",
+        '<article tabindex="0" data-testid="three">Third article</article>',
+      );
   });
+  await expect(page.getByTestId("ordinary-button")).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+  await expect(page.getByTestId("fullscreen-button")).not.toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+  await page.evaluate(() => document.exitFullscreen());
 });
 
 test(
