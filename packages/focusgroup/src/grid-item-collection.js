@@ -7,6 +7,7 @@ import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
+  getParentElement,
 } from "./shadow-utils/index.js";
 import {
   getGridNavigationDirection,
@@ -227,6 +228,43 @@ export class GridItemCollection {
       }
     }
     return true;
+  }
+
+  /**
+   * The grid's start target: the first navigable entry (in row-major order)
+   * marked with `focusgroupstart`, or the first entry as a fallback, or
+   * `null` for an invalid/empty grid. `FocusGroup` reads this to choose the
+   * initial tab stop after decoration (remembered focus takes precedence).
+   *
+   * Because a cell resolves to exactly one target, a marker on the target
+   * itself or on any ancestor of it within its cell (including the cell
+   * wrapper) identifies that target. Markers elsewhere (rows, the owner,
+   * non-target descendants) are ignored.
+   * @returns {HTMLElement | null}
+   */
+  get start() {
+    if (!this.#valid) {
+      return null;
+    }
+    for (const entry of this.#entries) {
+      if (this.#hasStartMarker(entry) && this.#isNavigable(entry.element)) {
+        return entry.element;
+      }
+    }
+    return this.first();
+  }
+
+  #hasStartMarker({ element, cell }) {
+    for (
+      let node = element;
+      node;
+      node = node === cell ? null : getParentElement(node)
+    ) {
+      if (node.hasAttribute("focusgroupstart")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   *items() {

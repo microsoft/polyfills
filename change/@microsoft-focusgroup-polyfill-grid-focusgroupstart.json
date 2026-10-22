@@ -1,0 +1,7 @@
+{
+  "type": "patch",
+  "comment": "Honor focusgroupstart when choosing the initial tab stop in grid focusgroups",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "dmytrokirpa@microsoft.com",
+  "dependentChangeType": "none"
+}
