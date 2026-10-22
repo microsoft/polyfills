@@ -637,9 +637,9 @@ test.describe("focusgroupstart in grids", () => {
     await expect(page.getByTestId("b2")).toBeFocused();
   });
 
-  test("a marker on a cell wrapper resolves to the cell's focusable target", async ({
-    page,
-  }, { project }) => {
+  test("a marker on a non-target cell wrapper is ignored", async ({ page }, {
+    project,
+  }) => {
     await setupPage(
       page,
       project,
@@ -651,6 +651,28 @@ test.describe("focusgroupstart in grids", () => {
             <div focusgroupstart><span><button data-testid="a2">A2</button></span></div>
           </div>
         </div>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a1")).toBeFocused();
+  });
+
+  test("a marker on a focusable cell target is honored", async ({ page }, {
+    project,
+  }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <table focusgroup="grid">
+          <tr>
+            <td tabindex="0" data-testid="a1"><button tabindex="-1">1</button></td>
+            <td tabindex="0" focusgroupstart data-testid="a2"><button tabindex="-1">2</button></td>
+          </tr>
+        </table>
       `,
     );
 
