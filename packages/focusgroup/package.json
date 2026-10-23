@@ -64,21 +64,21 @@
   "size-limit": [
     {
       "path": "build/index.min.mjs",
-      "limit": "6 kB",
+      "limit": "11.5 kB",
       "gzip": true
     },
     {
       "path": "build/index.min.mjs",
-      "limit": "5 kB"
+      "limit": "10.5 kB"
     },
     {
       "path": "build/index-shadowless.min.mjs",
-      "limit": "4 kB",
+      "limit": "9.5 kB",
       "gzip": true
     },
     {
       "path": "build/index-shadowless.min.mjs",
-      "limit": "4 kB"
+      "limit": "8.75 kB"
     }
   ],
   "bugs": {

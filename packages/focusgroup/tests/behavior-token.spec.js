@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { expect, test } from "@playwright/test";
-import { setupPage } from "./utils.js";
+import { pressTab, setupPage } from "./utils.js";
 
 // behavior-first-requirement.html
 test.describe("behavior token can appear in any position", () => {
@@ -60,6 +60,107 @@ test.describe("behavior tokens comprehensive", () => {
     item1 = page.getByTestId("item1");
     item2 = page.getByTestId("item2");
     item3 = page.getByTestId("item3");
+  });
+
+  test.describe("feed: block-axis navigation and default itemcontrols", () => {
+    test.beforeEach(async ({ page }, { project }) => {
+      await setupPage(
+        page,
+        project,
+        `
+        <div focusgroup="feed">
+          <article data-testid="item1" tabindex="0">item1</article>
+          <article data-testid="item2" tabindex="0">item2</article>
+          <article data-testid="item3" tabindex="0">item3</article>
+        </div>
+      `,
+      );
+    });
+
+    test.test("feed: ArrowDown navigates (block)", async ({ page }) => {
+      await page.getByTestId("item1").focus();
+      await page.keyboard.press("ArrowDown");
+
+      await expect(page.getByTestId("item2")).toBeFocused();
+    });
+
+    test.test("feed: ArrowRight blocked (block-only)", async ({ page }) => {
+      await page.getByTestId("item1").focus();
+      await page.keyboard.press("ArrowRight");
+
+      await expect(page.getByTestId("item1")).toBeFocused();
+    });
+
+    test("itemcontrols exposes controls only for the active item", async ({
+      page,
+    }, { project }) => {
+      await setupPage(
+        page,
+        project,
+        `
+        <div focusgroup="feed">
+          <article data-testid="card1" tabindex="0">
+            Card 1
+            <button data-testid="action1" focusgroup="none">Action 1</button>
+            <button data-testid="action1-explicit" tabindex="0" focusgroup="none">Action 1 explicit</button>
+          </article>
+          <article data-testid="card2" tabindex="0">
+            Card 2
+            <button data-testid="action2" focusgroup="none">Action 2</button>
+          </article>
+        </div>
+        <button data-testid="after">After</button>
+      `,
+      );
+
+      const card1 = page.getByTestId("card1");
+      const card2 = page.getByTestId("card2");
+      const action1 = page.getByTestId("action1");
+      const action1Explicit = page.getByTestId("action1-explicit");
+      const action2 = page.getByTestId("action2");
+
+      await card1.focus();
+      await expect(action1).not.toHaveAttribute("tabindex");
+      await expect(action1Explicit).toHaveAttribute("tabindex", "0");
+      await expect(action2).toHaveAttribute("tabindex", "-1");
+
+      await pressTab(page, project);
+      await expect(action1).toBeFocused();
+      await pressTab(page, project);
+      await expect(action1Explicit).toBeFocused();
+      await pressTab(page, project);
+      expect(
+        await page.evaluate(() => document.activeElement?.dataset.testid),
+      ).toBe("after");
+
+      await card1.focus();
+      await page.keyboard.press("ArrowDown");
+      await expect(card2).toBeFocused();
+      await expect(action1).toHaveAttribute("tabindex", "-1");
+      await expect(action1Explicit).toHaveAttribute("tabindex", "-1");
+      await expect(action2).not.toHaveAttribute("tabindex");
+    });
+
+    test("noitemcontrols preserves ordinary segment behavior", async ({
+      page,
+    }, { project }) => {
+      await setupPage(
+        page,
+        project,
+        `
+        <div focusgroup="feed noitemcontrols">
+          <article data-testid="card1" tabindex="0">
+            Card 1
+            <button data-testid="action1" focusgroup="none">Action 1</button>
+          </article>
+          <article data-testid="card2" tabindex="0">Card 2</article>
+        </div>
+      `,
+      );
+
+      await expect(page.getByTestId("action1")).not.toHaveAttribute("tabindex");
+      await expect(page.getByTestId("card2")).toHaveAttribute("tabindex", "0");
+    });
   });
 
   test.describe("toolbar: inline only, no wrap", () => {
