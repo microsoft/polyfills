@@ -588,3 +588,265 @@ test("vertical writing modes map physical arrows to grid axes", async ({
   await page.keyboard.press("ArrowLeft");
   await expect(page.getByTestId("b1")).toBeFocused();
 });
+
+test.describe("focusgroupstart in grids", () => {
+  test("initial Tab entry honors a non-first marked target in a manual grid", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div role="grid" focusgroup="grid manual">
+          <div role="row" focusgrouprow>
+            <button role="gridcell" data-testid="first">First cell</button>
+            <button role="gridcell" focusgroupstart data-testid="start">Requested start</button>
+          </div>
+        </div>
+        <button tabindex="0" data-testid="after">After</button>
+      `,
+    );
+
+    await expect(page.getByTestId("first")).toHaveAttribute("tabindex", "-1");
+    await expect(page.getByTestId("start")).toHaveAttribute("tabindex", "0");
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("start")).toBeFocused();
+  });
+
+  test("initial Tab entry honors a marked target in a native-table grid", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <table focusgroup="grid">
+          <tbody>
+            <tr><td tabindex="0" data-testid="a1">A1</td><td tabindex="0" data-testid="a2">A2</td></tr>
+            <tr><td tabindex="0" data-testid="b1">B1</td><td tabindex="0" focusgroupstart data-testid="b2">B2</td></tr>
+          </tbody>
+        </table>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("b2")).toBeFocused();
+  });
+
+  test("a marker on a non-target cell wrapper is ignored", async ({ page }, {
+    project,
+  }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div focusgroup="grid manual">
+          <div focusgrouprow>
+            <div><button data-testid="a1">A1</button></div>
+            <div focusgroupstart><span><button data-testid="a2">A2</button></span></div>
+          </div>
+        </div>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a1")).toBeFocused();
+  });
+
+  test("a marker on a focusable cell target is honored", async ({ page }, {
+    project,
+  }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <table focusgroup="grid">
+          <tr>
+            <td tabindex="0" data-testid="a1"><button tabindex="-1">1</button></td>
+            <td tabindex="0" focusgroupstart data-testid="a2"><button tabindex="-1">2</button></td>
+          </tr>
+        </table>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a2")).toBeFocused();
+  });
+
+  test("without a marker, the first target is the initial tab stop", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div focusgroup="grid manual">
+          <div focusgrouprow>
+            <button data-testid="a1">A1</button>
+            <button data-testid="a2">A2</button>
+          </div>
+        </div>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a1")).toBeFocused();
+  });
+
+  test("remembered reentry returns to the last focused target, not the marker", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div focusgroup="grid manual">
+          <div focusgrouprow>
+            <button data-testid="a1">A1</button>
+            <button focusgroupstart data-testid="a2">A2</button>
+            <button data-testid="a3">A3</button>
+          </div>
+        </div>
+        <button tabindex="0" data-testid="after">After</button>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a2")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("a3")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("after")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("a3")).toBeFocused();
+  });
+
+  test("nomemory reentry returns to the marked start", async ({ page }, {
+    project,
+  }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div focusgroup="grid manual nomemory">
+          <div focusgrouprow>
+            <button data-testid="a1">A1</button>
+            <button focusgroupstart data-testid="a2">A2</button>
+            <button data-testid="a3">A3</button>
+          </div>
+        </div>
+        <button tabindex="0" data-testid="after">After</button>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a2")).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("a3")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("after")).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByTestId("a2")).toBeFocused();
+  });
+
+  test("moving the marker updates the start when no target is remembered", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div focusgroup="grid manual">
+          <div focusgrouprow>
+            <button data-testid="a1">A1</button>
+            <button focusgroupstart data-testid="a2">A2</button>
+            <button data-testid="a3">A3</button>
+          </div>
+        </div>
+      `,
+    );
+
+    await expect(page.getByTestId("a2")).toHaveAttribute("tabindex", "0");
+    await page.evaluate(() => {
+      document
+        .querySelector("[focusgroupstart]")
+        .removeAttribute("focusgroupstart");
+      document
+        .querySelector('[data-testid="a3"]')
+        .setAttribute("focusgroupstart", "");
+    });
+    await expect(page.getByTestId("a3")).toHaveAttribute("tabindex", "0");
+    await expect(page.getByTestId("a2")).toHaveAttribute("tabindex", "-1");
+
+    await page.evaluate(() =>
+      document
+        .querySelector("[focusgroupstart]")
+        .removeAttribute("focusgroupstart"),
+    );
+    await expect(page.getByTestId("a1")).toHaveAttribute("tabindex", "0");
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a1")).toBeFocused();
+  });
+
+  test("an ineligible marked element is not chosen as the start", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <button tabindex="0" data-testid="before">Before</button>
+        <div focusgroup="grid manual">
+          <div focusgrouprow focusgroupstart>
+            <div><button data-testid="a1">A1</button></div>
+            <div><button data-testid="a2">A2</button><span tabindex="-1" focusgroupstart data-testid="src">src</span></div>
+          </div>
+        </div>
+      `,
+    );
+
+    await page.getByTestId("before").focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByTestId("a1")).toBeFocused();
+  });
+
+  test("an invalid grid does not resolve a marked start", async ({ page }, {
+    project,
+  }) => {
+    await setupPage(
+      page,
+      project,
+      `
+        <div focusgroup="grid manual">
+          <div focusgrouprow>
+            <button data-testid="a1">A1</button>
+            <button focusgroupstart data-testid="a2">A2</button>
+          </div>
+          <div focusgrouprow>
+            <button data-testid="b1">B1</button>
+          </div>
+        </div>
+      `,
+    );
+
+    await expect(page.getByTestId("a2")).not.toHaveAttribute("tabindex", "0");
+    await expect(page.getByTestId("a1")).not.toHaveAttribute("tabindex", "-1");
+  });
+});

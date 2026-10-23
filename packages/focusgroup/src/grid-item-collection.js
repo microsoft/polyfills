@@ -229,6 +229,31 @@ export class GridItemCollection {
     return true;
   }
 
+  /**
+   * The grid's start target: the first navigable entry (in row-major order)
+   * marked with `focusgroupstart`, or the first entry as a fallback, or
+   * `null` for an invalid/empty grid. `FocusGroup` reads this to choose the
+   * initial tab stop after decoration (remembered focus takes precedence).
+   *
+   * Only a marker on the cell target itself counts; markers on rows, cell
+   * wrappers, or ineligible descendants are ignored, per the V2 explainer.
+   * @returns {HTMLElement | null}
+   */
+  get start() {
+    if (!this.#valid) {
+      return null;
+    }
+    for (const entry of this.#entries) {
+      if (
+        entry.element.hasAttribute("focusgroupstart") &&
+        this.#isNavigable(entry.element)
+      ) {
+        return entry.element;
+      }
+    }
+    return this.first();
+  }
+
   *items() {
     if (!this.#valid) {
       return;
