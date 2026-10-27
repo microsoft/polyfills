@@ -1,0 +1,7 @@
+{
+  "type": "major",
+  "comment": "publish the first version of css gap decorations polyfill to npm",
+  "packageName": "@microsoft/css-gap-decorations-polyfill",
+  "email": "kbabbitt@microsoft.com",
+  "dependentChangeType": "none"
+}
