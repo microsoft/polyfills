@@ -2,13 +2,18 @@
 // Licensed under the MIT License.
 
 import { DatasetName } from "./constants.js";
+import { DOMItemControls } from "./dom-item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
+import { authoredTabindex } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
   getClosestElement,
+  getParentElement,
 } from "./shadow-utils/index.js";
 import {
+  checkVisibility,
+  generateUniqueId,
   getGridNavigationDirection,
   hasGenericRole,
   isKeyboardFocusable,
@@ -30,6 +35,9 @@ function flatChildren(element) {
  * explicitly enrolled direct-child rows.
  */
 export class GridItemCollection {
+  id = generateUniqueId();
+  /** @type {DOMItemControls} */
+  controls;
   #owner;
   #manual;
   #entries = [];
@@ -43,6 +51,19 @@ export class GridItemCollection {
    * @type {Map<Element, {row: number, col: number}>}
    */
   #sources = new Map();
+  /** @type {Set<Element>} */
+  #decoratedStructuralElements = new Set();
+  /** @type {AbortController|null} */
+  #fullscreenController = null;
+
+  /**
+   * Lookups by target element and by cell, rebuilt with the entries. Entries
+   * are row-major and rectangular, so coordinates index `#entries` directly.
+   * @type {Map<Element, number>}
+   */
+  #indexByElement = new Map();
+  /** @type {Map<Element, number>} */
+  #indexByCell = new Map();
 
   /**
    * Whether the last `#build()` (via the constructor or `decorate()`)
@@ -58,17 +79,27 @@ export class GridItemCollection {
   constructor(owner, manual) {
     this.#owner = owner;
     this.#manual = manual;
+    this.controls = new DOMItemControls(owner, this);
     this.#build();
+  }
+
+  #participates(element) {
+    return (
+      !getClosestElement(element, "[inert]") &&
+      checkVisibility(element, this.#owner)
+    );
   }
 
   #build() {
     this.#entries = [];
+    this.#indexByElement.clear();
+    this.#indexByCell.clear();
     this.#valid = false;
     this.#rowCount = 0;
     this.#colCount = 0;
     this.#sources = new Map();
     const children = flatChildren(this.#owner);
-    const rows = this.#manual
+    const structuralRows = this.#manual
       ? children.filter((el) => el.hasAttribute("focusgrouprow"))
       : children.flatMap((child) =>
           child.tagName === "TR"
@@ -77,6 +108,8 @@ export class GridItemCollection {
               ? [...child.children].filter((row) => row.tagName === "TR")
               : [],
         );
+    // Exclusion precedes rectangularity: hiding a column can narrow the grid.
+    const rows = structuralRows.filter((row) => this.#participates(row));
     if (
       !rows.length ||
       (!this.#manual && !["TABLE"].includes(this.#owner.tagName))
@@ -85,7 +118,9 @@ export class GridItemCollection {
     }
     const cells = rows.map((row) =>
       flatChildren(row).filter(
-        (cell) => this.#manual || ["TD", "TH"].includes(cell.tagName),
+        (cell) =>
+          (this.#manual || ["TD", "TH"].includes(cell.tagName)) &&
+          this.#participates(cell),
       ),
     );
     if (
@@ -116,6 +151,9 @@ export class GridItemCollection {
         );
         while (walker.nextNode()) {
           const child = walker.currentNode;
+          if (!this.#participates(child)) {
+            continue;
+          }
           const scope = getClosestElement(child, "[focusgroup]");
           const table = getClosestElement(child, "table");
           const inScope =
@@ -148,6 +186,8 @@ export class GridItemCollection {
           row: r,
           col: c,
           cell,
+          // A shadow-internal cell's parent is its row's shadow root.
+          rowElement: rows[r],
           nativelyTabbable: isKeyboardFocusable(
             candidates[0],
             this.#owner,
@@ -160,13 +200,28 @@ export class GridItemCollection {
     this.#rowCount = rows.length;
     this.#colCount = cells[0].length;
 
-    if (!this.#validateFullScope(rows, cells)) {
+    if (!this.#validateFullScope(structuralRows, cells)) {
       this.#entries = [];
       this.#sources = new Map();
       this.#valid = false;
       this.#rowCount = 0;
       this.#colCount = 0;
     }
+    this.#index();
+  }
+
+  #index() {
+    this.#indexByElement = new Map(
+      this.#entries.map((entry, i) => [entry.element, i]),
+    );
+    this.#indexByCell = new Map(
+      this.#entries.map((entry, i) => [entry.cell, i]),
+    );
+  }
+
+  /** @param {Element} element */
+  #entryFor(element) {
+    return this.#entries[this.#indexByElement.get(element) ?? -1];
   }
 
   /**
@@ -213,7 +268,7 @@ export class GridItemCollection {
         return false;
       }
 
-      if (rowSet.has(node) || cellSet.has(node)) {
+      if (rowSet.has(node) || cellSet.has(node) || !this.#participates(node)) {
         continue;
       }
 
@@ -267,24 +322,40 @@ export class GridItemCollection {
     return this.#entries.at(-1)?.element ?? null;
   }
   next(current) {
-    const i = this.#entries.findIndex((e) => e.element === current);
+    const i = this.#indexByElement.get(current) ?? -1;
     return this.#entries[i + 1]?.element ?? null;
   }
   previous(current) {
-    const i = this.#entries.findIndex((e) => e.element === current);
+    const i = this.#indexByElement.get(current) ?? -1;
     return this.#entries[i - 1]?.element ?? null;
   }
   contains(element) {
-    return (
-      this.#entries.some((e) => e.element === element) ||
-      this.#sources.has(element)
-    );
+    return this.#indexByElement.has(element) || this.#sources.has(element);
   }
   isItem(element) {
-    return this.#entries.some((e) => e.element === element);
+    return this.#indexByElement.has(element);
+  }
+  /** @param {Element} node */
+  itemForNode(node) {
+    if (!this.#valid) {
+      return null;
+    }
+    // Same flat-tree ancestry as `nodeContains(cell, node)`, but one map
+    // lookup per ancestor instead of a containment test per cell.
+    for (
+      let ancestor = node;
+      ancestor && ancestor !== this.#owner;
+      ancestor = getParentElement(ancestor)
+    ) {
+      const i = this.#indexByCell.get(ancestor);
+      if (i !== undefined) {
+        return this.#entries[i].element;
+      }
+    }
+    return null;
   }
   #isNavigable(element) {
-    const entry = this.#entries.find((item) => item.element === element);
+    const entry = this.#entryFor(element);
     if (!entry) {
       return false;
     }
@@ -297,33 +368,39 @@ export class GridItemCollection {
     return true;
   }
   decorate() {
+    this.undecorate();
     this.#build();
     if (!this.#valid) {
       return;
     }
     for (const entry of this.#entries) {
-      entry.element.setAttribute(DatasetName.ITEM, "");
-      const row = entry.cell.parentElement;
+      entry.element.setAttribute(DatasetName.ITEM, this.id);
+      const row = entry.rowElement;
       if (this.#manual && hasGenericRole(row) && !row.hasAttribute("role")) {
         row.setAttribute("role", "row");
         row.setAttribute(DatasetName.INFERRED_ROLE, "");
+        this.#decoratedStructuralElements.add(row);
       }
       if (hasGenericRole(entry.cell) && !entry.cell.hasAttribute("role")) {
         entry.cell.setAttribute("role", "gridcell");
         entry.cell.setAttribute(DatasetName.INFERRED_ROLE, "");
+        this.#decoratedStructuralElements.add(entry.cell);
       }
     }
   }
   undecorate() {
     for (const entry of this.#entries) {
-      entry.element.removeAttribute(DatasetName.ITEM);
-      for (const el of [entry.cell, entry.cell.parentElement]) {
-        if (el?.hasAttribute(DatasetName.INFERRED_ROLE)) {
-          el.removeAttribute("role");
-          el.removeAttribute(DatasetName.INFERRED_ROLE);
-        }
+      if (entry.element.getAttribute(DatasetName.ITEM) === this.id) {
+        entry.element.removeAttribute(DatasetName.ITEM);
       }
     }
+    for (const element of this.#decoratedStructuralElements) {
+      if (element.getAttribute(DatasetName.INFERRED_ROLE) === "") {
+        element.removeAttribute("role");
+        element.removeAttribute(DatasetName.INFERRED_ROLE);
+      }
+    }
+    this.#decoratedStructuralElements.clear();
   }
   navigate(event, current, definition) {
     if (isKeyConflictElement(current)) {
@@ -340,9 +417,7 @@ export class GridItemCollection {
     }
     visited.add(current);
 
-    const source =
-      this.#entries.find((e) => e.element === current) ??
-      this.#sources.get(current);
+    const source = this.#entryFor(current) ?? this.#sources.get(current);
     if (!source) {
       return null;
     }
@@ -402,7 +477,12 @@ export class GridItemCollection {
         row += delta;
       }
     }
-    const target = this.#entries.find((e) => e.row === row && e.col === col);
+    const candidate =
+      row >= 0 && row < rowCount && col >= 0 && col < colCount
+        ? this.#entries[row * colCount + col]
+        : undefined;
+    const target =
+      candidate?.row === row && candidate.col === col ? candidate : undefined;
     if (!target) {
       return null;
     }
@@ -412,17 +492,28 @@ export class GridItemCollection {
     return target.element;
   }
   observe(focusGroup) {
+    this.#fullscreenController = new AbortController();
+    this.#owner.ownerDocument.addEventListener(
+      "fullscreenchange",
+      () => focusGroup.update(),
+      { signal: this.#fullscreenController.signal },
+    );
     this.#observable.startObserving(
       this.#owner,
       (records) => {
-        const authorTabindexChanges = records
-          .filter(
-            (record) =>
-              record.type === "attributes" &&
-              record.attributeName === "tabindex" &&
-              this.#entries.some((entry) => entry.element === record.target),
-          )
-          .map((record) => record.target);
+        const authorTabindexChanges = new Map(
+          records
+            .filter(
+              (record) =>
+                record.type === "attributes" &&
+                record.attributeName === "tabindex" &&
+                this.#indexByElement.has(record.target),
+            )
+            .map((record) => [
+              /** @type {HTMLElement} */ (record.target),
+              authoredTabindex(record),
+            ]),
+        );
         const definition = records.some(
           (record) =>
             record.type === "attributes" &&
@@ -435,6 +526,7 @@ export class GridItemCollection {
       },
       {
         attributes: true,
+        attributeOldValue: true,
         childList: true,
         subtree: true,
         attributeFilter: [
@@ -447,6 +539,10 @@ export class GridItemCollection {
           "href",
           "hidden",
           "inert",
+          "class",
+          "style",
+          "slot",
+          "name",
           "rowspan",
           "colspan",
           "tabindex",
@@ -457,6 +553,8 @@ export class GridItemCollection {
     );
   }
   disconnect() {
+    this.#fullscreenController?.abort();
+    this.#fullscreenController = null;
     this.#observable.stopObserving();
   }
   flush() {
