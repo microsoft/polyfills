@@ -137,6 +137,14 @@ export class TreeWalkerItemCollection {
       },
       createMutationObserver,
     );
+    if (this.#itemcontrols) {
+      this.#fullscreenController = new AbortController();
+      this.#owner.ownerDocument.addEventListener(
+        "fullscreenchange",
+        () => focusGroup.update(),
+        { signal: this.#fullscreenController.signal },
+      );
+    }
   }
 
   /**
@@ -144,6 +152,8 @@ export class TreeWalkerItemCollection {
    * registry. Called from `FocusGroup#disconnect()`; safe to call directly.
    */
   disconnect() {
+    this.#fullscreenController?.abort();
+    this.#fullscreenController = null;
     this.#observable.stopObserving();
     this.#owner = null;
     this.#walker = null;
@@ -161,6 +171,9 @@ export class TreeWalkerItemCollection {
 
   /** @type {boolean} */
   #itemcontrols = false;
+
+  /** @type {AbortController|null} */
+  #fullscreenController = null;
 
   /**
    * Discovers items in the owner subtree and writes the marker attributes

@@ -51,6 +51,10 @@ export class GridItemCollection {
    * @type {Map<Element, {row: number, col: number}>}
    */
   #sources = new Map();
+  /** @type {Set<Element>} */
+  #decoratedStructuralElements = new Set();
+  /** @type {AbortController|null} */
+  #fullscreenController = null;
 
   /**
    * Lookups by target element and by cell, rebuilt with the entries. Entries
@@ -364,6 +368,7 @@ export class GridItemCollection {
     return true;
   }
   decorate() {
+    this.undecorate();
     this.#build();
     if (!this.#valid) {
       return;
@@ -374,26 +379,28 @@ export class GridItemCollection {
       if (this.#manual && hasGenericRole(row) && !row.hasAttribute("role")) {
         row.setAttribute("role", "row");
         row.setAttribute(DatasetName.INFERRED_ROLE, "");
+        this.#decoratedStructuralElements.add(row);
       }
       if (hasGenericRole(entry.cell) && !entry.cell.hasAttribute("role")) {
         entry.cell.setAttribute("role", "gridcell");
         entry.cell.setAttribute(DatasetName.INFERRED_ROLE, "");
+        this.#decoratedStructuralElements.add(entry.cell);
       }
     }
   }
   undecorate() {
     for (const entry of this.#entries) {
-      if (entry.element.getAttribute(DatasetName.ITEM) !== this.id) {
-        continue;
-      }
-      entry.element.removeAttribute(DatasetName.ITEM);
-      for (const el of [entry.cell, entry.rowElement]) {
-        if (el?.hasAttribute(DatasetName.INFERRED_ROLE)) {
-          el.removeAttribute("role");
-          el.removeAttribute(DatasetName.INFERRED_ROLE);
-        }
+      if (entry.element.getAttribute(DatasetName.ITEM) === this.id) {
+        entry.element.removeAttribute(DatasetName.ITEM);
       }
     }
+    for (const element of this.#decoratedStructuralElements) {
+      if (element.getAttribute(DatasetName.INFERRED_ROLE) === "") {
+        element.removeAttribute("role");
+        element.removeAttribute(DatasetName.INFERRED_ROLE);
+      }
+    }
+    this.#decoratedStructuralElements.clear();
   }
   navigate(event, current, definition) {
     if (isKeyConflictElement(current)) {
@@ -485,6 +492,12 @@ export class GridItemCollection {
     return target.element;
   }
   observe(focusGroup) {
+    this.#fullscreenController = new AbortController();
+    this.#owner.ownerDocument.addEventListener(
+      "fullscreenchange",
+      () => focusGroup.update(),
+      { signal: this.#fullscreenController.signal },
+    );
     this.#observable.startObserving(
       this.#owner,
       (records) => {
@@ -540,6 +553,8 @@ export class GridItemCollection {
     );
   }
   disconnect() {
+    this.#fullscreenController?.abort();
+    this.#fullscreenController = null;
     this.#observable.stopObserving();
   }
   flush() {

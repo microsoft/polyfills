@@ -494,3 +494,112 @@ for (const pendingAuthorValue of [null, "5"]) {
     });
   });
 }
+
+for (const movedNode of ["target", "cell"]) {
+  test(`destination-first grid transfer restores source ${movedNode} structure`, async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div focusgroup="grid manual" id="source">
+        <div focusgrouprow id="row"><div id="cell"><button data-testid="moved">Moved</button></div></div>
+      </div>
+      <div focusgroup="grid manual" id="destination">
+        <div focusgrouprow><div id="destination-cell"></div></div>
+      </div>`,
+    );
+    const result = await page.evaluate((movedNode) => {
+      const source = globalThis.__FOCUSGROUP_POLYFILL__.m.get(
+        document.getElementById("source"),
+      );
+      const destination = globalThis.__FOCUSGROUP_POLYFILL__.m.get(
+        document.getElementById("destination"),
+      );
+      const moved =
+        movedNode === "target"
+          ? document.querySelector('[data-testid="moved"]')
+          : document.getElementById("cell");
+      document.getElementById("destination-cell").append(moved);
+      destination.update();
+      source.update();
+      return {
+        rowRole: document.getElementById("row").getAttribute("role"),
+        cellRole: document.getElementById("cell").getAttribute("role"),
+        item: document
+          .querySelector('[data-testid="moved"]')
+          .getAttribute("data-fg-item"),
+      };
+    }, movedNode);
+    expect(result.rowRole).toBeNull();
+    expect(result.cellRole).toBeNull();
+    expect(result.item).not.toBeNull();
+  });
+}
+
+test("grid reconciliation preserves inferred roles on nested owners and children", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `<div focusgroup="grid manual" id="grid">
+      <div focusgrouprow><div focusgroup="tablist" tabindex="0" data-testid="nested">
+        <button data-testid="nested-item">Item</button>
+      </div></div>
+    </div>`,
+  );
+  const result = await page.evaluate(() => {
+    const grid = globalThis.__FOCUSGROUP_POLYFILL__.m.get(
+      document.getElementById("grid"),
+    );
+    const nested = document.querySelector('[data-testid="nested"]');
+    const item = document.querySelector('[data-testid="nested-item"]');
+    grid.update();
+    const afterUpdate = [
+      nested.getAttribute("role"),
+      item.getAttribute("role"),
+    ];
+    grid.disconnect();
+    return {
+      afterUpdate,
+      afterDisconnect: [nested.getAttribute("role"), item.getAttribute("role")],
+    };
+  });
+  expect(result).toEqual({
+    afterUpdate: ["tablist", "tab"],
+    afterDisconnect: ["tablist", "tab"],
+  });
+});
+
+test("fullscreen changes reconcile inactive feed controls without DOM mutations", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `<div focusgroup="feed">
+      <article tabindex="0" data-testid="active">
+        Active <button type="button" data-testid="enter">Enter fullscreen</button>
+      </article>
+      <article tabindex="0" data-testid="fullscreen">
+        Inactive <button focusgroup="none" data-testid="control">Control</button>
+      </article>
+    </div>`,
+  );
+  await page.getByTestId("active").focus();
+  const control = page.getByTestId("control");
+  await expect(control).toHaveAttribute("tabindex", "-1");
+  await page.getByTestId("enter").evaluate((button) => {
+    const article = document.querySelector('[data-testid="fullscreen"]');
+    button.addEventListener("click", () => article.requestFullscreen(), {
+      once: true,
+    });
+  });
+  await page.getByTestId("enter").click();
+  await page.waitForFunction(() => document.fullscreenElement);
+  await expect(control).not.toHaveAttribute("tabindex", "-1");
+  await page.evaluate(() => document.exitFullscreen());
+  await page.waitForFunction(() => !document.fullscreenElement);
+  await expect(control).toHaveAttribute("tabindex", "-1");
+});
