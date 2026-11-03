@@ -397,8 +397,8 @@
 <h2>Native table grid</h2>
 <table class="grid-demo" focusgroup="grid rowwrap">
   <tbody>
-    <tr><td tabindex="0">A1</td><td tabindex="0">A2</td><td tabindex="0">A3</td></tr>
-    <tr><td tabindex="0">B1</td><td tabindex="0">B2</td><td tabindex="0">B3</td></tr>
+    <tr><td tabindex="0">A1 <button focusgroup="none">A1 action</button></td><td tabindex="0">A2</td><td tabindex="0">A3</td></tr>
+    <tr><td tabindex="0">B1</td><td tabindex="0">B2 <button focusgroup="none">B2 action</button></td><td tabindex="0">B3</td></tr>
     <tr><td tabindex="0">C1</td><td tabindex="0">C2</td><td tabindex="0">C3</td></tr>
   </tbody>
 </table>
@@ -417,6 +417,51 @@
     <button>C1</button><button>C2</button><button>C3</button>
   </div>
 </div>
+
+<hr>
+
+<h2>Article feed with item controls</h2>
+<div focusgroup="feed" aria-label="Recent posts">
+  <div tabindex="0" aria-label="First post">
+    First post <button focusgroup="none">Like first post</button>
+    <button focusgroup="none">Reply to first post</button>
+  </div>
+  <div tabindex="0" aria-label="Second post">
+    Second post <button focusgroup="none">Like second post</button>
+    <button focusgroup="none">Reply to second post</button>
+  </div>
+</div>
+<p>Use Up/Down to move between articles, Tab to enter the active article's actions, and Shift+Tab to return to its boundary.</p>
+
+<hr>
+
+<h2>Toolbar with item controls</h2>
+<div focusgroup="toolbar itemcontrols" aria-label="Document tools">
+  <div tabindex="0" aria-label="Text tools">
+    Text <button focusgroup="none">Bold</button>
+    <button focusgroup="none">Italic</button>
+  </div>
+  <div tabindex="0" aria-label="Paragraph tools">
+    Paragraph <button focusgroup="none">Align left</button>
+    <button focusgroup="none">Align right</button>
+  </div>
+</div>
+<p>Use Left/Right to choose a tool group. Tab enters only the active group's buttons.</p>
+
+<hr>
+
+<h2>Article feed without item controls</h2>
+<div focusgroup="feed noitemcontrols" aria-label="Posts with always-available actions">
+  <div tabindex="0" aria-label="First post without filtering">
+    First post <button focusgroup="none">Like first</button>
+    <button focusgroup="none">Reply to first</button>
+  </div>
+  <div tabindex="0" aria-label="Second post without filtering">
+    Second post <button focusgroup="none">Like second</button>
+    <button focusgroup="none">Reply to second</button>
+  </div>
+</div>
+<p>Up/Down moves between articles. Unlike the default feed, Tab leaves every article's opted-out actions available.</p>
 
 <hr>
 

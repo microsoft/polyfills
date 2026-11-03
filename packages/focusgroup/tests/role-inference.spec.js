@@ -114,6 +114,8 @@ test("should infer ARIA roles for items", async ({ page }, { project }) => {
   await expect(page.getByTestId("listbox-item-div")).toHaveComputedRole(
     "option",
   );
+  // Native-only Canary 157.0.8102.0 exposes "button". V1 permits inference
+  // here: "option" is allowed by https://www.w3.org/TR/html-aria/#el-button.
   await expect(page.getByTestId("listbox-item-button")).toHaveComputedRole(
     "option",
   );
@@ -142,6 +144,34 @@ test("should infer ARIA roles for items", async ({ page }, { project }) => {
   await expect(page.getByTestId("menubar-item-ce")).toHaveComputedRole(
     "menuitem",
   );
+});
+
+test("feed items preserve button semantics while generic items infer article", async ({
+  page,
+}, { project }) => {
+  await setupPage(
+    page,
+    project,
+    `
+      <div focusgroup="feed" data-testid="feed">
+        <button data-testid="button">Button item</button>
+        <div tabindex="0" data-testid="article">Generic item</div>
+      </div>
+    `,
+  );
+
+  await expect(page.getByTestId("button")).toHaveComputedRole("button");
+  await expect(page.getByTestId("article")).toHaveComputedRole("article");
+
+  await page
+    .getByTestId("feed")
+    .evaluate((element) => element.setAttribute("focusgroup", "tablist"));
+  await expect(page.getByTestId("button")).toHaveComputedRole("tab");
+  await page
+    .getByTestId("feed")
+    .evaluate((element) => element.setAttribute("focusgroup", "feed"));
+  await expect(page.getByTestId("button")).toHaveComputedRole("button");
+  await expect(page.getByTestId("article")).toHaveComputedRole("article");
 });
 
 test("owner and items with a non-generic native role do not get inferred roles", async ({

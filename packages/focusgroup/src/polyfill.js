@@ -4,17 +4,18 @@
 import { FocusGroup } from "./focusgroup.js";
 import { state } from "./global-state.js";
 import { GridItemCollection } from "./grid-item-collection.js";
+import { batchWrites } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
+  getParentElement,
 } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import {
   hasDocument,
   inferRole,
   parseDefinition,
-  shouldPolyfillV2,
-  supportsFocusGroup,
+  shouldDeferToNative,
 } from "./utils.js";
 
 let elementPolyfillMap;
@@ -23,6 +24,57 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
   /** @type {Map<HTMLElement, FocusGroup>} */
   elementPolyfillMap = state.m ??= new Map();
 
+  // Legacy bundles may already own `g`; install the current removal protocol
+  // independently so their containment-based cleanup cannot suppress it.
+  if (!state.r) {
+    // Owners torn down while detached. Detached DOM is often reinserted later
+    // (cached tabs, `<KeepAlive>`, virtualized lists), and `polyfill()` alone
+    // does not observe additions, so reinstate exactly these owners when they
+    // return. Weak references let permanently removed subtrees be collected.
+    /** @type {Set<WeakRef<HTMLElement>>} */
+    const swept = new Set();
+    const removalObserver = createMutationObserver((entries) => {
+      if (entries.some((entry) => entry.removedNodes.length)) {
+        for (const [owner, group] of elementPolyfillMap) {
+          if (!owner.isConnected) {
+            group?.disconnect();
+            elementPolyfillMap.delete(owner);
+            swept.add(new WeakRef(owner));
+          }
+        }
+      }
+      if (!swept.size || !entries.some((entry) => entry.addedNodes.length)) {
+        return;
+      }
+      const restored = [];
+      for (const ref of swept) {
+        const owner = ref.deref();
+        if (!owner) {
+          swept.delete(ref);
+        } else if (owner.isConnected) {
+          swept.delete(ref);
+          restored.push(owner);
+        }
+      }
+      // Ancestors first, matching the walker order `queueOwners()` expects.
+      const depths = new Map();
+      for (const owner of restored) {
+        let depth = 0;
+        for (
+          let ancestor = getParentElement(owner);
+          ancestor;
+          ancestor = getParentElement(ancestor)
+        ) {
+          depth++;
+        }
+        depths.set(owner, depth);
+      }
+      restored.sort((a, b) => depths.get(a) - depths.get(b));
+      queueOwners(restored);
+    });
+    removalObserver.observe(document.body, { childList: true, subtree: true });
+    state.r = removalObserver;
+  }
   if (!state.g) {
     // Observe shadow trees too: custom elements commonly render their
     // `focusgroup` element into a shadow root *after* the polyfill is
@@ -36,13 +88,6 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
             polyfill(entry.target);
           }
           continue;
-        }
-
-        for (const node of entry.removedNodes) {
-          if (elementPolyfillMap.has(node)) {
-            elementPolyfillMap.get(node)?.disconnect();
-            elementPolyfillMap.delete(node);
-          }
         }
 
         if (!state.b) {
@@ -89,9 +134,20 @@ export function polyfill(root) {
         : NodeFilter.FILTER_SKIP,
   );
 
+  const candidates = [];
   do {
-    const element = walker.currentNode;
+    candidates.push(/** @type {HTMLElement} */ (walker.currentNode));
+  } while (walker.nextNode());
+  queueOwners(candidates);
+}
 
+/**
+ * Reserves and schedules FocusGroups for `elements`, given in tree order.
+ * @param {HTMLElement[]} elements
+ */
+function queueOwners(elements) {
+  const pending = [];
+  for (const element of elements) {
     // The walker's filter never runs on its own root, so `root` has to be
     // vetted here — otherwise every element passed to `polyfill()` (including
     // the default `<body>` and every node reported by the mutation observer)
@@ -103,11 +159,7 @@ export function polyfill(root) {
       continue;
     }
 
-    const definition = parseDefinition(element);
-    if (
-      !shouldPolyfillV2(definition.behavior) &&
-      supportsFocusGroup(definition.behavior)
-    ) {
+    if (shouldDeferToNative(parseDefinition(element))) {
       continue;
     }
 
@@ -115,41 +167,101 @@ export function polyfill(root) {
     // from the global mutation observer) cannot schedule a duplicate
     // FocusGroup before the rAF callback below installs the real instance.
     elementPolyfillMap.set(element, null);
+    pending.push(element);
+  }
 
-    // Make sure the element is ready during initial polyfilling.
-    requestAnimationFrame(() => {
-      // The element may have been removed (and its slot deleted) before the
-      // rAF fired; bail out so we don't resurrect a tracking entry.
-      if (!elementPolyfillMap.has(element)) {
-        return;
+  // Descendants must establish their own tab stops before an ancestor can
+  // decide which nested boundaries to filter.
+  initQueue.push(...pending.reverse());
+  if (pending.length && !initScheduled) {
+    initScheduled = true;
+    requestAnimationFrame(initPending);
+  }
+}
+
+/** @type {HTMLElement[]} */
+let initQueue = [];
+let initScheduled = false;
+
+/**
+ * Creates every FocusGroup queued in this frame in one batch of managed
+ * writes, then reconciles each affected ancestor once. Updating ancestors
+ * per created descendant would rebuild a feed once per nested toolbar.
+ */
+function initPending() {
+  const queue = initQueue;
+  initQueue = [];
+  initScheduled = false;
+  batchWrites(() => {
+    /** @type {Map<HTMLElement, number>} */
+    const created = new Map();
+    for (const element of queue) {
+      const fg = createFocusGroup(element);
+      if (fg) {
+        created.set(element, created.size);
       }
-      const definition = parseDefinition(element);
-      const createItems = (nextDefinition) =>
-        nextDefinition.behavior === "grid"
-          ? new GridItemCollection(element, nextDefinition.manual)
-          : new TreeWalkerItemCollection(element);
-      const items = createItems(definition);
-      const fg = new FocusGroup(element, items, {
-        definition,
-        createItems,
-        onNativeTakeover: (owner) => {
-          elementPolyfillMap.delete(owner);
-        },
-        decorateOwner: (el, behavior, valid) =>
-          inferRole(
-            el,
-            behavior === "grid" && valid === false ? null : behavior,
-            "owner",
-          ),
-        decorateItem: (el, behavior) => {
-          if (behavior !== "grid") {
-            inferRole(el, behavior, "child");
-          }
-        },
-      });
-      elementPolyfillMap.set(element, fg);
-    });
-  } while (walker.nextNode());
+    }
+    // An ancestor created after its descendant already saw it.
+    const stale = new Set();
+    for (const [element, index] of created) {
+      // Walk ancestors rather than scanning every tracked owner, which would
+      // make initial polyfilling quadratic in the number of owners.
+      for (
+        let ancestor = getParentElement(element);
+        ancestor;
+        ancestor = getParentElement(ancestor)
+      ) {
+        if (
+          elementPolyfillMap.get(ancestor) &&
+          !((created.get(ancestor) ?? -1) > index)
+        ) {
+          stale.add(ancestor);
+        }
+      }
+    }
+    for (const ancestor of stale) {
+      elementPolyfillMap.get(ancestor)?.update();
+    }
+  });
+}
+
+/** @param {HTMLElement} element */
+function createFocusGroup(element) {
+  // The element may have been removed (and its slot deleted) before the
+  // rAF fired; bail out so we don't resurrect a tracking entry.
+  if (!elementPolyfillMap.has(element) || elementPolyfillMap.get(element)) {
+    return null;
+  }
+  const definition = parseDefinition(element);
+  if (shouldDeferToNative(definition)) {
+    elementPolyfillMap.delete(element);
+    return null;
+  }
+  const createItems = (nextDefinition) =>
+    nextDefinition.behavior === "grid"
+      ? new GridItemCollection(element, nextDefinition.manual)
+      : new TreeWalkerItemCollection(element, nextDefinition.itemcontrols);
+  const items = createItems(definition);
+  const fg = new FocusGroup(element, items, {
+    definition,
+    createItems,
+    onNativeTakeover: (owner) => {
+      elementPolyfillMap.delete(owner);
+    },
+    decorateOwner: (el, behavior, valid) =>
+      inferRole(
+        el,
+        behavior === "grid" && valid === false ? null : behavior,
+        "owner",
+      ),
+    decorateItem: (el, behavior) => {
+      if (behavior !== "grid") {
+        inferRole(el, behavior, "child");
+      }
+    },
+  });
+  elementPolyfillMap.set(element, fg);
+  return fg;
 }
 
 /**

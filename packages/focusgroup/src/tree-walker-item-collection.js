@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 import { BehaviorToken, DatasetName } from "./constants.js";
+import { DOMItemControls } from "./dom-item-controls.js";
 import { ObservableItemCollection } from "./observable-item-collection.js";
+import { authoredTabindex } from "./observer-registry.js";
 import {
   createMutationObserver,
   createTreeWalker,
@@ -44,6 +46,12 @@ export class TreeWalkerItemCollection {
    */
   id = generateUniqueId();
 
+  /** @type {DOMItemControls} */
+  controls;
+
+  /** @type {Set<Element>} */
+  #decorated = new Set();
+
   /**
    * First descendant with the `focusgroupstart` attribute (shadow-aware),
    * or the first item as fallback, or `null` if none exist. `FocusGroup`
@@ -72,9 +80,13 @@ export class TreeWalkerItemCollection {
 
   /**
    * @param {HTMLElement!} owner - The focus group owner element.
+   * @param {boolean} [itemcontrols=false] - Whether nested content within
+   *   an owned item should create a segment boundary.
    */
-  constructor(owner) {
+  constructor(owner, itemcontrols = false) {
     this.#owner = owner;
+    this.#itemcontrols = itemcontrols;
+    this.controls = new DOMItemControls(owner, this);
 
     this.#walker = createTreeWalker(
       document,
@@ -110,14 +122,29 @@ export class TreeWalkerItemCollection {
           "disabled",
           "href",
           "hidden",
+          "inert",
+          "slot",
+          "name",
           "tabindex",
           "type",
+          // Rendering changes can alter which item controls are eligible.
+          // Only observe these hot attributes when that filter is active.
+          ...(this.#itemcontrols ? ["class", "style"] : []),
         ],
+        attributeOldValue: true,
         childList: true,
         subtree: true,
       },
       createMutationObserver,
     );
+    if (this.#itemcontrols) {
+      this.#fullscreenController = new AbortController();
+      this.#owner.ownerDocument.addEventListener(
+        "fullscreenchange",
+        () => focusGroup.update(),
+        { signal: this.#fullscreenController.signal },
+      );
+    }
   }
 
   /**
@@ -125,22 +152,28 @@ export class TreeWalkerItemCollection {
    * registry. Called from `FocusGroup#disconnect()`; safe to call directly.
    */
   disconnect() {
+    this.#fullscreenController?.abort();
+    this.#fullscreenController = null;
     this.#observable.stopObserving();
     this.#owner = null;
     this.#walker = null;
   }
 
   /**
-   * Flushes this collection's mutation observer by calling `takeRecords()`,
-   * dropping any pending records (typically caused by polyfill-managed
-   * attribute writes during decoration). Called by `FocusGroup` after writing
-   * `tabindex`/`data-fg-*` to avoid re-entering `#handleItemsMutate`.
+   * Queues pending author records for reconciliation. Managed tabindex writes
+   * are excluded at their source rather than by discarding the whole batch.
    */
   flush() {
     this.#observable.flush();
   }
 
   #observable = new ObservableItemCollection();
+
+  /** @type {boolean} */
+  #itemcontrols = false;
+
+  /** @type {AbortController|null} */
+  #fullscreenController = null;
 
   /**
    * Discovers items in the owner subtree and writes the marker attributes
@@ -179,7 +212,14 @@ export class TreeWalkerItemCollection {
       skipSubtreeOf = null;
 
       if (this.#isNestedGroupOwner(node)) {
-        if (isSegmentor(node, this.#owner)) {
+        const containingItem = getClosestElement(
+          getParentElement(node),
+          `[${DatasetName.ITEM}="${this.id}"]`,
+        );
+        if (
+          isSegmentor(node, this.#owner) &&
+          (!this.#itemcontrols || !containingItem)
+        ) {
           pendingSegmentBoundary = true;
         }
         const isOptedOut = node
@@ -195,6 +235,7 @@ export class TreeWalkerItemCollection {
       }
 
       node.setAttribute(DatasetName.ITEM, this.id);
+      this.#decorated.add(node);
       if (pendingSegmentBoundary) {
         segment++;
         node.setAttribute(DatasetName.SEGMENT, String(segment));
@@ -227,21 +268,18 @@ export class TreeWalkerItemCollection {
 
   /**
    * Clears all marker attributes (`data-fg-item`, `data-fg-seg`,
-   * `data-fg-segs`) written by `decorate()`. Light walk over marked nodes.
+   * `data-fg-segs`) written by `decorate()`, including items that left the tree.
    */
   undecorate() {
-    // Snapshot first — clearing markers mid-walk would invalidate the
-    // walker's filter and skip subsequent nodes.
-    const marked = [];
-    this.#walker.currentNode = this.#owner;
-    while (this.#walker.nextNode()) {
-      marked.push(/** @type {HTMLElement} */ (this.#walker.currentNode));
-    }
-    for (const node of marked) {
+    for (const node of this.#decorated) {
+      if (!this.isItem(node)) {
+        continue;
+      }
       node.removeAttribute(DatasetName.ITEM);
       node.removeAttribute(DatasetName.SEGMENT);
       node.removeAttribute(DatasetName.SEGMENT_START);
     }
+    this.#decorated.clear();
   }
 
   /**
@@ -342,6 +380,16 @@ export class TreeWalkerItemCollection {
     return element.getAttribute(DatasetName.ITEM) === this.id;
   }
 
+  /** @param {Element} node */
+  itemForNode(node) {
+    for (let el = node; el && el !== this.#owner; el = getParentElement(el)) {
+      if (this.isItem(el)) {
+        return /** @type {HTMLElement} */ (el);
+      }
+    }
+    return null;
+  }
+
   /**
    * The persistent walker's filter — accepts elements decorated as items of
    * this items collection (matching `id`) and rejects nested groups whose
@@ -411,6 +459,9 @@ export class TreeWalkerItemCollection {
    * @returns {FocusGroupUpdateInfo | null}
    */
   #classify(records) {
+    if (!records.length) {
+      return {};
+    }
     const relevant = records.filter(
       (e) =>
         !(
@@ -438,8 +489,8 @@ export class TreeWalkerItemCollection {
       }
     }
 
-    /** @type {HTMLElement[]} */
-    const authorTabindexChanges = [];
+    /** @type {Map<HTMLElement, string|null>} */
+    const authorTabindexChanges = new Map();
     for (const e of relevant) {
       if (
         e.type === "attributes" &&
@@ -447,7 +498,10 @@ export class TreeWalkerItemCollection {
         e.target.hasAttribute(DatasetName.AUTHOR_TABINDEX) &&
         e.target.getAttribute(DatasetName.ITEM) === this.id
       ) {
-        authorTabindexChanges.push(/** @type {HTMLElement} */ (e.target));
+        authorTabindexChanges.set(
+          /** @type {HTMLElement} */ (e.target),
+          authoredTabindex(e),
+        );
       }
     }
 

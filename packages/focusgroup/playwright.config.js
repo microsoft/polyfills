@@ -38,26 +38,26 @@ export default defineConfig({
       name: "chromium Shadowless",
       use: { ...devices["Desktop Chrome"] },
       grepInvert: /@shadow/,
-      testMatch: "tests/*.spec.js",
+      testMatch: ["tests/*.spec.js", "src/polyfill-tests/*.spec.js"],
     },
 
     {
       name: "firefox Shadowless",
       use: { ...devices["Desktop Firefox"] },
       grepInvert: /@shadow/,
-      testMatch: "tests/*.spec.js",
+      testMatch: ["tests/*.spec.js", "src/polyfill-tests/*.spec.js"],
     },
 
     {
       name: "webkit Shadowless",
       use: { ...devices["Desktop Safari"] },
       grepInvert: /@shadow/,
-      testMatch: "tests/*.spec.js",
+      testMatch: ["tests/*.spec.js", "src/polyfill-tests/*.spec.js"],
     },
 
     {
       name: "Google Chrome Canary",
-      testMatch: "tests/*.spec.js",
+      testMatch: ["tests/*.spec.js", "src/polyfill-tests/*.spec.js"],
       use: {
         ...devices["Desktop Chrome"],
         channel: "chrome-canary",

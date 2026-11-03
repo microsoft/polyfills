@@ -12,24 +12,44 @@ The polyfill follows these principles:
 - **Updates**: Ship updates as the spec evolves so the latest version of the polyfill implements the latest version of the spec.
 - **Migration**: Make it easy to migrate to new updates if/when the spec evolves.
 
-For more information about focusgroup itself, see the [V1 explainer](https://open-ui.org/components/scoped-focusgroup.explainer/) and [V2 grid explainer](https://open-ui.org/components/focusgroup-v2.explainer/).
+For more information about focusgroup itself, see the [V1 explainer](https://open-ui.org/components/scoped-focusgroup.explainer/) and [V2 explainer](https://open-ui.org/components/focusgroup-v2.explainer/).
 
-The polyfill supports V2 `focusgroup="grid"` for rectangular native tables and
+The polyfill supports V2 `focusgroup="feed"` for block-axis navigation between
+articles and the `itemcontrols` modifier on other linear behaviors (for example,
+`focusgroup="toolbar itemcontrols"`). `feed` and
+`grid` default to `itemcontrols`; `noitemcontrols` disables either default or
+an explicit modifier. Mark individual controls with `focusgroup="none"`, or
+place a compound control in an independent nested focusgroup. Tab reaches
+controls of the focused item, while inactive items' controls are skipped;
+Shift+Tab enters a group at the item boundary. Script or pointer focus on a
+nested control activates its containing item without making a negative-`tabindex`
+control sequentially focusable.
+Generic feed items infer the `article` role; native button items retain their
+button semantics rather than receiving an invalid `article` role.
+
+The polyfill also supports `focusgroup="grid"` for rectangular native tables and
 `focusgroup="grid manual"` for generic markup whose direct-child rows carry
 `focusgrouprow`. Grid movement supports Arrow keys, Home/End, Ctrl+Home/Ctrl+End,
 and the `wrap`, `flow`, `rowwrap`, `rowflow`, `colwrap`, and `colflow` modifiers.
-The `itemcontrols` modifier is not supported yet; support is tracked separately
-in [PR #66](https://github.com/microsoft/polyfills/pull/66).
 
-### V2 (grid) compatibility
+### V2 compatibility
 
-`focusgroup="grid"` is based on an early-stage, unstable explainer/spec: the
+`feed`, `grid`, and `itemcontrols` are based on an early-stage explainer/spec: the
 attribute's shape and behaviors can still change before any browser ships a
 matching implementation. To avoid a compatibility trap where a browser ships
 a native V2 implementation that follows an older iteration of the spec than
 the one your site (and the polyfill) has moved on to, **the polyfill always
-polyfills `grid`, even when the browser reports native support for it**, until
+polyfills `feed` and `grid`, even when the browser reports native support**, until
 there's confidence the API has stabilized (e.g. once a browser ships it).
+The same applies to the `itemcontrols` and `noitemcontrols` modifiers on any
+behavior: `focusgroup="toolbar itemcontrols"` is polyfilled even when the
+browser supports both `toolbar` and `itemcontrols`.
+
+When polyfilling one of these owners in a browser that natively supports its
+V1 behavior (for example `toolbar`), the native and polyfilled behaviors both
+see the element. The polyfill handles and cancels the arrow keys it navigates
+with, but this combination has not been verified against a shipping native
+implementation yet.
 
 If you need to exercise a browser's native implementation directly — for
 example, for an origin trial, a demo site, or a test — opt back into deferring
@@ -101,9 +121,10 @@ While one of the polyfill’s principles is “correctness”, it’s still boun
     * Built-in elements that have key conflict (e.g. `<input>`): cancelling default arrow/home/end key behavior won’t enable the polyfill to add directional navigation
 * If an item’s keyboard focusability is changed by a method that doesn’t reflect on any attribute changes, polyfill will not be able to exclude the item from continuing participating the directional navigation
     * For example, a custom element (as a focusgroup item) gets disabled through a property change or other mechanism without reflecting its disabled state in a `disabled` attribute
-* After initial polyfill, visibility changes on elements that matter to the focusgroup’s behaviors will not automatically update the group’s behavior:
-    * For example, if a menu has a submenu that is initially hidden, because the submenu is hidden, it will not segment the top-level menu items. When the submenu becomes visible (e.g. hitting `ArrowRight` key on its parent menu item), it still will not segment the top-level menu items, as a result, hitting `Tab` key will not move the focus to the next top-level item, but out of the menu instead
-    * This is because the polyfill only observes changes to the child element lists and their attributes, we may add support for visibility changes in the future
+* Adding or removing items reconciles the whole group, so the cost of an append grows with the number of items already in it. For feeds with thousands of rendered articles, prefer virtualization, as the explainer's feed guidance also anticipates.
+* Visibility reconciliation observes `hidden` and `inert` changes within all owners, and `class`/`style` changes within itemcontrols owners and grids.
+    * Other linear groups do not observe `class`/`style`: revealing a nested menu through CSS alone may leave its segment boundaries unchanged until the next relevant mutation.
+    * Changes outside the observed owner, stylesheet edits, media queries, and animations do not themselves trigger reconciliation. Applications with their own collections can call `FocusGroup.update()` when such changes affect their items.
 
 ## Common patterns
 
@@ -198,6 +219,28 @@ The package exports a `FocusGroup` class that handles just directional keyboard 
 
 The minimum surface is `items()`, `first()`, `last()`, `next()`, `previous()`, and `contains()`. Optional members add support for segments, mutation observation, and a designated start item. See the per-property JSDoc and a minimal array-backed example in [`src/focusgroup-items.js`](./src/focusgroup-items.js). For a fully featured, class-based reference implementation, see `TreeWalkerItemCollection` in [`src/tree-walker-item-collection.js`](./src/tree-walker-item-collection.js).
 
+For `definition.itemcontrols: true`, supply the optional `controls` adapter:
+
+```js
+itemCollection.controls = {
+  // Sequentially eligible nested controls and their containing item boundaries.
+  items: () => controlEntries, // [{ element: button, item: article }, ...]
+  // Also resolve non-tabbable controls for pointer/script focus and memory.
+  itemForNode: (element) => controlToItem.get(element) ?? null,
+};
+```
+
+`FocusGroup` applies focus state and filtering to this model; it does not walk
+the DOM to discover controls or parse their enclosing owners. The built-in linear
+and grid collections supply a shared DOM adapter. Custom collections that do not
+use it avoid importing its tree-walking and eligibility code.
+
+When multiple bundle versions coexist, controls inside a nested owner with a
+legacy observer protocol remain unfiltered by enclosing itemcontrols owners.
+Legacy observers cannot distinguish suppression writes from authored tabindex
+changes; preserving their own navigation takes precedence over outer filtering.
+Use the same current bundle version for all owners to get full nested filtering.
+
 ### Constructing a `FocusGroup`
 
 ```js
@@ -253,6 +296,10 @@ focusGroup.update({ authorTabindexChanges: [changedItem] });
 ```
 
 If your collection has its own observation (e.g. a `MutationObserver`), it can call `focusGroup.update()` directly — `TreeWalkerItemCollection` does this.
+
+The owner-decoration hook runs after each collection rebuild and receives the
+optional `valid` property as its third argument. This keeps inferred grid roles
+in sync with changing topology, not just changes to the behavior definition.
 
 ## Testing
 

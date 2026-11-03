@@ -13,5 +13,5 @@
     "outDir": "build/types"
   },
   "include": ["src/**/*.js"],
-  "exclude": ["src/**/*.spec.js"]
+  "exclude": ["src/**/*.spec.js", "src/polyfill-tests"]
 }
