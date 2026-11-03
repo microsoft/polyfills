@@ -52,7 +52,7 @@ extends:
 
           - task: UseNode@1
             inputs:
-              version: "24.x"
+              version: "26.x"
             displayName: "Install Node.js"
 
           - script: |
