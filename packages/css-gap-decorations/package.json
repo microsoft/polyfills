@@ -1,0 +1,54 @@
+{
+  "name": "@microsoft/css-gap-decorations-polyfill",
+  "version": "0.0.0",
+  "description": "Polyfill for CSS Gap Decorations (css-gaps-1)",
+  "type": "module",
+  "main": "dist/css-gap-decorations.js",
+  "module": "dist/css-gap-decorations.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/css-gap-decorations.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./fn": {
+      "import": "./dist/css-gap-decorations-fn.js",
+      "types": "./dist/index-fn.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc && npx tsx build-iife.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:wpt": "playwright test --config wpt-runner/playwright.config.ts",
+    "test:wpt:update": "playwright test --config wpt-runner/playwright.config.ts --update-snapshots",
+    "wpt:vendor": "npx tsx wpt-runner/vendor.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "serve": "^14.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/polyfills",
+    "directory": "packages/css-gap-decorations"
+  },
+  "keywords": [
+    "css",
+    "polyfill",
+    "gap-decorations",
+    "column-rule",
+    "row-rule"
+  ]
+}
