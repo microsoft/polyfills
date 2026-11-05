@@ -1,0 +1,64 @@
+{
+  "name": "@microsoft/lightningcss-at-function",
+  "version": "0.0.1",
+  "description": "A Lightning CSS transform for statically resolvable CSS @function rules.",
+  "scripts": {
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
+    "test": "npm run build && node --test",
+    "test:ci": "node --test",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Microsoft/polyfills.git",
+    "directory": "packages/lightningcss-at-function"
+  },
+  "keywords": [
+    "css",
+    "lightningcss",
+    "lightningcss-plugin",
+    "at-function",
+    "custom-functions",
+    "polyfill"
+  ],
+  "author": "Microsoft",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./build/index.cjs",
+  "module": "./build/index.mjs",
+  "types": "./build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.mjs",
+      "require": "./build/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "build"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "css-tree": "^3.2.1"
+  },
+  "devDependencies": {
+    "@csstools/css-parser-algorithms": "^4.0.0",
+    "@csstools/css-tokenizer": "^4.0.0",
+    "@types/css-tree": "^2.3.11",
+    "@types/node": "^25.6.0",
+    "esbuild": "0.28.1",
+    "lightningcss": "^1.33.0",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "lightningcss": "^1.33.0"
+  },
+  "bugs": {
+    "url": "https://github.com/Microsoft/polyfills/issues"
+  },
+  "homepage": "https://github.com/microsoft/polyfills/tree/main/packages/lightningcss-at-function#readme"
+}
