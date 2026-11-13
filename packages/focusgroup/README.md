@@ -101,7 +101,7 @@ While one of the polyfill’s principles is “correctness”, it’s still boun
     * Built-in elements that have key conflict (e.g. `<input>`): cancelling default arrow/home/end key behavior won’t enable the polyfill to add directional navigation
 * If an item’s keyboard focusability is changed by a method that doesn’t reflect on any attribute changes, polyfill will not be able to exclude the item from continuing participating the directional navigation
     * For example, a custom element (as a focusgroup item) gets disabled through a property change or other mechanism without reflecting its disabled state in a `disabled` attribute
-* After initial polyfill, visibility changes on elements that matter to the focusgroup’s behaviors will not automatically update the group’s behavior:
+* After initial polyfill, visibility changes on elements that matter to the focusgroup’s behaviors will not automatically update the group’s behavior, except when a popover, `<dialog>` or `<details>` that contains the group is shown or hidden (the polyfill listens for its `toggle` event):
     * For example, if a menu has a submenu that is initially hidden, because the submenu is hidden, it will not segment the top-level menu items. When the submenu becomes visible (e.g. hitting `ArrowRight` key on its parent menu item), it still will not segment the top-level menu items, as a result, hitting `Tab` key will not move the focus to the next top-level item, but out of the menu instead
     * This is because the polyfill only observes changes to the child element lists and their attributes, we may add support for visibility changes in the future
 

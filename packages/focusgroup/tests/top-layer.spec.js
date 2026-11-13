@@ -719,3 +719,86 @@ test.describe("popover invoker inside focusgroup", () => {
     await expect(page.getByTestId("src_pop_first")).toBeFocused();
   });
 });
+
+// Not ported from WPT: the polyfill picks its items when it scans a group, and a popover or
+// <details> opening changes what is visible without a DOM mutation it observes.
+// https://github.com/microsoft/polyfills/issues/74
+test.describe("focusgroup hidden when polyfilled, shown later", () => {
+  test("a focusgroup that is itself a popover navigates once shown", async ({
+    page,
+  }, { project }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="menu" focusgroup="menu" popover>
+        <button data-testid="save">Save</button>
+        <button data-testid="fork">Fork</button>
+        <button data-testid="delete">Delete</button>
+      </div>`,
+    );
+
+    await page.getByTestId("menu").evaluate((el) => el.showPopover());
+
+    await page.getByTestId("save").focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("fork")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("delete")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByTestId("save")).toBeFocused();
+  });
+
+  test("a focusgroup inside a popover navigates once shown", async ({ page }, {
+    project,
+  }) => {
+    await setupPage(
+      page,
+      project,
+      `<div data-testid="pop" popover>
+        <div focusgroup="toolbar">
+          <button data-testid="a">A</button>
+          <button data-testid="b">B</button>
+        </div>
+      </div>`,
+    );
+
+    await page.getByTestId("pop").evaluate((el) => el.showPopover());
+
+    await page.getByTestId("a").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("b")).toBeFocused();
+  });
+
+  test("a focusgroup inside a closed <details> navigates once opened", async ({
+    page,
+  }, { project }) => {
+    test.fixme(
+      project.name.startsWith("chromium"),
+      "Chromium 149 does not decorate items in opened <details> content, even on a manual update()",
+    );
+    await setupPage(
+      page,
+      project,
+      `<details data-testid="details">
+        <summary>More</summary>
+        <div focusgroup="toolbar">
+          <button data-testid="a">A</button>
+          <button data-testid="b">B</button>
+        </div>
+      </details>`,
+    );
+
+    // `<details>` queues its toggle event, so let it fire as it would before a user's next key press
+    await page.getByTestId("details").evaluate(
+      (el) =>
+        new Promise((resolve) => {
+          el.addEventListener("toggle", () => resolve(), { once: true });
+          el.open = true;
+        }),
+    );
+
+    await page.getByTestId("a").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("b")).toBeFocused();
+  });
+});
