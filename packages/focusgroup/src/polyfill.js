@@ -7,6 +7,7 @@ import { GridItemCollection } from "./grid-item-collection.js";
 import {
   createMutationObserver,
   createTreeWalker,
+  nodeContains,
 } from "./shadow-utils/index.js";
 import { TreeWalkerItemCollection } from "./tree-walker-item-collection.js";
 import {
@@ -63,6 +64,23 @@ if (hasDocument() && typeof MutationObserver !== "undefined") {
       subtree: true,
     });
     state.g = observer;
+
+    // Opening a popover, `<dialog>` or `<details>` makes the groups inside it
+    // visible without any mutation the observers above can see, so a group
+    // polyfilled while hidden would otherwise never get its items. Groups
+    // around the toggled element are left alone: they exclude top-layer
+    // content. `toggle` doesn't bubble; a capturing listener sees every one.
+    document.addEventListener(
+      "toggle",
+      (event) => {
+        for (const [owner, focusGroup] of elementPolyfillMap) {
+          if (focusGroup && nodeContains(event.target, owner)) {
+            focusGroup.update();
+          }
+        }
+      },
+      { capture: true },
+    );
   }
 }
 

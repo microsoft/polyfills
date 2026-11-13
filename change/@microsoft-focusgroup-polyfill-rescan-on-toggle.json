@@ -1,0 +1,7 @@
+{
+  "type": "patch",
+  "comment": "Rescan focusgroups inside a popover, dialog or details when it is shown",
+  "packageName": "@microsoft/focusgroup-polyfill",
+  "email": "johanroed@gmail.com",
+  "dependentChangeType": "none"
+}
